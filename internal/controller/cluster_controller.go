@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -29,9 +30,8 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/giantswarm/teleport-operator/pkg/teleportclient"
+	"github.com/giantswarm/teleport-operator/internal/pkg/teleportclient"
 
-	"github.com/gravitational/teleport/api/client"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
@@ -59,6 +59,11 @@ type ClusterReconciler struct {
 func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("cluster", req.NamespacedName)
 
+	if _, err := r.TeleportClient.GetClient(ctx); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to get Teleport client: %w", err)
+	}
+	log.Info("Teleport client connected")
+
 	cluster := &capi.Cluster{}
 	if err := r.Client.Get(ctx, req.NamespacedName, cluster); err != nil {
 		if apierrors.IsNotFound(err) {
@@ -68,20 +73,13 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
-	log.Info("Found cluster")
-
-	// Skip if teleport secret already exists for the cluster
 	secretName := "teleport-kube-agent-join-token"
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
 			Namespace: cluster.Namespace,
 		},
-		StringData: map[string]string{
-			"joinToken": "join-token-here",
-		},
 	}
-
 	secretNamespacedName := types.NamespacedName{
 		Name:      secretName,
 		Namespace: cluster.Namespace,
@@ -92,10 +90,14 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if apierrors.IsNotFound(err) {
 			log.Info(fmt.Sprintf("Secret does not exist: %s", secretName))
 			// Generate token from Teleport
-
 			// Here you can add the code to create the Secret
+			joinToken, err := r.TeleportClient.GetToken(ctx, cluster.Name)
+			if err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to generate join token: %w", err)
+			}
+			log.Info("Join token generated")
 			secret.StringData = map[string]string{
-				"joinToken": "short-lived-join-token-goes-here",
+				"joinToken": joinToken,
 			}
 			if err := r.Create(ctx, secret); err != nil {
 				return ctrl.Result{}, fmt.Errorf("failed to create Secret: %w", err)
@@ -107,11 +109,34 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return ctrl.Result{}, fmt.Errorf("failed to get Secret: %w", err)
 		}
 	} else {
-		log.Info(fmt.Sprintf("Secret exists: %s. Cluster will be ignored", secretName))
+		log.Info(fmt.Sprintf("Secret exists: %s", secretName))
+		// Update secret if token expired or is expiring
+		hasExpired, err := r.TeleportClient.HasTokenExpired(ctx, cluster.Name)
+		if err != nil {
+			return ctrl.Result{}, fmt.Errorf("failed to verify token expiry: %w", err)
+		}
+		if hasExpired {
+			log.Info("Join token expired")
+			joinToken, err := r.TeleportClient.GetToken(ctx, cluster.Name)
+			if err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to generate teleport token: %w", err)
+			}
+			log.Info("Join token generated")
+			secret.StringData = map[string]string{
+				"joinToken": joinToken,
+			}
+			if err := r.Update(ctx, secret); err != nil {
+				return ctrl.Result{}, fmt.Errorf("failed to update Secret: %w", err)
+			} else {
+				log.Info(fmt.Sprintf("Secret updated: %s", secretName))
+			}
+		} else {
+			log.Info("Join token is valid, nothing to do.")
+		}
 	}
 
 	// Here you can add the code to handle the case where the Secret exists
-	return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
