@@ -31,9 +31,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+
 	"github.com/giantswarm/teleport-operator/internal/controller"
 	"github.com/giantswarm/teleport-operator/internal/pkg/teleportclient"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	//+kubebuilder:scaffold:imports
 )
 
