@@ -31,24 +31,12 @@ spec:
       containers:
       - name: {{ .Chart.Name }}
         image: "{{ .Values.registry.domain }}/{{ .Values.image.name }}:{{ .Values.image.tag }}"
-        env:
-        - name: AWS_SHARED_CREDENTIALS_FILE
-          value: /home/.aws/credentials
         args:
-        - "--installation={{ .Values.installation.name }}"
-        - "--capa={{ .Values.capa }}"
-        - "--legacy={{ .Values.legacy }}"
+        - "--namespace={{ include "resource.default.namespace"  . }}"
         securityContext:
           {{- with .Values.securityContext }}
             {{- . | toYaml | nindent 10 }}
           {{- end }}
         resources:
           {{- toYaml .Values.resources | nindent 10 }}
-        volumeMounts:
-        - mountPath: /home/.aws
-          name: credentials
       terminationGracePeriodSeconds: 10
-      volumes:
-      - name: credentials
-        secret:
-          secretName: {{ include "resource.default.name" . }}-aws-credentials

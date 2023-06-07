@@ -2,23 +2,6 @@
     "$schema": "http://json-schema.org/schema#",
     "type": "object",
     "properties": {
-        "aws": {
-            "type": "object",
-            "properties": {
-                "accessKeyID": {
-                    "type": "string"
-                },
-                "region": {
-                    "type": "string"
-                },
-                "secretAccessKey": {
-                    "type": "string"
-                }
-            }
-        },
-        "capa": {
-            "type": "boolean"
-        },
         "image": {
             "type": "object",
             "properties": {
@@ -29,17 +12,6 @@
                     "type": "string"
                 }
             }
-        },
-        "installation": {
-            "type": "object",
-            "properties": {
-                "name": {
-                    "type": "string"
-                }
-            }
-        },
-        "legacy": {
-            "type": "boolean"
         },
         "pod": {
             "type": "object",

@@ -1,19 +1,8 @@
-aws:
-  accessKeyID: accesskey
-  secretAccessKey: secretkey
-  region: region
-
-capa: false
-legacy: true
-
-installation:
-  name: name
-
 project:
   branch: "[[ .Branch ]]"
   commit: "[[ .SHA ]]"
 image:
-  name: "giantswarm/irsa-operator"
+  name: "giantswarm/teleport-operator"
   tag: "[[ .Version ]]"
 registry:
   domain: docker.io
