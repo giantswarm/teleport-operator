@@ -5,7 +5,7 @@ go 1.19
 require (
 	github.com/giantswarm/microerror v0.4.0
 	github.com/go-logr/logr v1.2.4
-	github.com/gravitational/teleport/api v0.0.0-20230606022908-5e60f9001626
+	github.com/gravitational/teleport/api v0.0.0-20230607072028-2f3f42ef14ad
 	github.com/onsi/ginkgo/v2 v2.9.2
 	github.com/onsi/gomega v1.27.5
 	k8s.io/api v0.26.1
