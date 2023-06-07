@@ -73,7 +73,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
-	secretName := "teleport-kube-agent-join-token"
+	secretName := "teleport-kube-agent-join-token" //#nosec G101
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
