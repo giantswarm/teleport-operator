@@ -38,18 +38,6 @@ workflows:
           filters:
             tags:
               only: /^v.*/
-      - architect/push-to-docker:
-          context: "architect"
-          name: push-teleport-operator-to-aliyun
-          image: "giantswarm-registry.cn-shanghai.cr.aliyuncs.com/giantswarm/teleport-operator"
-          username_envar: "ALIYUN_USERNAME"
-          password_envar: "ALIYUN_PASSWORD"
-          requires:
-            - go-build
-          # Needed to trigger job also on git tag.
-          filters:
-            tags:
-              only: /^v.*/
 
       - architect/push-to-app-catalog:
           context: "architect"
@@ -75,7 +63,6 @@ workflows:
           requires:
             - push-teleport-operator-to-quay
             - push-teleport-operator-to-docker
-            - push-teleport-operator-to-aliyun
             - push-teleport-operator-to-app-catalog
           filters:
             branches:
