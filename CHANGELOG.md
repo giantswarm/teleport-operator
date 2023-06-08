@@ -9,7 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Helm chart for operator
+- 
 ### Fixed
-- CircleCI config
+- Fix CircleCI config
 
 [Unreleased]: https://github.com/giantswarm/teleport-operator/tree/main
