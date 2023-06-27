@@ -31,6 +31,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/giantswarm/microerror"
+
 	"github.com/giantswarm/teleport-operator/internal/pkg/teleportclient"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
