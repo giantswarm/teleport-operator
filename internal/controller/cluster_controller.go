@@ -30,6 +30,7 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/giantswarm/microerror"
 	"github.com/giantswarm/teleport-operator/internal/pkg/teleportclient"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -135,6 +136,17 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
+	// Management cluster
+	{
+		clusterName := fmt.Sprintf("%s-mc", r.TeleportClient.ManagementClusterName)
+		namespace := "giantswarm"
+
+		err := r.ensureClusterRegistered(ctx, log, clusterName, namespace, true)
+		if err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
+		}
+	}
+
 	// Here you can add the code to handle the case where the Secret exists
 	return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
 }
@@ -145,4 +157,33 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		// Uncomment the following line adding a pointer to an instance of the controlled resource as an argument
 		For(&capi.Cluster{}).
 		Complete(r)
+}
+
+func (r *ClusterReconciler) ensureClusterRegistered(ctx context.Context, logger logr.Logger, clusterName string, namespace string, mc bool) error {
+	logger.Info("Checking if cluster is already registered in teleport")
+
+	exists, err := r.TeleportClient.ClusterExists(ctx, clusterName)
+	if err != nil {
+		return microerror.Mask(err)
+	}
+
+	if !exists {
+		logger.Info("cluster did not exist in teleport")
+
+		// token, err := r.TeleportClient.GetToken(ctx, clusterName)
+		// if err != nil {
+		// 	return microerror.Mask(err)
+		// }
+
+		// logger.Info("installing teleport agent app in cluster")
+
+		// err = r.TeleportApp.EnsureApp(ctx, namespace, clusterName, token, mc)
+		// if err != nil {
+		// 	return microerror.Mask(err)
+		// }
+
+		// logger.Info("installed teleport agent app in cluster")
+	}
+
+	return nil
 }

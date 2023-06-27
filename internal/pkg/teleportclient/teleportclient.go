@@ -15,8 +15,9 @@ import (
 )
 
 type TeleportClient struct {
-	ProxyAddr    string
-	IdentityFile string
+	ProxyAddr             string
+	IdentityFile          string
+	ManagementClusterName string
 }
 
 const TELEPORT_JOIN_TOKEN_VALIDITY = 1 * time.Hour
@@ -48,15 +49,18 @@ func New(namespace string) (*TeleportClient, error) {
 
 	proxyAddrBytes, proxyAddrOk := secret.Data["proxyAddr"]
 	identityFileBytes, identityFileOk := secret.Data["identityFile"]
-	if !proxyAddrOk && !identityFileOk {
-		return nil, fmt.Errorf("malformed Secret: `identityFile` or `proxyAddr` key not found")
+	managementClusterNameBytes, managementClusterNameOk := secret.Data["managementClusterName"]
+	if !proxyAddrOk && !identityFileOk && !managementClusterNameOk {
+		return nil, fmt.Errorf("malformed Secret: `identityFile` or `proxyAddr` or `managementClusterName` key not found")
 	}
 	identityFile := string(identityFileBytes)
 	proxyAddr := string(proxyAddrBytes)
+	managementClusterName := string(managementClusterNameBytes)
 
 	return &TeleportClient{
-		IdentityFile: identityFile,
-		ProxyAddr:    proxyAddr,
+		IdentityFile:          identityFile,
+		ProxyAddr:             proxyAddr,
+		ManagementClusterName: managementClusterName,
 	}, nil
 }
 
@@ -150,4 +154,22 @@ func (t *TeleportClient) HasTokenExpired(ctx context.Context, clusterName string
 		}
 		return true, nil
 	}
+}
+
+func (t *TeleportClient) ClusterExists(ctx context.Context, clusterName string) (bool, error) {
+	c, err := t.GetClient(ctx)
+	if err != nil {
+		return false, microerror.Mask(err)
+	}
+
+	cluster, err := c.GetKubernetesCluster(ctx, clusterName)
+	if err != nil {
+		return false, microerror.Mask(err)
+	}
+
+	if cluster.GetName() == clusterName {
+		return true, nil
+	}
+
+	return false, nil
 }
