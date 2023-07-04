@@ -12,6 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Helm chart for operator
+- Teleport kube-agent-app installation for MC/WC
 
 ### Fixed
 - Fix CircleCI config
