@@ -19,8 +19,8 @@ package controller
 import (
 	"context"
 	"fmt"
-	"time"
 
+	"github.com/giantswarm/microerror"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -30,11 +30,11 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
-	"github.com/giantswarm/microerror"
-
+	"github.com/giantswarm/teleport-operator/internal/pkg/teleportapp"
 	"github.com/giantswarm/teleport-operator/internal/pkg/teleportclient"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 // ClusterReconciler reconciles a Cluster object
@@ -43,7 +43,10 @@ type ClusterReconciler struct {
 	Log            logr.Logger
 	Scheme         *runtime.Scheme
 	TeleportClient *teleportclient.TeleportClient
+	TeleportApp    *teleportapp.TeleportApp
 }
+
+const finalizerName string = "teleport.finalizer.giantswarm.io"
 
 //+kubebuilder:rbac:groups=cluster.x-k8s.io.giantswarm.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=cluster.x-k8s.io.giantswarm.io,resources=clusters/status,verbs=get;update;patch
@@ -61,11 +64,6 @@ type ClusterReconciler struct {
 func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("cluster", req.NamespacedName)
 
-	if _, err := r.TeleportClient.GetClient(ctx); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to get Teleport client: %w", err)
-	}
-	log.Info("Teleport client connected")
-
 	cluster := &capi.Cluster{}
 	if err := r.Client.Get(ctx, req.NamespacedName, cluster); err != nil {
 		if apierrors.IsNotFound(err) {
@@ -74,6 +72,33 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 		return ctrl.Result{}, err
 	}
+
+	if !cluster.DeletionTimestamp.IsZero() {
+		if containsString(cluster.GetFinalizers(), finalizerName) {
+			clusterName := cluster.Name
+			if clusterName != r.TeleportClient.ManagementClusterName {
+				clusterName = fmt.Sprintf("%s-%s", r.TeleportClient.ManagementClusterName, clusterName)
+			}
+
+			err := r.ensureClusterDeregistered(ctx, log, clusterName)
+			if err != nil {
+				return ctrl.Result{}, microerror.Mask(err)
+			}
+
+			// Remove the finalizer
+			controllerutil.RemoveFinalizer(cluster, finalizerName)
+			// Remember to update the cluster
+			if err := r.Update(context.Background(), cluster); err != nil {
+				return ctrl.Result{}, microerror.Mask(err)
+			}
+		}
+		return ctrl.Result{}, nil
+	}
+
+	if _, err := r.TeleportClient.GetClient(ctx); err != nil {
+		return ctrl.Result{}, fmt.Errorf("failed to get Teleport client: %w", err)
+	}
+	log.Info("Teleport client connected")
 
 	secretName := "teleport-kube-agent-join-token" //#nosec G101
 	secret := &corev1.Secret{
@@ -137,54 +162,102 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
-	// Management cluster
-	{
-		clusterName := fmt.Sprintf("%s-mc", r.TeleportClient.ManagementClusterName)
-		namespace := "giantswarm"
+	// Register teleport for MC/WC cluster
+	clusterName := cluster.Name
+	namespace := "giantswarm"
 
-		err := r.ensureClusterRegistered(ctx, log, clusterName, namespace, true)
-		if err != nil {
+	mc := true
+	if clusterName != r.TeleportClient.ManagementClusterName {
+		namespace = cluster.Namespace
+		mc = false
+	}
+
+	if err := r.ensureClusterRegistered(ctx, log, clusterName, r.TeleportClient.ManagementClusterName, namespace, mc); err != nil {
+		return ctrl.Result{}, microerror.Mask(err)
+	}
+
+	if !containsString(cluster.GetFinalizers(), finalizerName) {
+		controllerutil.AddFinalizer(cluster, finalizerName)
+		if err := r.Update(context.Background(), cluster); err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
 	}
 
 	// Here you can add the code to handle the case where the Secret exists
-	return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
+	return ctrl.Result{}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
-		// Uncomment the following line adding a pointer to an instance of the controlled resource as an argument
 		For(&capi.Cluster{}).
 		Complete(r)
 }
 
-func (r *ClusterReconciler) ensureClusterRegistered(ctx context.Context, logger logr.Logger, clusterName string, namespace string, mc bool) error {
-	logger.Info("Checking if cluster is already registered in teleport")
+func (r *ClusterReconciler) ensureClusterRegistered(ctx context.Context, log logr.Logger, clusterName string, managementClusterName string, namespace string, mc bool) error {
+	log.Info("Checking if cluster is already registered in teleport")
 
-	exists, err := r.TeleportClient.ClusterExists(ctx, clusterName)
+	_clusterName := clusterName
+	if !mc {
+		_clusterName = fmt.Sprintf("%s-%s", r.TeleportClient.ManagementClusterName, clusterName)
+	}
+	exists, _, err := r.TeleportClient.ClusterExists(ctx, _clusterName)
 	if err != nil {
 		return microerror.Mask(err)
 	}
 
 	if !exists {
-		logger.Info("cluster did not exist in teleport")
+		log.Info("Cluster does not exists in teleport")
 
-		// token, err := r.TeleportClient.GetToken(ctx, clusterName)
-		// if err != nil {
-		// 	return microerror.Mask(err)
-		// }
+		joinToken, err := r.TeleportClient.GetToken(ctx, _clusterName)
+		if err != nil {
+			return fmt.Errorf("Failed to generate join token: %w", err)
+		}
 
-		// logger.Info("installing teleport agent app in cluster")
+		log.Info("Installing teleport kube agent app in cluster")
 
-		// err = r.TeleportApp.EnsureApp(ctx, namespace, clusterName, token, mc)
-		// if err != nil {
-		// 	return microerror.Mask(err)
-		// }
+		err = r.TeleportApp.EnsureApp(ctx, namespace, clusterName, managementClusterName, joinToken, mc)
+		if err != nil {
+			return microerror.Mask(err)
+		}
 
-		// logger.Info("installed teleport agent app in cluster")
+		log.Info("Installed teleport kube agent app in cluster")
+		log.Info("Cluster registered in teleport")
+	} else {
+		log.Info("Cluster exists in teleport")
 	}
 
 	return nil
+}
+
+func (r *ClusterReconciler) ensureClusterDeregistered(ctx context.Context, log logr.Logger, clusterName string) error {
+	log.Info("Checking if cluster is registered in teleport")
+
+	exists, ks, err := r.TeleportClient.ClusterExists(ctx, clusterName)
+	if err != nil {
+		return microerror.Mask(err)
+	}
+
+	if !exists {
+		log.Info("Cluster does not exists in teleport")
+		return nil
+	}
+
+	log.Info("De-registering teleport kube agent app in cluster")
+
+	if err := r.TeleportClient.DeregisterCluster(ctx, ks); err != nil {
+		return microerror.Mask(err)
+	}
+	log.Info("Cluster de-registered from teleport")
+
+	return nil
+}
+
+func containsString(slice []string, s string) bool {
+	for _, item := range slice {
+		if item == s {
+			return true
+		}
+	}
+	return false
 }

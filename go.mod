@@ -3,6 +3,9 @@ module github.com/giantswarm/teleport-operator
 go 1.19
 
 require (
+	github.com/giantswarm/apiextensions-application v0.6.0
+	github.com/giantswarm/k8smetadata v0.21.0
+	github.com/giantswarm/kubectl-gs v1.60.0
 	github.com/giantswarm/microerror v0.4.0
 	github.com/go-logr/logr v1.2.4
 	github.com/gravitational/teleport/api v0.0.0-20230607072028-2f3f42ef14ad
@@ -51,7 +54,7 @@ require (
 	github.com/google/gnostic v0.5.7-v3refs // indirect
 	github.com/google/go-cmp v0.5.9 // indirect
 	github.com/google/gofuzz v1.2.0 // indirect
-	github.com/google/pprof v0.0.0-20210407192527-94a9f03dee38 // indirect
+	github.com/google/pprof v0.0.0-20210720184732-4bb14d4b1be1 // indirect
 	github.com/google/uuid v1.3.0 // indirect
 	github.com/gravitational/trace v1.2.1 // indirect
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.7.0 // indirect

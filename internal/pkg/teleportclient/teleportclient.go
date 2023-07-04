@@ -17,7 +17,11 @@ import (
 type TeleportClient struct {
 	ProxyAddr             string
 	IdentityFile          string
+	TeleportVersion       string
 	ManagementClusterName string
+	AppName               string
+	AppVersion            string
+	AppCatalog            string
 }
 
 const TELEPORT_JOIN_TOKEN_VALIDITY = 1 * time.Hour
@@ -50,17 +54,29 @@ func New(namespace string) (*TeleportClient, error) {
 	proxyAddrBytes, proxyAddrOk := secret.Data["proxyAddr"]
 	identityFileBytes, identityFileOk := secret.Data["identityFile"]
 	managementClusterNameBytes, managementClusterNameOk := secret.Data["managementClusterName"]
-	if !proxyAddrOk && !identityFileOk && !managementClusterNameOk {
-		return nil, fmt.Errorf("malformed Secret: `identityFile` or `proxyAddr` or `managementClusterName` key not found")
+	teleportVersionBytes, teleportVersionOk := secret.Data["teleportVersion"]
+	appNameBytes, appNameOk := secret.Data["appName"]
+	appVersionBytes, appVersionOk := secret.Data["appVersion"]
+	appCatalogBytes, appCatalogOk := secret.Data["appCatalog"]
+	if !proxyAddrOk && !identityFileOk && !managementClusterNameOk && !teleportVersionOk && appNameOk && appVersionOk && appCatalogOk {
+		return nil, fmt.Errorf("malformed Secret: required keys not found")
 	}
 	identityFile := string(identityFileBytes)
 	proxyAddr := string(proxyAddrBytes)
 	managementClusterName := string(managementClusterNameBytes)
+	teleportVersion := string(teleportVersionBytes)
+	appName := string(appNameBytes)
+	appVersion := string(appVersionBytes)
+	appCatalog := string(appCatalogBytes)
 
 	return &TeleportClient{
 		IdentityFile:          identityFile,
 		ProxyAddr:             proxyAddr,
 		ManagementClusterName: managementClusterName,
+		TeleportVersion:       teleportVersion,
+		AppName:               appName,
+		AppVersion:            appVersion,
+		AppCatalog:            appCatalog,
 	}, nil
 }
 
@@ -156,20 +172,35 @@ func (t *TeleportClient) HasTokenExpired(ctx context.Context, clusterName string
 	}
 }
 
-func (t *TeleportClient) ClusterExists(ctx context.Context, clusterName string) (bool, error) {
+func (t *TeleportClient) ClusterExists(ctx context.Context, clusterName string) (bool, tt.KubeServer, error) {
 	c, err := t.GetClient(ctx)
 	if err != nil {
-		return false, microerror.Mask(err)
+		return false, nil, microerror.Mask(err)
 	}
 
-	cluster, err := c.GetKubernetesCluster(ctx, clusterName)
+	ks, err := c.GetKubernetesServers(ctx)
 	if err != nil {
-		return false, microerror.Mask(err)
+		return false, nil, microerror.Mask(err)
 	}
 
-	if cluster.GetName() == clusterName {
-		return true, nil
+	for _, k := range ks {
+		if k.GetCluster().GetName() == clusterName {
+			return true, k, nil
+		}
 	}
 
-	return false, nil
+	return false, nil, nil
+}
+
+func (t *TeleportClient) DeregisterCluster(ctx context.Context, ks tt.KubeServer) error {
+	c, err := t.GetClient(ctx)
+	if err != nil {
+		return microerror.Mask(err)
+	}
+
+	if err := c.DeleteKubernetesServer(ctx, ks.GetHostID(), ks.GetCluster().GetName()); err != nil {
+		return microerror.Mask(err)
+	}
+
+	return nil
 }

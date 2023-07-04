@@ -23,6 +23,8 @@ import (
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 
+	appv1alpha1 "github.com/giantswarm/apiextensions-application/api/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -34,6 +36,7 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 
 	"github.com/giantswarm/teleport-operator/internal/controller"
+	"github.com/giantswarm/teleport-operator/internal/pkg/teleportapp"
 	"github.com/giantswarm/teleport-operator/internal/pkg/teleportclient"
 	//+kubebuilder:scaffold:imports
 )
@@ -46,6 +49,9 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(capi.AddToScheme(scheme))
+	_ = appv1alpha1.AddToScheme(scheme)
+	_ = capi.AddToScheme(scheme)
+	_ = corev1.AddToScheme(scheme)
 
 	//+kubebuilder:scaffold:scheme
 }
@@ -99,11 +105,26 @@ func main() {
 		os.Exit(1)
 	}
 
+	teleportApp, err := teleportapp.New(teleportapp.Config{
+		CtrlClient:        mgr.GetClient(),
+		Logger:            ctrl.Log.WithName("teleportapp"),
+		TeleportProxyAddr: teleportClient.ProxyAddr,
+		TeleportVersion:   teleportClient.TeleportVersion,
+		AppName:           teleportClient.AppName,
+		AppVersion:        teleportClient.AppVersion,
+		AppCatalog:        teleportClient.AppCatalog,
+	})
+	if err != nil {
+		setupLog.Error(err, "unable to create teleport app helper")
+		os.Exit(1)
+	}
+
 	if err = (&controller.ClusterReconciler{
 		Client:         mgr.GetClient(),
 		Log:            ctrl.Log.WithName("controllers").WithName("Cluster"),
 		Scheme:         mgr.GetScheme(),
 		TeleportClient: teleportClient,
+		TeleportApp:    teleportApp,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 		os.Exit(1)
