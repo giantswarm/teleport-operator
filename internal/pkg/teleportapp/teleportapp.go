@@ -83,7 +83,7 @@ kubeClusterName: "%s"
 `
 
 	kubeClusterName := clusterName
-	if mc == false {
+	if !mc {
 		kubeClusterName = fmt.Sprintf("%s-%s", managementClusterName, clusterName)
 	}
 
@@ -151,7 +151,7 @@ func (t *TeleportApp) ensureApp(ctx context.Context, appNamespace string, cluste
 		InCluster: mc,
 	}
 
-	if mc == false {
+	if !mc {
 		appSpecKubeConfig.Context = appv1alpha1.AppSpecKubeConfigContext{
 			Name: fmt.Sprintf("%s-%s", managementClusterName, clusterName),
 		}
@@ -189,7 +189,7 @@ func (t *TeleportApp) ensureApp(ctx context.Context, appNamespace string, cluste
 		Spec: appSpec,
 	}
 
-	if mc == true {
+	if mc {
 		desiredApp.Labels[label.AppOperatorVersion] = "0.0.0"
 	}
 
