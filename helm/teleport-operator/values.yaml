@@ -25,13 +25,13 @@ resources:
 podSecurityContext:
   seccompProfile:
     type: RuntimeDefault
-
-# Add seccomp to container security context
-securityContext:
-  seccompProfile:
-    type: RuntimeDefault
   allowPrivilegeEscalation: false
   runAsNonRoot: true
   capabilities:
     drop:
       - ALL
+
+# Add seccomp to container security context
+securityContext:
+  seccompProfile:
+    type: RuntimeDefault
