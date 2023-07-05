@@ -100,7 +100,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 	log.Info("Teleport client connected")
 
-	secretName := "teleport-kube-agent-join-token" //#nosec G101
+	secretName := fmt.Sprintf("%s-teleport-join-token", cluster.Name) //#nosec G101
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,

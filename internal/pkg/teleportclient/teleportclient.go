@@ -103,6 +103,11 @@ func (t *TeleportClient) GetClient(ctx context.Context) (*tc.Client, error) {
 }
 
 func (t *TeleportClient) GetToken(ctx context.Context, clusterName string) (string, error) {
+	_clusterName := t.ManagementClusterName
+	if clusterName != t.ManagementClusterName {
+		_clusterName = fmt.Sprintf("%s-%s", t.ManagementClusterName, clusterName)
+	}
+
 	clt, err := t.GetClient(ctx)
 	if err != nil {
 		return "", microerror.Mask(err)
@@ -116,7 +121,7 @@ func (t *TeleportClient) GetToken(ctx context.Context, clusterName string) (stri
 		}
 
 		for _, t := range tokens {
-			if t.GetMetadata().Labels["cluster"] == clusterName {
+			if t.GetMetadata().Labels["cluster"] == _clusterName {
 				err = clt.DeleteToken(ctx, t.GetName())
 				if err != nil {
 					return "", microerror.Mask(err)
@@ -135,7 +140,7 @@ func (t *TeleportClient) GetToken(ctx context.Context, clusterName string) (stri
 		}
 		oldMeta := newToken.GetMetadata()
 		oldMeta.Labels = map[string]string{
-			"cluster": clusterName,
+			"cluster": _clusterName,
 		}
 		newToken.SetMetadata(oldMeta)
 		err = clt.UpsertToken(ctx, newToken)
@@ -148,6 +153,11 @@ func (t *TeleportClient) GetToken(ctx context.Context, clusterName string) (stri
 }
 
 func (t *TeleportClient) HasTokenExpired(ctx context.Context, clusterName string) (bool, error) {
+	_clusterName := t.ManagementClusterName
+	if clusterName != t.ManagementClusterName {
+		_clusterName = fmt.Sprintf("%s-%s", t.ManagementClusterName, clusterName)
+	}
+
 	clt, err := t.GetClient(ctx)
 	if err != nil {
 		return false, microerror.Mask(err)
@@ -160,7 +170,7 @@ func (t *TeleportClient) HasTokenExpired(ctx context.Context, clusterName string
 		}
 
 		for _, t := range tokens {
-			if t.GetMetadata().Labels["cluster"] == clusterName {
+			if t.GetMetadata().Labels["cluster"] == _clusterName {
 				// Nearing expiry, less than an hour, refresh it
 				// if time.Since(*t.GetMetadata().Expires).Hours() < -1 {
 				// 	return true, nil
