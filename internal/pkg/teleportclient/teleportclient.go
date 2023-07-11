@@ -24,7 +24,7 @@ type TeleportClient struct {
 	AppCatalog            string
 }
 
-const TELEPORT_JOIN_TOKEN_VALIDITY = 1 * time.Hour
+const TELEPORT_JOIN_TOKEN_VALIDITY = 24 * time.Hour
 
 func New(namespace string) (*TeleportClient, error) {
 	// Get a config to talk to the apiserver
