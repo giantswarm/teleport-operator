@@ -102,18 +102,13 @@ func (t *TeleportClient) GetClient(ctx context.Context) (*tc.Client, error) {
 	return c, nil
 }
 
-func (t *TeleportClient) GetToken(ctx context.Context, clusterName string) (string, error) {
-	_clusterName := t.ManagementClusterName
-	if clusterName != t.ManagementClusterName {
-		_clusterName = fmt.Sprintf("%s-%s", t.ManagementClusterName, clusterName)
-	}
-
+func (t *TeleportClient) GetToken(ctx context.Context) (string, error) {
 	clt, err := t.GetClient(ctx)
 	if err != nil {
 		return "", microerror.Mask(err)
 	}
 
-	// Look for an existing token or generate one
+	// Look for an existing token or generate one if it's expired
 	{
 		tokens, err := clt.GetTokens(ctx)
 		if err != nil {
@@ -121,18 +116,13 @@ func (t *TeleportClient) GetToken(ctx context.Context, clusterName string) (stri
 		}
 
 		for _, t := range tokens {
-			if t.GetMetadata().Labels["cluster"] == _clusterName {
-				err = clt.DeleteToken(ctx, t.GetName())
-				if err != nil {
-					return "", microerror.Mask(err)
-				}
-				break
+			if t.GetMetadata().Labels["operator"] == "teleport-operator" {
+				return t.GetName(), nil
 			}
 		}
 
 		// Generate a token
 		expiration := time.Now().Add(TELEPORT_JOIN_TOKEN_VALIDITY)
-
 		token := randSeq(32)
 		newToken, err := tt.NewProvisionToken(token, []tt.SystemRole{tt.RoleKube, tt.RoleNode}, expiration)
 		if err != nil {
@@ -140,7 +130,7 @@ func (t *TeleportClient) GetToken(ctx context.Context, clusterName string) (stri
 		}
 		oldMeta := newToken.GetMetadata()
 		oldMeta.Labels = map[string]string{
-			"cluster": _clusterName,
+			"operator": "teleport-operator",
 		}
 		newToken.SetMetadata(oldMeta)
 		err = clt.UpsertToken(ctx, newToken)
@@ -152,12 +142,7 @@ func (t *TeleportClient) GetToken(ctx context.Context, clusterName string) (stri
 	}
 }
 
-func (t *TeleportClient) HasTokenExpired(ctx context.Context, clusterName string) (bool, error) {
-	_clusterName := t.ManagementClusterName
-	if clusterName != t.ManagementClusterName {
-		_clusterName = fmt.Sprintf("%s-%s", t.ManagementClusterName, clusterName)
-	}
-
+func (t *TeleportClient) IsTokenValid(ctx context.Context, oldToken string) (bool, error) {
 	clt, err := t.GetClient(ctx)
 	if err != nil {
 		return false, microerror.Mask(err)
@@ -170,19 +155,18 @@ func (t *TeleportClient) HasTokenExpired(ctx context.Context, clusterName string
 		}
 
 		for _, t := range tokens {
-			if t.GetMetadata().Labels["cluster"] == _clusterName {
-				// Nearing expiry, less than an hour, refresh it
-				// if time.Since(*t.GetMetadata().Expires).Hours() < -1 {
-				// 	return true, nil
-				// }
+			if t.GetMetadata().Labels["operator"] == "teleport-operator" {
+				if t.GetName() == oldToken {
+					return true, nil
+				}
 				return false, nil
 			}
 		}
-		return true, nil
+		return false, nil
 	}
 }
 
-func (t *TeleportClient) ClusterExists(ctx context.Context, clusterName string) (bool, tt.KubeServer, error) {
+func (t *TeleportClient) IsClusterRegistered(ctx context.Context, clusterName string) (bool, tt.KubeServer, error) {
 	c, err := t.GetClient(ctx)
 	if err != nil {
 		return false, nil, microerror.Mask(err)

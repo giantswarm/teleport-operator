@@ -19,6 +19,7 @@ package controller
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/giantswarm/microerror"
 	"github.com/go-logr/logr"
@@ -30,6 +31,7 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 	"github.com/giantswarm/teleport-operator/internal/pkg/teleportapp"
 	"github.com/giantswarm/teleport-operator/internal/pkg/teleportclient"
 
@@ -73,118 +75,23 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
+	// Check if the cluster instance is marked to be deleted, which is indicated by the deletion timestamp being set.
+	// if it is, delete the cluster from teleport
 	if !cluster.DeletionTimestamp.IsZero() {
-		if containsString(cluster.GetFinalizers(), finalizerName) {
-			clusterName := cluster.Name
-			if clusterName != r.TeleportClient.ManagementClusterName {
-				clusterName = fmt.Sprintf("%s-%s", r.TeleportClient.ManagementClusterName, clusterName)
-			}
-
-			err := r.ensureClusterDeregistered(ctx, log, clusterName)
-			if err != nil {
-				return ctrl.Result{}, microerror.Mask(err)
-			}
-
-			// Remove the finalizer
-			controllerutil.RemoveFinalizer(cluster, finalizerName)
-			// Remember to update the cluster
-			if err := r.Update(context.Background(), cluster); err != nil {
-				return ctrl.Result{}, microerror.Mask(err)
-			}
-		}
-		return ctrl.Result{}, nil
+		return ctrl.Result{}, r.ensureClusterDeletion(ctx, log, cluster)
 	}
 
-	if _, err := r.TeleportClient.GetClient(ctx); err != nil {
-		return ctrl.Result{}, fmt.Errorf("failed to get Teleport client: %w", err)
-	}
-	log.Info("Teleport client connected")
-
-	secretName := fmt.Sprintf("%s-teleport-join-token", cluster.Name) //#nosec G101
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      secretName,
-			Namespace: cluster.Namespace,
-		},
-	}
-	secretNamespacedName := types.NamespacedName{
-		Name:      secretName,
-		Namespace: cluster.Namespace,
+	// Create teleport join secret if it doesn't exist or update it it's expired
+	if err := r.ensureSecret(ctx, log, cluster); err != nil {
+		return ctrl.Result{}, err
 	}
 
-	if err := r.Get(ctx, secretNamespacedName, secret); err != nil {
-		// If the Secret does not exist
-		if apierrors.IsNotFound(err) {
-			log.Info(fmt.Sprintf("Secret does not exist: %s", secretName))
-			// Generate token from Teleport
-			// Here you can add the code to create the Secret
-			joinToken, err := r.TeleportClient.GetToken(ctx, cluster.Name)
-			if err != nil {
-				return ctrl.Result{}, fmt.Errorf("failed to generate join token: %w", err)
-			}
-			log.Info("Join token generated")
-			secret.StringData = map[string]string{
-				"joinToken": joinToken,
-			}
-			if err := r.Create(ctx, secret); err != nil {
-				return ctrl.Result{}, fmt.Errorf("failed to create Secret: %w", err)
-			} else {
-				log.Info(fmt.Sprintf("Secret created: %s", secretName))
-			}
-		} else {
-			// If there was an error other than IsNotFound, return it
-			return ctrl.Result{}, fmt.Errorf("failed to get Secret: %w", err)
-		}
-	} else {
-		log.Info(fmt.Sprintf("Secret exists: %s", secretName))
-		// Update secret if token expired or is expiring
-		hasExpired, err := r.TeleportClient.HasTokenExpired(ctx, cluster.Name)
-		if err != nil {
-			return ctrl.Result{}, fmt.Errorf("failed to verify token expiry: %w", err)
-		}
-		if hasExpired {
-			log.Info("Join token expired")
-			joinToken, err := r.TeleportClient.GetToken(ctx, cluster.Name)
-			if err != nil {
-				return ctrl.Result{}, fmt.Errorf("failed to generate teleport token: %w", err)
-			}
-			log.Info("Join token generated")
-			secret.StringData = map[string]string{
-				"joinToken": joinToken,
-			}
-			if err := r.Update(ctx, secret); err != nil {
-				return ctrl.Result{}, fmt.Errorf("failed to update Secret: %w", err)
-			} else {
-				log.Info(fmt.Sprintf("Secret updated: %s", secretName))
-			}
-		} else {
-			log.Info("Join token is valid, nothing to do.")
-		}
+	// Register teleport for MC/WC
+	if err := r.registerTeleport(ctx, log, cluster); err != nil {
+		return ctrl.Result{}, err
 	}
 
-	// Register teleport for MC/WC cluster
-	clusterName := cluster.Name
-	namespace := "giantswarm"
-
-	mc := true
-	if clusterName != r.TeleportClient.ManagementClusterName {
-		namespace = cluster.Namespace
-		mc = false
-	}
-
-	if err := r.ensureClusterRegistered(ctx, log, clusterName, r.TeleportClient.ManagementClusterName, namespace, mc); err != nil {
-		return ctrl.Result{}, microerror.Mask(err)
-	}
-
-	if !containsString(cluster.GetFinalizers(), finalizerName) {
-		controllerutil.AddFinalizer(cluster, finalizerName)
-		if err := r.Update(context.Background(), cluster); err != nil {
-			return ctrl.Result{}, microerror.Mask(err)
-		}
-	}
-
-	// Here you can add the code to handle the case where the Secret exists
-	return ctrl.Result{}, nil
+	return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
@@ -194,46 +101,33 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-func (r *ClusterReconciler) ensureClusterRegistered(ctx context.Context, log logr.Logger, clusterName string, managementClusterName string, namespace string, mc bool) error {
-	log.Info("Checking if cluster is already registered in teleport")
+func (r *ClusterReconciler) ensureClusterDeletion(ctx context.Context, log logr.Logger, cluster *capi.Cluster) error {
+	if containsString(cluster.GetFinalizers(), finalizerName) {
+		r.deleteSecret(ctx, log, cluster)
+		r.deleteConfigMap(ctx, log, cluster)
 
-	_clusterName := clusterName
-	if !mc {
-		_clusterName = fmt.Sprintf("%s-%s", r.TeleportClient.ManagementClusterName, clusterName)
-	}
-	exists, _, err := r.TeleportClient.ClusterExists(ctx, _clusterName)
-	if err != nil {
-		return microerror.Mask(err)
-	}
-
-	if !exists {
-		log.Info("Cluster does not exists in teleport")
-
-		joinToken, err := r.TeleportClient.GetToken(ctx, _clusterName)
-		if err != nil {
-			return fmt.Errorf("Failed to generate join token: %w", err)
+		var registerName string
+		if cluster.Name != r.TeleportClient.ManagementClusterName {
+			registerName = fmt.Sprintf("%s-%s", r.TeleportClient.ManagementClusterName, cluster.Name)
+		} else {
+			registerName = cluster.Name
 		}
 
-		log.Info("Installing teleport kube agent app in cluster")
-
-		err = r.TeleportApp.EnsureApp(ctx, namespace, clusterName, managementClusterName, joinToken, mc)
-		if err != nil {
+		if err := r.ensureClusterDeregistered(ctx, log, registerName); err != nil {
 			return microerror.Mask(err)
 		}
-
-		log.Info("Installed teleport kube agent app in cluster")
-		log.Info("Cluster registered in teleport")
-	} else {
-		log.Info("Cluster exists in teleport")
+		controllerutil.RemoveFinalizer(cluster, finalizerName)
+		if err := r.Update(context.Background(), cluster); err != nil {
+			return microerror.Mask(err)
+		}
 	}
-
 	return nil
 }
 
-func (r *ClusterReconciler) ensureClusterDeregistered(ctx context.Context, log logr.Logger, clusterName string) error {
+func (r *ClusterReconciler) ensureClusterDeregistered(ctx context.Context, log logr.Logger, registerName string) error {
 	log.Info("Checking if cluster is registered in teleport")
 
-	exists, ks, err := r.TeleportClient.ClusterExists(ctx, clusterName)
+	exists, ks, err := r.TeleportClient.IsClusterRegistered(ctx, registerName)
 	if err != nil {
 		return microerror.Mask(err)
 	}
@@ -253,6 +147,140 @@ func (r *ClusterReconciler) ensureClusterDeregistered(ctx context.Context, log l
 	return nil
 }
 
+func (r *ClusterReconciler) ensureSecret(ctx context.Context, log logr.Logger, cluster *capi.Cluster) error {
+	secretName := fmt.Sprintf("%s-teleport-join-token", cluster.Name) //#nosec G101
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: cluster.Namespace,
+		},
+	}
+	if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: cluster.Namespace}, secret); err != nil {
+		if apierrors.IsNotFound(err) {
+			log.Info(fmt.Sprintf("Secret does not exist: %s", secretName))
+			joinToken, err := r.generateJoinToken(ctx)
+			if err != nil {
+				return err
+			}
+			log.Info("Generated node join token.")
+			secret.StringData = map[string]string{
+				"joinToken": joinToken,
+			}
+			if err := r.Create(ctx, secret); err != nil {
+				return fmt.Errorf("failed to create Secret: %w", err)
+			} else {
+				log.Info(fmt.Sprintf("Secret created: %s", secretName))
+				return nil
+			}
+		} else {
+			return fmt.Errorf("failed to get Secret: %w", err)
+		}
+	}
+
+	log.Info(fmt.Sprintf("Secret exists: %s", secretName))
+
+	oldTokenBytes, ok := secret.Data["joinToken"]
+	if !ok {
+		log.Info("failed to get joinToken from Secret: %s", secretName)
+	}
+
+	isTokenValid, err := r.TeleportClient.IsTokenValid(ctx, string(oldTokenBytes))
+	if err != nil {
+		return fmt.Errorf("failed to verify token validity: %w", err)
+	}
+	if !isTokenValid {
+		log.Info("Join token has expired.")
+		joinToken, err := r.generateJoinToken(ctx)
+		if err != nil {
+			return err
+		}
+		log.Info("Join token re-generated")
+		secret.StringData = map[string]string{
+			"joinToken": joinToken,
+		}
+		if err := r.Update(ctx, secret); err != nil {
+			return fmt.Errorf("failed to update Secret: %w", err)
+		} else {
+			log.Info(fmt.Sprintf("Secret updated: %s", secretName))
+		}
+	} else {
+		log.Info("Join token is valid, nothing to do.")
+	}
+	return nil
+}
+
+func (r *ClusterReconciler) deleteSecret(ctx context.Context, log logr.Logger, cluster *capi.Cluster) error {
+	secretName := fmt.Sprintf("%s-teleport-join-token", cluster.Name) //#nosec G101
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: cluster.Namespace,
+		},
+	}
+
+	log.Info("Deleting secret...")
+	if err := r.Delete(ctx, secret); err != nil {
+		return fmt.Errorf("failed to create Secret: %w", err)
+	}
+
+	log.Info("Secret deleted.")
+	return nil
+}
+
+func (r *ClusterReconciler) registerTeleport(ctx context.Context, log logr.Logger, cluster *capi.Cluster) error {
+	var installNamespace string
+	var registerName string
+	var isManagementCluster bool
+
+	// If the cluster is a management cluster, install it in giantswarm namespace
+	if cluster.Name == r.TeleportClient.ManagementClusterName {
+		isManagementCluster = true
+		installNamespace = "giantswarm"
+		registerName = cluster.Name
+	} else {
+		isManagementCluster = false
+		installNamespace = cluster.Namespace
+		registerName = fmt.Sprintf("%s-%s", r.TeleportClient.ManagementClusterName, cluster.Name)
+	}
+
+	if err := r.ensureClusterRegistered(ctx, log, cluster.Name, registerName, installNamespace, isManagementCluster); err != nil {
+		return microerror.Mask(err)
+	}
+
+	if !containsString(cluster.GetFinalizers(), finalizerName) {
+		controllerutil.AddFinalizer(cluster, finalizerName)
+		if err := r.Update(context.Background(), cluster); err != nil {
+			return microerror.Mask(err)
+		}
+	}
+	return nil
+}
+
+func (r *ClusterReconciler) ensureClusterRegistered(ctx context.Context, log logr.Logger, clusterName string, registerName string, installNamespace string, isManagementCluster bool) error {
+	isRegistered, _, err := r.TeleportClient.IsClusterRegistered(ctx, registerName)
+	if err != nil {
+		return err
+	}
+
+	if isRegistered {
+		log.Info("Cluster is already registered in teleport.")
+		return nil
+	}
+	log.Info("Registering cluster in teleport...")
+
+	joinToken, err := r.generateJoinToken(ctx)
+	if err != nil {
+		return err
+	}
+
+	err = r.TeleportApp.InstallApp(ctx, installNamespace, registerName, clusterName, joinToken, isManagementCluster)
+	if err != nil {
+		return microerror.Mask(err)
+	}
+
+	return nil
+}
+
 func containsString(slice []string, s string) bool {
 	for _, item := range slice {
 		if item == s {
@@ -260,4 +288,29 @@ func containsString(slice []string, s string) bool {
 		}
 	}
 	return false
+}
+
+func (r *ClusterReconciler) generateJoinToken(ctx context.Context) (string, error) {
+	joinToken, err := r.TeleportClient.GetToken(ctx)
+	if err != nil {
+		return "", fmt.Errorf("failed to generate token: %w", err)
+	}
+	return joinToken, nil
+}
+
+func (r *ClusterReconciler) deleteConfigMap(ctx context.Context, log logr.Logger, cluster *capi.Cluster) error {
+	log.Info("Deleting config map...")
+	configMapName := fmt.Sprintf("%s-%s", cluster.Namespace, r.TeleportClient.AppName)
+
+	cm := corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      key.ConfigmapName(configMapName),
+			Namespace: cluster.Namespace,
+		},
+	}
+	if err := r.Delete(ctx, &cm); err != nil {
+		return microerror.Mask(err)
+	}
+	log.Info("ConfigMap deleted.")
+	return nil
 }
