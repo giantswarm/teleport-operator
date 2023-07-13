@@ -103,8 +103,12 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 func (r *ClusterReconciler) ensureClusterDeletion(ctx context.Context, log logr.Logger, cluster *capi.Cluster) error {
 	if containsString(cluster.GetFinalizers(), finalizerName) {
-		r.deleteSecret(ctx, log, cluster)
-		r.deleteConfigMap(ctx, log, cluster)
+		if err := r.deleteSecret(ctx, log, cluster); err != nil {
+			log.Info(err.Error())
+		}
+		if err := r.deleteConfigMap(ctx, log, cluster); err != nil {
+			log.Info(err.Error())
+		}
 
 		var registerName string
 		if cluster.Name != r.TeleportClient.ManagementClusterName {
