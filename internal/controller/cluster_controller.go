@@ -48,6 +48,13 @@ type ClusterReconciler struct {
 	TeleportApp    *teleportapp.TeleportApp
 }
 
+type ClusterRegisterConfig struct {
+	ClusterName         string
+	RegisterName        string
+	InstallNamespace    string
+	IsManagementCluster bool
+}
+
 const finalizerName string = "teleport.finalizer.giantswarm.io"
 
 //+kubebuilder:rbac:groups=cluster.x-k8s.io.giantswarm.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
@@ -112,7 +119,7 @@ func (r *ClusterReconciler) ensureClusterDeletion(ctx context.Context, log logr.
 
 		var registerName string
 		if cluster.Name != r.TeleportClient.ManagementClusterName {
-			registerName = fmt.Sprintf("%s-%s", r.TeleportClient.ManagementClusterName, cluster.Name)
+			registerName = key.RegisterName(r.TeleportClient.ManagementClusterName, cluster.Name)
 		} else {
 			registerName = cluster.Name
 		}
@@ -244,10 +251,16 @@ func (r *ClusterReconciler) registerTeleport(ctx context.Context, log logr.Logge
 	} else {
 		isManagementCluster = false
 		installNamespace = cluster.Namespace
-		registerName = fmt.Sprintf("%s-%s", r.TeleportClient.ManagementClusterName, cluster.Name)
+		registerName = key.RegisterName(r.TeleportClient.ManagementClusterName, cluster.Name)
 	}
 
-	if err := r.ensureClusterRegistered(ctx, log, cluster.Name, registerName, installNamespace, isManagementCluster); err != nil {
+	clusterRegisterConfig := ClusterRegisterConfig{
+		ClusterName:         cluster.Name,
+		RegisterName:        registerName,
+		InstallNamespace:    installNamespace,
+		IsManagementCluster: isManagementCluster,
+	}
+	if err := r.ensureClusterRegistered(ctx, &clusterRegisterConfig); err != nil {
 		return microerror.Mask(err)
 	}
 
@@ -260,24 +273,31 @@ func (r *ClusterReconciler) registerTeleport(ctx context.Context, log logr.Logge
 	return nil
 }
 
-func (r *ClusterReconciler) ensureClusterRegistered(ctx context.Context, log logr.Logger, clusterName string, registerName string, installNamespace string, isManagementCluster bool) error {
-	isRegistered, _, err := r.TeleportClient.IsClusterRegistered(ctx, registerName)
+func (r *ClusterReconciler) ensureClusterRegistered(ctx context.Context, config *ClusterRegisterConfig) error {
+	isRegistered, _, err := r.TeleportClient.IsClusterRegistered(ctx, config.RegisterName)
 	if err != nil {
 		return err
 	}
 
 	if isRegistered {
-		log.Info("Cluster is already registered in teleport.")
+		r.Log.Info("Cluster is already registered in teleport.")
 		return nil
 	}
-	log.Info("Registering cluster in teleport...")
+	r.Log.Info("Registering cluster in teleport...")
 
 	joinToken, err := r.generateJoinToken(ctx)
 	if err != nil {
 		return err
 	}
 
-	err = r.TeleportApp.InstallApp(ctx, installNamespace, registerName, clusterName, joinToken, isManagementCluster)
+	installAppConfig := teleportapp.AppConfig{
+		InstallNamespace:    config.InstallNamespace,
+		RegisterName:        config.RegisterName,
+		ClusterName:         config.ClusterName,
+		JoinToken:           joinToken,
+		IsManagementCluster: config.IsManagementCluster,
+	}
+	err = r.TeleportApp.InstallApp(ctx, &installAppConfig)
 	if err != nil {
 		return microerror.Mask(err)
 	}

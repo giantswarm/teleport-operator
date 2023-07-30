@@ -37,6 +37,14 @@ type Config struct {
 	AppCatalog        string
 }
 
+type AppConfig struct {
+	InstallNamespace    string
+	RegisterName        string
+	ClusterName         string
+	JoinToken           string
+	IsManagementCluster bool
+}
+
 func New(config Config) (*TeleportApp, error) {
 	// if config.CtrlClient == nil {
 	// 	return nil, microerror.Maskf(invalidConfigError, "%T.CtrlClient must not be empty", config)
@@ -56,21 +64,21 @@ func New(config Config) (*TeleportApp, error) {
 	}, nil
 }
 
-func (t *TeleportApp) InstallApp(ctx context.Context, namespace string, registerName string, clusterName string, joinToken string, isManagementCluster bool) error {
-	if err := t.ensureConfigmap(ctx, namespace, registerName, clusterName, joinToken); err != nil {
+func (t *TeleportApp) InstallApp(ctx context.Context, config *AppConfig) error {
+	if err := t.ensureConfigmap(ctx, config); err != nil {
 		return microerror.Mask(err)
 	}
 
-	if err := t.ensureApp(ctx, namespace, registerName, clusterName, isManagementCluster); err != nil {
+	if err := t.ensureApp(ctx, config); err != nil {
 		return microerror.Mask(err)
 	}
 
 	return nil
 }
 
-func (t *TeleportApp) ensureConfigmap(ctx context.Context, namespace string, registerName string, clusterName string, joinToken string) error {
-	logger := t.logger.WithValues("cluster", clusterName)
-	configMapName := fmt.Sprintf("%s-%s", clusterName, t.appName)
+func (t *TeleportApp) ensureConfigmap(ctx context.Context, config *AppConfig) error {
+	logger := t.logger.WithValues("cluster", config.ClusterName)
+	configMapName := fmt.Sprintf("%s-%s", config.ClusterName, t.appName)
 
 	name := key.ConfigmapName(configMapName)
 
@@ -80,7 +88,7 @@ proxyAddr: "%s"
 kubeClusterName: "%s"
 `
 	data := map[string]string{
-		"values": fmt.Sprintf(dateTpl, joinToken, t.teleportProxyAddr, registerName),
+		"values": fmt.Sprintf(dateTpl, config.JoinToken, t.teleportProxyAddr, config.RegisterName),
 	}
 
 	if t.teleportVersion != "" {
@@ -88,13 +96,13 @@ kubeClusterName: "%s"
 	}
 
 	cm := corev1.ConfigMap{}
-	err := t.ctrlClient.Get(ctx, client.ObjectKey{Name: name, Namespace: namespace}, &cm)
+	err := t.ctrlClient.Get(ctx, client.ObjectKey{Name: name, Namespace: config.InstallNamespace}, &cm)
 	if errors.IsNotFound(err) {
 		logger.Info("Configmap does not exist.")
 		cm := corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
 				Name:      name,
-				Namespace: namespace,
+				Namespace: config.InstallNamespace,
 				Labels: map[string]string{
 					label.ManagedBy: project.Name(),
 				},
@@ -115,24 +123,24 @@ kubeClusterName: "%s"
 	return nil
 }
 
-func (t *TeleportApp) ensureApp(ctx context.Context, appNamespace string, registerName string, clusterName string, isManagementCluster bool) error {
-	logger := t.logger.WithValues("cluster", clusterName)
+func (t *TeleportApp) ensureApp(ctx context.Context, config *AppConfig) error {
+	logger := t.logger.WithValues("cluster", config.ClusterName)
 
 	appSpecKubeConfig := appv1alpha1.AppSpecKubeConfig{
-		InCluster: isManagementCluster,
+		InCluster: config.IsManagementCluster,
 	}
 
-	if !isManagementCluster {
+	if !config.IsManagementCluster {
 		appSpecKubeConfig.Context = appv1alpha1.AppSpecKubeConfigContext{
-			Name: registerName,
+			Name: config.RegisterName,
 		}
 		appSpecKubeConfig.Secret = appv1alpha1.AppSpecKubeConfigSecret{
-			Name:      fmt.Sprintf("%s-kubeconfig", clusterName),
-			Namespace: appNamespace,
+			Name:      fmt.Sprintf("%s-kubeconfig", config.ClusterName),
+			Namespace: config.InstallNamespace,
 		}
 	}
 
-	appName := fmt.Sprintf("%s-%s", clusterName, t.appName)
+	appName := fmt.Sprintf("%s-%s", config.ClusterName, t.appName)
 	appSpec := appv1alpha1.AppSpec{
 		Catalog:    t.appCatalog,
 		KubeConfig: appSpecKubeConfig,
@@ -141,7 +149,7 @@ func (t *TeleportApp) ensureApp(ctx context.Context, appNamespace string, regist
 		UserConfig: appv1alpha1.AppSpecUserConfig{
 			ConfigMap: appv1alpha1.AppSpecUserConfigConfigMap{
 				Name:      key.ConfigmapName(appName),
-				Namespace: appNamespace,
+				Namespace: config.InstallNamespace,
 			},
 		},
 		Version: t.appVersion,
@@ -150,20 +158,20 @@ func (t *TeleportApp) ensureApp(ctx context.Context, appNamespace string, regist
 	desiredApp := appv1alpha1.App{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      appName,
-			Namespace: appNamespace,
+			Namespace: config.InstallNamespace,
 			Labels: map[string]string{
 				label.ManagedBy: project.Name(),
-				label.Cluster:   clusterName,
+				label.Cluster:   config.ClusterName,
 			},
 		},
 		Spec: appSpec,
 	}
-	if isManagementCluster {
+	if config.IsManagementCluster {
 		desiredApp.Labels[label.AppOperatorVersion] = "0.0.0"
 	}
 
 	app := appv1alpha1.App{}
-	err := t.ctrlClient.Get(ctx, client.ObjectKey{Name: appName, Namespace: appNamespace}, &app)
+	err := t.ctrlClient.Get(ctx, client.ObjectKey{Name: appName, Namespace: config.InstallNamespace}, &app)
 	if errors.IsNotFound(err) {
 		logger.Info("Installing teleport-kube-agent app...")
 		if err = t.ctrlClient.Create(ctx, &desiredApp); err != nil {
