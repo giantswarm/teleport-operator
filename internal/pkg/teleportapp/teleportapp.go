@@ -137,7 +137,7 @@ func (t *TeleportApp) ensureApp(ctx context.Context, config *AppConfig) error {
 			Name: config.RegisterName,
 		}
 		appSpecKubeConfig.Secret = appv1alpha1.AppSpecKubeConfigSecret{
-			Name:      fmt.Sprintf("%s-kubeconfig", config.ClusterName),
+			Name:      key.AppSpecKubeConfigSecretName(config.ClusterName),
 			Namespace: config.InstallNamespace,
 		}
 	}

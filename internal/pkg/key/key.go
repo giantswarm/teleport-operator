@@ -15,3 +15,7 @@ func SecretName(clusterName string) string {
 func RegisterName(managementClusterName, clusterName string) string {
 	return fmt.Sprintf("%s-%s", managementClusterName, clusterName)
 }
+
+func AppSpecKubeConfigSecretName(clusterName string) string {
+	return fmt.Sprintf("%s-kubeconfig", clusterName)
+}
