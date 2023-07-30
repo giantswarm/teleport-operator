@@ -142,7 +142,7 @@ func (t *TeleportApp) ensureApp(ctx context.Context, config *AppConfig) error {
 		}
 	}
 
-	appName := fmt.Sprintf("%s-%s", config.ClusterName, t.appName)
+	appName := key.AppName(config.ClusterName, t.appName)
 	appSpec := appv1alpha1.AppSpec{
 		Catalog:    t.appCatalog,
 		KubeConfig: appSpecKubeConfig,
