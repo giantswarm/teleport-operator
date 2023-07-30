@@ -185,6 +185,6 @@ func (t *TeleportApp) ensureApp(ctx context.Context, config *AppConfig) error {
 		return microerror.Mask(err)
 	}
 
-	logger.Info("App already exists, but not registered with teleport yet.")
+	logger.Info("App already exists.")
 	return nil
 }
