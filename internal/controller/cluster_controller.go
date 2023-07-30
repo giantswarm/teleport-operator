@@ -137,7 +137,7 @@ func (r *ClusterReconciler) ensureClusterDeregistered(ctx context.Context, log l
 	}
 
 	if !exists {
-		log.Info("Cluster does not exists in teleport")
+		log.Info("Cluster does not exist in teleport")
 		return nil
 	}
 
@@ -304,7 +304,7 @@ func (r *ClusterReconciler) generateJoinToken(ctx context.Context) (string, erro
 
 func (r *ClusterReconciler) deleteConfigMap(ctx context.Context, log logr.Logger, cluster *capi.Cluster) error {
 	log.Info("Deleting config map...")
-	configMapName := fmt.Sprintf("%s-%s", cluster.Namespace, r.TeleportClient.AppName)
+	configMapName := fmt.Sprintf("%s-%s", cluster.Name, r.TeleportClient.AppName)
 
 	cm := corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
