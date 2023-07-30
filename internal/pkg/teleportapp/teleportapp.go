@@ -45,6 +45,8 @@ type AppConfig struct {
 	IsManagementCluster bool
 }
 
+const APP_OPERATOR_VERSION = "0.0.0"
+
 func New(config Config) (*TeleportApp, error) {
 	// if config.CtrlClient == nil {
 	// 	return nil, microerror.Maskf(invalidConfigError, "%T.CtrlClient must not be empty", config)
@@ -167,7 +169,7 @@ func (t *TeleportApp) ensureApp(ctx context.Context, config *AppConfig) error {
 		Spec: appSpec,
 	}
 	if config.IsManagementCluster {
-		desiredApp.Labels[label.AppOperatorVersion] = "0.0.0"
+		desiredApp.Labels[label.AppOperatorVersion] = APP_OPERATOR_VERSION
 	}
 
 	app := appv1alpha1.App{}
