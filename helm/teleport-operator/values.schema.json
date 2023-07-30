@@ -13,6 +13,32 @@
                 }
             }
         },
+        "teleport": {
+            "type": "object",
+            "properties": {
+                "appCatalog": {
+                    "type": "string"
+                },
+                "appName": {
+                    "type": "string"
+                },
+                "appVersion": {
+                    "type": "string"
+                },
+                "identityFile": {
+                    "type": "string"
+                },
+                "managementClusterName": {
+                    "type": "string"
+                },
+                "proxyAddr": {
+                    "type": "string"
+                },
+                "teleportVersion": {
+                    "type": "string"
+                }
+            }
+        }, 
         "pod": {
             "type": "object",
             "properties": {
