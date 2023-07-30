@@ -166,7 +166,7 @@ func (t *TeleportClient) IsTokenValid(ctx context.Context, oldToken string) (boo
 	}
 }
 
-func (t *TeleportClient) IsClusterRegistered(ctx context.Context, clusterName string) (bool, tt.KubeServer, error) {
+func (t *TeleportClient) IsClusterRegistered(ctx context.Context, registerName string) (bool, tt.KubeServer, error) {
 	c, err := t.GetClient(ctx)
 	if err != nil {
 		return false, nil, microerror.Mask(err)
@@ -178,7 +178,7 @@ func (t *TeleportClient) IsClusterRegistered(ctx context.Context, clusterName st
 	}
 
 	for _, k := range ks {
-		if k.GetCluster().GetName() == clusterName {
+		if k.GetCluster().GetName() == registerName {
 			return true, k, nil
 		}
 	}

@@ -57,7 +57,7 @@ func New(config Config) (*TeleportApp, error) {
 }
 
 func (t *TeleportApp) InstallApp(ctx context.Context, namespace string, registerName string, clusterName string, joinToken string, isManagementCluster bool) error {
-	if err := t.ensureConfigmap(ctx, namespace, clusterName, joinToken); err != nil {
+	if err := t.ensureConfigmap(ctx, namespace, registerName, clusterName, joinToken); err != nil {
 		return microerror.Mask(err)
 	}
 
@@ -68,7 +68,7 @@ func (t *TeleportApp) InstallApp(ctx context.Context, namespace string, register
 	return nil
 }
 
-func (t *TeleportApp) ensureConfigmap(ctx context.Context, namespace string, clusterName string, joinToken string) error {
+func (t *TeleportApp) ensureConfigmap(ctx context.Context, namespace string, registerName string, clusterName string, joinToken string) error {
 	logger := t.logger.WithValues("cluster", clusterName)
 	configMapName := fmt.Sprintf("%s-%s", clusterName, t.appName)
 
@@ -80,7 +80,7 @@ proxyAddr: "%s"
 kubeClusterName: "%s"
 `
 	data := map[string]string{
-		"values": fmt.Sprintf(dateTpl, joinToken, t.teleportProxyAddr, clusterName),
+		"values": fmt.Sprintf(dateTpl, joinToken, t.teleportProxyAddr, registerName),
 	}
 
 	if t.teleportVersion != "" {
