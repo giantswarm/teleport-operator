@@ -38,7 +38,7 @@
                     "type": "string"
                 }
             }
-        }, 
+        },
         "pod": {
             "type": "object",
             "properties": {
