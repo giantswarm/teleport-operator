@@ -152,7 +152,7 @@ func (r *ClusterReconciler) ensureClusterDeregistered(ctx context.Context, log l
 }
 
 func (r *ClusterReconciler) ensureSecret(ctx context.Context, log logr.Logger, cluster *capi.Cluster) error {
-	secretName := fmt.Sprintf("%s-teleport-join-token", cluster.Name) //#nosec G101
+	secretName := key.SecretName(cluster.Name) //#nosec G101
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
@@ -214,7 +214,7 @@ func (r *ClusterReconciler) ensureSecret(ctx context.Context, log logr.Logger, c
 }
 
 func (r *ClusterReconciler) deleteSecret(ctx context.Context, log logr.Logger, cluster *capi.Cluster) error {
-	secretName := fmt.Sprintf("%s-teleport-join-token", cluster.Name) //#nosec G101
+	secretName := key.SecretName(cluster.Name) //#nosec G101
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
