@@ -4,6 +4,10 @@ import (
 	"fmt"
 )
 
+func GetManagedByLabel() string {
+	return "teleport-operator"
+}
+
 func GetConfigmapName(appName string) string {
 	return fmt.Sprintf("%s-config", appName)
 }

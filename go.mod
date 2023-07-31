@@ -5,7 +5,6 @@ go 1.19
 require (
 	github.com/giantswarm/apiextensions-application v0.6.0
 	github.com/giantswarm/k8smetadata v0.21.0
-	github.com/giantswarm/kubectl-gs v1.60.0
 	github.com/giantswarm/microerror v0.4.0
 	github.com/go-logr/logr v1.2.4
 	github.com/gravitational/teleport/api v0.0.0-20230607072028-2f3f42ef14ad

@@ -6,7 +6,6 @@ import (
 
 	appv1alpha1 "github.com/giantswarm/apiextensions-application/api/v1alpha1"
 	"github.com/giantswarm/k8smetadata/pkg/label"
-	"github.com/giantswarm/kubectl-gs/pkg/project"
 	"github.com/giantswarm/microerror"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -106,7 +105,7 @@ kubeClusterName: "%s"
 				Name:      name,
 				Namespace: config.InstallNamespace,
 				Labels: map[string]string{
-					label.ManagedBy: project.Name(),
+					label.ManagedBy: key.GetManagedByLabel(),
 				},
 			},
 			Data: data,
@@ -162,7 +161,7 @@ func (t *TeleportApp) ensureApp(ctx context.Context, config *AppConfig) error {
 			Name:      appName,
 			Namespace: config.InstallNamespace,
 			Labels: map[string]string{
-				label.ManagedBy: project.Name(),
+				label.ManagedBy: key.GetManagedByLabel(),
 				label.Cluster:   config.ClusterName,
 			},
 		},
