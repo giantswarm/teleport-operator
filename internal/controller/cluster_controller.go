@@ -119,7 +119,7 @@ func (r *ClusterReconciler) ensureClusterDeletion(ctx context.Context, log logr.
 
 		var registerName string
 		if cluster.Name != r.TeleportClient.ManagementClusterName {
-			registerName = key.RegisterName(r.TeleportClient.ManagementClusterName, cluster.Name)
+			registerName = key.GetRegisterName(r.TeleportClient.ManagementClusterName, cluster.Name)
 		} else {
 			registerName = cluster.Name
 		}
@@ -159,7 +159,7 @@ func (r *ClusterReconciler) ensureClusterDeregistered(ctx context.Context, log l
 }
 
 func (r *ClusterReconciler) ensureSecret(ctx context.Context, log logr.Logger, cluster *capi.Cluster) error {
-	secretName := key.SecretName(cluster.Name) //#nosec G101
+	secretName := key.GetSecretName(cluster.Name) //#nosec G101
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
@@ -221,7 +221,7 @@ func (r *ClusterReconciler) ensureSecret(ctx context.Context, log logr.Logger, c
 }
 
 func (r *ClusterReconciler) deleteSecret(ctx context.Context, log logr.Logger, cluster *capi.Cluster) error {
-	secretName := key.SecretName(cluster.Name) //#nosec G101
+	secretName := key.GetSecretName(cluster.Name) //#nosec G101
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
@@ -251,7 +251,7 @@ func (r *ClusterReconciler) registerTeleport(ctx context.Context, log logr.Logge
 	} else {
 		isManagementCluster = false
 		installNamespace = cluster.Namespace
-		registerName = key.RegisterName(r.TeleportClient.ManagementClusterName, cluster.Name)
+		registerName = key.GetRegisterName(r.TeleportClient.ManagementClusterName, cluster.Name)
 	}
 
 	clusterRegisterConfig := ClusterRegisterConfig{
@@ -328,7 +328,7 @@ func (r *ClusterReconciler) deleteConfigMap(ctx context.Context, log logr.Logger
 
 	cm := corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      key.ConfigmapName(configMapName),
+			Name:      key.GetConfigmapName(configMapName),
 			Namespace: cluster.Namespace,
 		},
 	}

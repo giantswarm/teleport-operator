@@ -82,7 +82,7 @@ func (t *TeleportApp) ensureConfigmap(ctx context.Context, config *AppConfig) er
 	logger := t.logger.WithValues("cluster", config.ClusterName)
 	configMapName := fmt.Sprintf("%s-%s", config.ClusterName, t.appName)
 
-	name := key.ConfigmapName(configMapName)
+	name := key.GetConfigmapName(configMapName)
 
 	dateTpl := `roles: "kube"
 authToken: "%s"
@@ -137,12 +137,12 @@ func (t *TeleportApp) ensureApp(ctx context.Context, config *AppConfig) error {
 			Name: config.RegisterName,
 		}
 		appSpecKubeConfig.Secret = appv1alpha1.AppSpecKubeConfigSecret{
-			Name:      key.AppSpecKubeConfigSecretName(config.ClusterName),
+			Name:      key.GetAppSpecKubeConfigSecretName(config.ClusterName),
 			Namespace: config.InstallNamespace,
 		}
 	}
 
-	appName := key.AppName(config.ClusterName, t.appName)
+	appName := key.GetAppName(config.ClusterName, t.appName)
 	appSpec := appv1alpha1.AppSpec{
 		Catalog:    t.appCatalog,
 		KubeConfig: appSpecKubeConfig,
@@ -150,7 +150,7 @@ func (t *TeleportApp) ensureApp(ctx context.Context, config *AppConfig) error {
 		Namespace:  "kube-system",
 		UserConfig: appv1alpha1.AppSpecUserConfig{
 			ConfigMap: appv1alpha1.AppSpecUserConfigConfigMap{
-				Name:      key.ConfigmapName(appName),
+				Name:      key.GetConfigmapName(appName),
 				Namespace: config.InstallNamespace,
 			},
 		},
