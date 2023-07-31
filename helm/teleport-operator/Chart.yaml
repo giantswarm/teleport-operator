@@ -1,5 +1,5 @@
 name: teleport-operator
-version: 0.0.0-dev
+version: [[ .Version ]]
 description: "Teleport operator"
 appVersion: "[[ .AppVersion ]]"
 home: "https://github.com/giantswarm/teleport-operator"
