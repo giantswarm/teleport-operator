@@ -109,42 +109,40 @@ func getClient(ctx context.Context, proxyAddr, identityFile string) (*tc.Client,
 	return c, nil
 }
 
-func (t *TeleportClient) GetToken(ctx context.Context) (string, error) {
+func (t *TeleportClient) GetToken(ctx context.Context, registerName string) (string, error) {
 	// Look for an existing token or generate one if it's expired
-	{
-		tokens, err := t.Client.GetTokens(ctx)
-		if err != nil {
-			return "", microerror.Mask(err)
-		}
-
-		for _, t := range tokens {
-			if t.GetMetadata().Labels["operator"] == "teleport-operator" {
-				return t.GetName(), nil
-			}
-		}
-
-		// Generate a token
-		expiration := time.Now().Add(TELEPORT_JOIN_TOKEN_VALIDITY)
-		token := randSeq(32)
-		newToken, err := tt.NewProvisionToken(token, []tt.SystemRole{tt.RoleKube, tt.RoleNode}, expiration)
-		if err != nil {
-			return "", microerror.Mask(err)
-		}
-		oldMeta := newToken.GetMetadata()
-		oldMeta.Labels = map[string]string{
-			"operator": "teleport-operator",
-		}
-		newToken.SetMetadata(oldMeta)
-		err = t.Client.UpsertToken(ctx, newToken)
-		if err != nil {
-			return "", microerror.Mask(err)
-		}
-
-		return token, nil
+	tokens, err := t.Client.GetTokens(ctx)
+	if err != nil {
+		return "", microerror.Mask(err)
 	}
+
+	for _, t := range tokens {
+		if t.GetMetadata().Labels["cluster"] == registerName {
+			return t.GetName(), nil
+		}
+	}
+
+	// Generate a token
+	expiration := time.Now().Add(TELEPORT_JOIN_TOKEN_VALIDITY)
+	token := randSeq(32)
+	newToken, err := tt.NewProvisionToken(token, []tt.SystemRole{tt.RoleKube, tt.RoleNode}, expiration)
+	if err != nil {
+		return "", microerror.Mask(err)
+	}
+	metadata := newToken.GetMetadata()
+	metadata.Labels = map[string]string{
+		"cluster": registerName,
+	}
+	newToken.SetMetadata(metadata)
+	err = t.Client.UpsertToken(ctx, newToken)
+	if err != nil {
+		return "", microerror.Mask(err)
+	}
+
+	return token, nil
 }
 
-func (t *TeleportClient) IsTokenValid(ctx context.Context, oldToken string) (bool, error) {
+func (t *TeleportClient) IsTokenValid(ctx context.Context, oldToken string, registerName string) (bool, error) {
 	{
 		tokens, err := t.Client.GetTokens(ctx)
 		if err != nil {
@@ -152,7 +150,7 @@ func (t *TeleportClient) IsTokenValid(ctx context.Context, oldToken string) (boo
 		}
 
 		for _, t := range tokens {
-			if t.GetMetadata().Labels["operator"] == "teleport-operator" {
+			if t.GetMetadata().Labels["cluster"] == registerName {
 				if t.GetName() == oldToken {
 					return true, nil
 				}

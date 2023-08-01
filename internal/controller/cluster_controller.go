@@ -88,11 +88,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, r.ensureClusterDeletion(ctx, log, cluster)
 	}
 
-	// Create teleport join secret if it doesn't exist or update it it's expired
-	if err := r.ensureSecret(ctx, log, cluster); err != nil {
-		return ctrl.Result{}, err
-	}
-
 	// Register teleport for MC/WC
 	if err := r.registerTeleport(ctx, log, cluster); err != nil {
 		return ctrl.Result{}, err
@@ -158,18 +153,18 @@ func (r *ClusterReconciler) ensureClusterDeregistered(ctx context.Context, log l
 	return nil
 }
 
-func (r *ClusterReconciler) ensureSecret(ctx context.Context, log logr.Logger, cluster *capi.Cluster) error {
-	secretName := key.GetSecretName(cluster.Name) //#nosec G101
+func (r *ClusterReconciler) ensureSecret(ctx context.Context, log logr.Logger, config *ClusterRegisterConfig) error {
+	secretName := key.GetSecretName(config.ClusterName) //#nosec G101
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
-			Namespace: cluster.Namespace,
+			Namespace: config.InstallNamespace,
 		},
 	}
-	if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: cluster.Namespace}, secret); err != nil {
+	if err := r.Get(ctx, types.NamespacedName{Name: secretName, Namespace: config.InstallNamespace}, secret); err != nil {
 		if apierrors.IsNotFound(err) {
 			log.Info(fmt.Sprintf("Secret does not exist: %s", secretName))
-			joinToken, err := r.generateJoinToken(ctx)
+			joinToken, err := r.generateJoinToken(ctx, config.RegisterName)
 			if err != nil {
 				return err
 			}
@@ -195,13 +190,13 @@ func (r *ClusterReconciler) ensureSecret(ctx context.Context, log logr.Logger, c
 		log.Info("failed to get joinToken from Secret: %s", secretName)
 	}
 
-	isTokenValid, err := r.TeleportClient.IsTokenValid(ctx, string(oldTokenBytes))
+	isTokenValid, err := r.TeleportClient.IsTokenValid(ctx, string(oldTokenBytes), config.RegisterName)
 	if err != nil {
 		return fmt.Errorf("failed to verify token validity: %w", err)
 	}
 	if !isTokenValid {
 		log.Info("Join token has expired.")
-		joinToken, err := r.generateJoinToken(ctx)
+		joinToken, err := r.generateJoinToken(ctx, config.RegisterName)
 		if err != nil {
 			return err
 		}
@@ -260,7 +255,13 @@ func (r *ClusterReconciler) registerTeleport(ctx context.Context, log logr.Logge
 		InstallNamespace:    installNamespace,
 		IsManagementCluster: isManagementCluster,
 	}
-	if err := r.ensureClusterRegistered(ctx, &clusterRegisterConfig); err != nil {
+
+	// Create teleport join secret if it doesn't exist or update it it's expired
+	if err := r.ensureSecret(ctx, log, &clusterRegisterConfig); err != nil {
+		return microerror.Mask(err)
+	}
+
+	if err := r.ensureClusterRegistered(ctx, log, &clusterRegisterConfig); err != nil {
 		return microerror.Mask(err)
 	}
 
@@ -273,19 +274,19 @@ func (r *ClusterReconciler) registerTeleport(ctx context.Context, log logr.Logge
 	return nil
 }
 
-func (r *ClusterReconciler) ensureClusterRegistered(ctx context.Context, config *ClusterRegisterConfig) error {
+func (r *ClusterReconciler) ensureClusterRegistered(ctx context.Context, log logr.Logger, config *ClusterRegisterConfig) error {
 	isRegistered, _, err := r.TeleportClient.IsClusterRegistered(ctx, config.RegisterName)
 	if err != nil {
 		return err
 	}
 
 	if isRegistered {
-		r.Log.Info("Cluster is already registered in teleport.")
+		log.Info("Cluster is registered in teleport.")
 		return nil
 	}
-	r.Log.Info("Registering cluster in teleport...")
+	log.Info("Registering cluster in teleport...")
 
-	joinToken, err := r.generateJoinToken(ctx)
+	joinToken, err := r.generateJoinToken(ctx, config.RegisterName)
 	if err != nil {
 		return err
 	}
@@ -314,8 +315,8 @@ func containsString(slice []string, s string) bool {
 	return false
 }
 
-func (r *ClusterReconciler) generateJoinToken(ctx context.Context) (string, error) {
-	joinToken, err := r.TeleportClient.GetToken(ctx)
+func (r *ClusterReconciler) generateJoinToken(ctx context.Context, registerName string) (string, error) {
+	joinToken, err := r.TeleportClient.GetToken(ctx, registerName)
 	if err != nil {
 		return "", fmt.Errorf("failed to generate token: %w", err)
 	}
