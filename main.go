@@ -104,15 +104,12 @@ func main() {
 		setupLog.Error(err, "unable to create teleport client")
 		os.Exit(1)
 	}
+	setupLog.Info("teleport client created", "proxy address", teleportClient.ProxyAddr)
 
 	teleportApp, err := teleportapp.New(teleportapp.Config{
-		CtrlClient:        mgr.GetClient(),
-		Logger:            ctrl.Log.WithName("teleportapp"),
-		TeleportProxyAddr: teleportClient.ProxyAddr,
-		TeleportVersion:   teleportClient.TeleportVersion,
-		AppName:           teleportClient.AppName,
-		AppVersion:        teleportClient.AppVersion,
-		AppCatalog:        teleportClient.AppCatalog,
+		CtrlClient:     mgr.GetClient(),
+		Logger:         ctrl.Log.WithName("teleportapp"),
+		TeleportClient: teleportClient,
 	})
 	if err != nil {
 		setupLog.Error(err, "unable to create teleport app helper")
@@ -123,8 +120,8 @@ func main() {
 		Client:         mgr.GetClient(),
 		Log:            ctrl.Log.WithName("controllers").WithName("Cluster"),
 		Scheme:         mgr.GetScheme(),
-		TeleportClient: teleportClient,
 		TeleportApp:    teleportApp,
+		TeleportClient: teleportClient,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 		os.Exit(1)

@@ -22,6 +22,7 @@ type TeleportClient struct {
 	AppName               string
 	AppVersion            string
 	AppCatalog            string
+	Client                *tc.Client
 }
 
 const TELEPORT_JOIN_TOKEN_VALIDITY = 24 * time.Hour
@@ -69,6 +70,11 @@ func New(namespace string) (*TeleportClient, error) {
 	appVersion := string(appVersionBytes)
 	appCatalog := string(appCatalogBytes)
 
+	client, err := getClient(context.TODO(), proxyAddr, identityFile)
+	if err != nil {
+		return nil, microerror.Mask(err)
+	}
+
 	return &TeleportClient{
 		IdentityFile:          identityFile,
 		ProxyAddr:             proxyAddr,
@@ -77,16 +83,17 @@ func New(namespace string) (*TeleportClient, error) {
 		AppName:               appName,
 		AppVersion:            appVersion,
 		AppCatalog:            appCatalog,
+		Client:                client,
 	}, nil
 }
 
-func (t *TeleportClient) GetClient(ctx context.Context) (*tc.Client, error) {
+func getClient(ctx context.Context, proxyAddr, identityFile string) (*tc.Client, error) {
 	c, err := tc.New(ctx, tc.Config{
 		Addrs: []string{
-			t.ProxyAddr,
+			proxyAddr,
 		},
 		Credentials: []tc.Credentials{
-			tc.LoadIdentityFileFromString(t.IdentityFile),
+			tc.LoadIdentityFileFromString(identityFile),
 		},
 	})
 
@@ -103,14 +110,9 @@ func (t *TeleportClient) GetClient(ctx context.Context) (*tc.Client, error) {
 }
 
 func (t *TeleportClient) GetToken(ctx context.Context) (string, error) {
-	clt, err := t.GetClient(ctx)
-	if err != nil {
-		return "", microerror.Mask(err)
-	}
-
 	// Look for an existing token or generate one if it's expired
 	{
-		tokens, err := clt.GetTokens(ctx)
+		tokens, err := t.Client.GetTokens(ctx)
 		if err != nil {
 			return "", microerror.Mask(err)
 		}
@@ -133,7 +135,7 @@ func (t *TeleportClient) GetToken(ctx context.Context) (string, error) {
 			"operator": "teleport-operator",
 		}
 		newToken.SetMetadata(oldMeta)
-		err = clt.UpsertToken(ctx, newToken)
+		err = t.Client.UpsertToken(ctx, newToken)
 		if err != nil {
 			return "", microerror.Mask(err)
 		}
@@ -143,13 +145,8 @@ func (t *TeleportClient) GetToken(ctx context.Context) (string, error) {
 }
 
 func (t *TeleportClient) IsTokenValid(ctx context.Context, oldToken string) (bool, error) {
-	clt, err := t.GetClient(ctx)
-	if err != nil {
-		return false, microerror.Mask(err)
-	}
-
 	{
-		tokens, err := clt.GetTokens(ctx)
+		tokens, err := t.Client.GetTokens(ctx)
 		if err != nil {
 			return false, microerror.Mask(err)
 		}
@@ -167,12 +164,7 @@ func (t *TeleportClient) IsTokenValid(ctx context.Context, oldToken string) (boo
 }
 
 func (t *TeleportClient) IsClusterRegistered(ctx context.Context, registerName string) (bool, tt.KubeServer, error) {
-	c, err := t.GetClient(ctx)
-	if err != nil {
-		return false, nil, microerror.Mask(err)
-	}
-
-	ks, err := c.GetKubernetesServers(ctx)
+	ks, err := t.Client.GetKubernetesServers(ctx)
 	if err != nil {
 		return false, nil, microerror.Mask(err)
 	}
@@ -187,12 +179,7 @@ func (t *TeleportClient) IsClusterRegistered(ctx context.Context, registerName s
 }
 
 func (t *TeleportClient) DeregisterCluster(ctx context.Context, ks tt.KubeServer) error {
-	c, err := t.GetClient(ctx)
-	if err != nil {
-		return microerror.Mask(err)
-	}
-
-	if err := c.DeleteKubernetesServer(ctx, ks.GetHostID(), ks.GetCluster().GetName()); err != nil {
+	if err := t.Client.DeleteKubernetesServer(ctx, ks.GetHostID(), ks.GetCluster().GetName()); err != nil {
 		return microerror.Mask(err)
 	}
 

@@ -14,26 +14,19 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/giantswarm/teleport-operator/internal/pkg/key"
+	"github.com/giantswarm/teleport-operator/internal/pkg/teleportclient"
 )
 
 type TeleportApp struct {
-	ctrlClient        client.Client
-	logger            logr.Logger
-	teleportProxyAddr string
-	teleportVersion   string
-	appCatalog        string
-	appVersion        string
-	appName           string
+	ctrlClient     client.Client
+	logger         logr.Logger
+	teleportClient *teleportclient.TeleportClient
 }
 
 type Config struct {
-	CtrlClient        client.Client
-	Logger            logr.Logger
-	TeleportProxyAddr string
-	TeleportVersion   string
-	AppName           string
-	AppVersion        string
-	AppCatalog        string
+	CtrlClient     client.Client
+	Logger         logr.Logger
+	TeleportClient *teleportclient.TeleportClient
 }
 
 type AppConfig struct {
@@ -47,21 +40,10 @@ type AppConfig struct {
 const APP_OPERATOR_VERSION = "0.0.0"
 
 func New(config Config) (*TeleportApp, error) {
-	// if config.CtrlClient == nil {
-	// 	return nil, microerror.Maskf(invalidConfigError, "%T.CtrlClient must not be empty", config)
-	// }
-	// if config.TeleportProxyAddr == "" {
-	// 	return nil, microerror.Maskf(invalidConfigError, "%T.TeleportProxyAddr must not be empty", config)
-	// }
-
 	return &TeleportApp{
-		ctrlClient:        config.CtrlClient,
-		logger:            config.Logger,
-		teleportProxyAddr: config.TeleportProxyAddr,
-		teleportVersion:   config.TeleportVersion,
-		appName:           config.AppName,
-		appVersion:        config.AppVersion,
-		appCatalog:        config.AppCatalog,
+		ctrlClient:     config.CtrlClient,
+		logger:         config.Logger,
+		teleportClient: config.TeleportClient,
 	}, nil
 }
 
@@ -79,7 +61,7 @@ func (t *TeleportApp) InstallApp(ctx context.Context, config *AppConfig) error {
 
 func (t *TeleportApp) ensureConfigmap(ctx context.Context, config *AppConfig) error {
 	logger := t.logger.WithValues("cluster", config.ClusterName)
-	configMapName := fmt.Sprintf("%s-%s", config.ClusterName, t.appName)
+	configMapName := fmt.Sprintf("%s-%s", config.ClusterName, t.teleportClient.AppName)
 
 	name := key.GetConfigmapName(configMapName)
 
@@ -89,11 +71,11 @@ proxyAddr: "%s"
 kubeClusterName: "%s"
 `
 	data := map[string]string{
-		"values": fmt.Sprintf(dateTpl, config.JoinToken, t.teleportProxyAddr, config.RegisterName),
+		"values": fmt.Sprintf(dateTpl, config.JoinToken, t.teleportClient.ProxyAddr, config.RegisterName),
 	}
 
-	if t.teleportVersion != "" {
-		data["values"] = fmt.Sprintf("%steleportVersionOverride: %q", data["values"], t.teleportVersion)
+	if t.teleportClient.TeleportVersion != "" {
+		data["values"] = fmt.Sprintf("%steleportVersionOverride: %q", data["values"], t.teleportClient.TeleportVersion)
 	}
 
 	cm := corev1.ConfigMap{}
@@ -141,11 +123,11 @@ func (t *TeleportApp) ensureApp(ctx context.Context, config *AppConfig) error {
 		}
 	}
 
-	appName := key.GetAppName(config.ClusterName, t.appName)
+	appName := key.GetAppName(config.ClusterName, t.teleportClient.AppName)
 	appSpec := appv1alpha1.AppSpec{
-		Catalog:    t.appCatalog,
+		Catalog:    t.teleportClient.AppCatalog,
 		KubeConfig: appSpecKubeConfig,
-		Name:       t.appName,
+		Name:       t.teleportClient.AppName,
 		Namespace:  "kube-system",
 		UserConfig: appv1alpha1.AppSpecUserConfig{
 			ConfigMap: appv1alpha1.AppSpecUserConfigConfigMap{
@@ -153,7 +135,7 @@ func (t *TeleportApp) ensureApp(ctx context.Context, config *AppConfig) error {
 				Namespace: config.InstallNamespace,
 			},
 		},
-		Version: t.appVersion,
+		Version: t.teleportClient.AppVersion,
 	}
 
 	desiredApp := appv1alpha1.App{

@@ -44,8 +44,8 @@ type ClusterReconciler struct {
 	client.Client
 	Log            logr.Logger
 	Scheme         *runtime.Scheme
-	TeleportClient *teleportclient.TeleportClient
 	TeleportApp    *teleportapp.TeleportApp
+	TeleportClient *teleportclient.TeleportClient
 }
 
 type ClusterRegisterConfig struct {
