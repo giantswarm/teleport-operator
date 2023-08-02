@@ -1,9 +1,5 @@
-project:
-  branch: "[[ .Branch ]]"
-  commit: "[[ .SHA ]]"
 image:
   name: "giantswarm/teleport-operator"
-  tag: "[[ .Version ]]"
 registry:
   domain: docker.io
 
