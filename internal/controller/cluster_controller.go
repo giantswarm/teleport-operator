@@ -122,14 +122,16 @@ func (r *ClusterReconciler) ensureClusterDeletion(ctx context.Context, log logr.
 		if err := r.ensureClusterDeregistered(ctx, log, registerName); err != nil {
 			return microerror.Mask(err)
 		}
-		controllerutil.RemoveFinalizer(cluster, key.TeleportOperatorFinalizer)
 		patchHelper, err := patch.NewHelper(cluster, r.Client)
 		if err != nil {
 			return errors.WithStack(err)
 		}
+		controllerutil.RemoveFinalizer(cluster, key.TeleportOperatorFinalizer)
 		if err := patchHelper.Patch(ctx, cluster); err != nil {
+			log.Error(err, "failed to remove finalizer.")
 			return microerror.Mask(client.IgnoreNotFound(err))
 		}
+		log.Info("Successfully removed finalizer.", "finalizer_name", key.TeleportOperatorFinalizer)
 	}
 	return nil
 }
@@ -271,10 +273,16 @@ func (r *ClusterReconciler) registerTeleport(ctx context.Context, log logr.Logge
 	}
 
 	if !controllerutil.ContainsFinalizer(cluster, key.TeleportOperatorFinalizer) {
+		patchHelper, err := patch.NewHelper(cluster, r.Client)
+		if err != nil {
+			return errors.WithStack(err)
+		}
 		controllerutil.AddFinalizer(cluster, key.TeleportOperatorFinalizer)
-		if err := r.Update(context.Background(), cluster); err != nil {
+		if err := patchHelper.Patch(ctx, cluster); err != nil {
+			log.Error(err, "failed to add finalizer.")
 			return microerror.Mask(client.IgnoreNotFound(err))
 		}
+		log.Info("Successfully added finalizer.", "finalizer_name", key.TeleportOperatorFinalizer)
 	}
 	return nil
 }

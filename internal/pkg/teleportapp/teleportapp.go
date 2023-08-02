@@ -38,6 +38,10 @@ type AppConfig struct {
 }
 
 func New(config Config) (*TeleportApp, error) {
+	if config.CtrlClient == nil {
+		return nil, microerror.Maskf(invalidConfigError, "%T.CtrlClient must not be empty", config)
+	}
+
 	return &TeleportApp{
 		ctrlClient:     config.CtrlClient,
 		logger:         config.Logger,
