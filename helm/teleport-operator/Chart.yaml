@@ -1,7 +1,6 @@
 name: teleport-operator
 version: [[ .Version ]]
 description: "Teleport operator"
-appVersion: "[[ .AppVersion ]]"
 home: "https://github.com/giantswarm/teleport-operator"
 apiVersion: v1
 annotations:
