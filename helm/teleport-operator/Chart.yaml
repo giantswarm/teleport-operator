@@ -5,3 +5,9 @@ home: "https://github.com/giantswarm/teleport-operator"
 apiVersion: v1
 annotations:
   application.giantswarm.io/team: "bigmac"
+icon: https://s.giantswarm.io/app-icons/teleport/1/light.png
+maintainers:
+  - name: giantswarm/team-bigmac
+    email: team-bigmac@giantswarm.io
+keywords:
+  - Teleport
