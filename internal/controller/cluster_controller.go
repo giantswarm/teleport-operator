@@ -23,12 +23,14 @@ import (
 
 	"github.com/giantswarm/microerror"
 	"github.com/go-logr/logr"
+	"github.com/pkg/errors"
 	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	"k8s.io/apimachinery/pkg/types"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	"sigs.k8s.io/cluster-api/util/patch"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/giantswarm/teleport-operator/internal/pkg/key"
@@ -121,7 +123,11 @@ func (r *ClusterReconciler) ensureClusterDeletion(ctx context.Context, log logr.
 			return microerror.Mask(err)
 		}
 		controllerutil.RemoveFinalizer(cluster, key.TeleportOperatorFinalizer)
-		if err := r.Update(context.Background(), cluster); err != nil {
+		patchHelper, err := patch.NewHelper(cluster, r.Client)
+		if err != nil {
+			return errors.WithStack(err)
+		}
+		if err := patchHelper.Patch(ctx, cluster); err != nil {
 			return microerror.Mask(client.IgnoreNotFound(err))
 		}
 	}
