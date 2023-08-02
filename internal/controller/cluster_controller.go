@@ -122,11 +122,7 @@ func (r *ClusterReconciler) ensureClusterDeletion(ctx context.Context, log logr.
 		}
 		controllerutil.RemoveFinalizer(cluster, key.TeleportOperatorFinalizer)
 		if err := r.Update(context.Background(), cluster); err != nil {
-			if apierrors.IsNotFound(err) {
-				return nil
-			}
-
-			return microerror.Mask(err)
+			return microerror.Mask(client.IgnoreNotFound(err))
 		}
 	}
 	return nil
@@ -271,10 +267,7 @@ func (r *ClusterReconciler) registerTeleport(ctx context.Context, log logr.Logge
 	if !controllerutil.ContainsFinalizer(cluster, key.TeleportOperatorFinalizer) {
 		controllerutil.AddFinalizer(cluster, key.TeleportOperatorFinalizer)
 		if err := r.Update(context.Background(), cluster); err != nil {
-			if apierrors.IsNotFound(err) {
-				return nil
-			}
-			return microerror.Mask(err)
+			return microerror.Mask(client.IgnoreNotFound(err))
 		}
 	}
 	return nil
