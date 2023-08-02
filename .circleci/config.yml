@@ -41,7 +41,7 @@ workflows:
 
       - architect/push-to-app-catalog:
           context: "architect"
-          # executor: "app-build-suite" # uncomment this if you want automatic metadata generation and helm chart linting
+          executor: "app-build-suite" # uncomment this if you want automatic metadata generation and helm chart linting
           name: push-teleport-operator-to-app-catalog
           app_catalog: "control-plane-catalog"
           app_catalog_test: "control-plane-test-catalog"
