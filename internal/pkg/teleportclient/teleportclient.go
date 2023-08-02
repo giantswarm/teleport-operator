@@ -6,13 +6,14 @@ import (
 	"time"
 
 	"github.com/giantswarm/microerror"
-	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 	tc "github.com/gravitational/teleport/api/client"
 	tt "github.com/gravitational/teleport/api/types"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
+
+	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 )
 
 type TeleportClient struct {
