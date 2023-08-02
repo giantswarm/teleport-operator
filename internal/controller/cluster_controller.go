@@ -93,6 +93,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, err
 	}
 
+	// We need to constantly requeue to check the token validity
+	// and re-generate and update secret for the cluster
 	return ctrl.Result{RequeueAfter: 1 * time.Minute}, nil
 }
 
@@ -112,12 +114,11 @@ func (r *ClusterReconciler) ensureClusterDeletion(ctx context.Context, log logr.
 			return microerror.Mask(err)
 		}
 
-		var registerName string
+		registerName := key.GetRegisterName(r.TeleportClient.ManagementClusterName, cluster.Name)
 		if cluster.Name == r.TeleportClient.ManagementClusterName {
 			registerName = cluster.Name
-		} else {
-			registerName = key.GetRegisterName(r.TeleportClient.ManagementClusterName, cluster.Name)
 		}
+		log.Info(fmt.Sprintf("registerName = %s", registerName))
 
 		if err := r.ensureClusterDeregistered(ctx, log, registerName); err != nil {
 			return microerror.Mask(err)
