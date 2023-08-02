@@ -42,5 +42,6 @@ podSecurityContext:
 
 # Add seccomp to container security context
 securityContext:
+  readOnlyRootFilesystem: true
   seccompProfile:
     type: RuntimeDefault
