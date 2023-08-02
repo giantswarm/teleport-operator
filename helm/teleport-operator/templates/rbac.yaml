@@ -25,10 +25,6 @@ rules:
   resources:
   - awsclusters
   - awsclusters/status
-  - awsclusterroleidentities
-  - awsclusterroleidentities/status
-  - awsclustercontrolleridentities
-  - awsclusterstaticidentities
   - clusters
   - clusters/status
   verbs:

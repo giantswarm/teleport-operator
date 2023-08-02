@@ -55,8 +55,6 @@ type ClusterRegisterConfig struct {
 	IsManagementCluster bool
 }
 
-const finalizerName string = "teleport.finalizer.giantswarm.io"
-
 //+kubebuilder:rbac:groups=cluster.x-k8s.io.giantswarm.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=cluster.x-k8s.io.giantswarm.io,resources=clusters/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=cluster.x-k8s.io.giantswarm.io,resources=clusters/finalizers,verbs=update
@@ -104,26 +102,30 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 }
 
 func (r *ClusterReconciler) ensureClusterDeletion(ctx context.Context, log logr.Logger, cluster *capi.Cluster) error {
-	if containsString(cluster.GetFinalizers(), finalizerName) {
+	if controllerutil.ContainsFinalizer(cluster, key.TeleportOperatorFinalizer) {
 		if err := r.deleteSecret(ctx, log, cluster); err != nil {
-			log.Info(err.Error())
+			return microerror.Mask(err)
 		}
 		if err := r.deleteConfigMap(ctx, log, cluster); err != nil {
-			log.Info(err.Error())
+			return microerror.Mask(err)
 		}
 
 		var registerName string
-		if cluster.Name != r.TeleportClient.ManagementClusterName {
-			registerName = key.GetRegisterName(r.TeleportClient.ManagementClusterName, cluster.Name)
-		} else {
+		if cluster.Name == r.TeleportClient.ManagementClusterName {
 			registerName = cluster.Name
+		} else {
+			registerName = key.GetRegisterName(r.TeleportClient.ManagementClusterName, cluster.Name)
 		}
 
 		if err := r.ensureClusterDeregistered(ctx, log, registerName); err != nil {
 			return microerror.Mask(err)
 		}
-		controllerutil.RemoveFinalizer(cluster, finalizerName)
+		controllerutil.RemoveFinalizer(cluster, key.TeleportOperatorFinalizer)
 		if err := r.Update(context.Background(), cluster); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
+
 			return microerror.Mask(err)
 		}
 	}
@@ -131,24 +133,22 @@ func (r *ClusterReconciler) ensureClusterDeletion(ctx context.Context, log logr.
 }
 
 func (r *ClusterReconciler) ensureClusterDeregistered(ctx context.Context, log logr.Logger, registerName string) error {
-	log.Info("Checking if cluster is registered in teleport")
-
+	log.Info("Checking if cluster is registered in teleport...")
 	exists, ks, err := r.TeleportClient.IsClusterRegistered(ctx, registerName)
 	if err != nil {
 		return microerror.Mask(err)
 	}
 
 	if !exists {
-		log.Info("Cluster does not exist in teleport")
+		log.Info("Cluster does not exist in teleport.")
 		return nil
 	}
 
-	log.Info("De-registering teleport kube agent app in cluster")
-
+	log.Info("De-registering cluster from teleport...")
 	if err := r.TeleportClient.DeregisterCluster(ctx, ks); err != nil {
 		return microerror.Mask(err)
 	}
-	log.Info("Cluster de-registered from teleport")
+	log.Info("Cluster de-registered from teleport.")
 
 	return nil
 }
@@ -226,6 +226,11 @@ func (r *ClusterReconciler) deleteSecret(ctx context.Context, log logr.Logger, c
 
 	log.Info("Deleting secret...")
 	if err := r.Delete(ctx, secret); err != nil {
+		if apierrors.IsNotFound(err) {
+			log.Info("Secret does not exists.")
+			return nil
+		}
+
 		return fmt.Errorf("failed to create Secret: %w", err)
 	}
 
@@ -238,10 +243,9 @@ func (r *ClusterReconciler) registerTeleport(ctx context.Context, log logr.Logge
 	var registerName string
 	var isManagementCluster bool
 
-	// If the cluster is a management cluster, install it in giantswarm namespace
 	if cluster.Name == r.TeleportClient.ManagementClusterName {
 		isManagementCluster = true
-		installNamespace = "giantswarm"
+		installNamespace = key.MCTeleportAppDefaultNamespace
 		registerName = cluster.Name
 	} else {
 		isManagementCluster = false
@@ -256,7 +260,6 @@ func (r *ClusterReconciler) registerTeleport(ctx context.Context, log logr.Logge
 		IsManagementCluster: isManagementCluster,
 	}
 
-	// Create teleport join secret if it doesn't exist or update it it's expired
 	if err := r.ensureSecret(ctx, log, &clusterRegisterConfig); err != nil {
 		return microerror.Mask(err)
 	}
@@ -265,9 +268,12 @@ func (r *ClusterReconciler) registerTeleport(ctx context.Context, log logr.Logge
 		return microerror.Mask(err)
 	}
 
-	if !containsString(cluster.GetFinalizers(), finalizerName) {
-		controllerutil.AddFinalizer(cluster, finalizerName)
+	if !controllerutil.ContainsFinalizer(cluster, key.TeleportOperatorFinalizer) {
+		controllerutil.AddFinalizer(cluster, key.TeleportOperatorFinalizer)
 		if err := r.Update(context.Background(), cluster); err != nil {
+			if apierrors.IsNotFound(err) {
+				return nil
+			}
 			return microerror.Mask(err)
 		}
 	}
@@ -306,15 +312,6 @@ func (r *ClusterReconciler) ensureClusterRegistered(ctx context.Context, log log
 	return nil
 }
 
-func containsString(slice []string, s string) bool {
-	for _, item := range slice {
-		if item == s {
-			return true
-		}
-	}
-	return false
-}
-
 func (r *ClusterReconciler) generateJoinToken(ctx context.Context, registerName string) (string, error) {
 	joinToken, err := r.TeleportClient.GetToken(ctx, registerName)
 	if err != nil {
@@ -334,6 +331,11 @@ func (r *ClusterReconciler) deleteConfigMap(ctx context.Context, log logr.Logger
 		},
 	}
 	if err := r.Delete(ctx, &cm); err != nil {
+		if apierrors.IsNotFound(err) {
+			log.Info("ConfigMap does not exist.")
+			return nil
+		}
+
 		return microerror.Mask(err)
 	}
 	log.Info("ConfigMap deleted.")

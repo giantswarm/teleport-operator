@@ -37,8 +37,6 @@ type AppConfig struct {
 	IsManagementCluster bool
 }
 
-const APP_OPERATOR_VERSION = "0.0.0"
-
 func New(config Config) (*TeleportApp, error) {
 	return &TeleportApp{
 		ctrlClient:     config.CtrlClient,
@@ -65,13 +63,8 @@ func (t *TeleportApp) ensureConfigmap(ctx context.Context, config *AppConfig) er
 
 	name := key.GetConfigmapName(configMapName)
 
-	dateTpl := `roles: "kube"
-authToken: "%s"
-proxyAddr: "%s"
-kubeClusterName: "%s"
-`
 	data := map[string]string{
-		"values": fmt.Sprintf(dateTpl, config.JoinToken, t.teleportClient.ProxyAddr, config.RegisterName),
+		"values": t.getConfigmapValues(config),
 	}
 
 	if t.teleportClient.TeleportVersion != "" {
@@ -87,7 +80,7 @@ kubeClusterName: "%s"
 				Name:      name,
 				Namespace: config.InstallNamespace,
 				Labels: map[string]string{
-					label.ManagedBy: key.GetManagedByLabel(),
+					label.ManagedBy: key.TeleportOperatorLabelValue,
 				},
 			},
 			Data: data,
@@ -128,7 +121,7 @@ func (t *TeleportApp) ensureApp(ctx context.Context, config *AppConfig) error {
 		Catalog:    t.teleportClient.AppCatalog,
 		KubeConfig: appSpecKubeConfig,
 		Name:       t.teleportClient.AppName,
-		Namespace:  "kube-system",
+		Namespace:  key.TeleportKubeAppNamespace,
 		UserConfig: appv1alpha1.AppSpecUserConfig{
 			ConfigMap: appv1alpha1.AppSpecUserConfigConfigMap{
 				Name:      key.GetConfigmapName(appName),
@@ -143,14 +136,14 @@ func (t *TeleportApp) ensureApp(ctx context.Context, config *AppConfig) error {
 			Name:      appName,
 			Namespace: config.InstallNamespace,
 			Labels: map[string]string{
-				label.ManagedBy: key.GetManagedByLabel(),
+				label.ManagedBy: key.TeleportOperatorLabelValue,
 				label.Cluster:   config.ClusterName,
 			},
 		},
 		Spec: appSpec,
 	}
 	if config.IsManagementCluster {
-		desiredApp.Labels[label.AppOperatorVersion] = APP_OPERATOR_VERSION
+		desiredApp.Labels[label.AppOperatorVersion] = key.AppOperatorVersion
 	}
 
 	app := appv1alpha1.App{}
@@ -168,4 +161,13 @@ func (t *TeleportApp) ensureApp(ctx context.Context, config *AppConfig) error {
 
 	logger.Info("App already exists.")
 	return nil
+}
+
+func (t *TeleportApp) getConfigmapValues(config *AppConfig) string {
+	dateTpl := `roles: "kube"
+authToken: "%s"
+proxyAddr: "%s"
+kubeClusterName: "%s"
+`
+	return fmt.Sprintf(dateTpl, config.JoinToken, t.teleportClient.ProxyAddr, config.RegisterName)
 }

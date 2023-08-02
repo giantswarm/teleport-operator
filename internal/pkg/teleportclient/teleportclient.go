@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/giantswarm/microerror"
+	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 	tc "github.com/gravitational/teleport/api/client"
 	tt "github.com/gravitational/teleport/api/types"
 	corev1 "k8s.io/api/core/v1"
@@ -25,8 +26,6 @@ type TeleportClient struct {
 	Client                *tc.Client
 }
 
-const TELEPORT_JOIN_TOKEN_VALIDITY = 24 * time.Hour
-
 func New(namespace string) (*TeleportClient, error) {
 	// Get a config to talk to the apiserver
 	cfg, err := config.GetConfig()
@@ -45,7 +44,7 @@ func New(namespace string) (*TeleportClient, error) {
 	// Check if the Secret exists
 	secret := &corev1.Secret{}
 	secretNamespacedName := types.NamespacedName{
-		Name:      "teleport-operator",
+		Name:      key.TeleportOperatorSecretName,
 		Namespace: namespace, // Replace with the correct namespace
 	}
 	if err := c.Get(context.Background(), secretNamespacedName, secret); err != nil {
@@ -123,7 +122,7 @@ func (t *TeleportClient) GetToken(ctx context.Context, registerName string) (str
 	}
 
 	// Generate a token
-	expiration := time.Now().Add(TELEPORT_JOIN_TOKEN_VALIDITY)
+	expiration := time.Now().Add(key.TeleportJoinTokenValidity)
 	token := randSeq(32)
 	newToken, err := tt.NewProvisionToken(token, []tt.SystemRole{tt.RoleKube, tt.RoleNode}, expiration)
 	if err != nil {

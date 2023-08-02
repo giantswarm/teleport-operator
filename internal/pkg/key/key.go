@@ -2,11 +2,18 @@ package key
 
 import (
 	"fmt"
+	"time"
 )
 
-func GetManagedByLabel() string {
-	return "teleport-operator"
-}
+const (
+	AppOperatorVersion            = "0.0.0"
+	TeleportOperatorFinalizer     = "teleport.finalizer.giantswarm.io"
+	MCTeleportAppDefaultNamespace = "giantswarm"
+	TeleportKubeAppNamespace      = "kube-system"
+	TeleportOperatorLabelValue    = "teleport-operator"
+	TeleportOperatorSecretName    = "teleport-operator"
+	TeleportJoinTokenValidity     = 24 * time.Hour
+)
 
 func GetConfigmapName(appName string) string {
 	return fmt.Sprintf("%s-config", appName)
