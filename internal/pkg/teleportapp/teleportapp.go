@@ -59,9 +59,7 @@ func (t *TeleportApp) InstallApp(ctx context.Context, config *AppConfig) error {
 
 func (t *TeleportApp) ensureConfigmap(ctx context.Context, config *AppConfig) error {
 	logger := t.logger.WithValues("cluster", config.ClusterName)
-	configMapName := fmt.Sprintf("%s-%s", config.ClusterName, t.teleportClient.AppName)
-
-	name := key.GetConfigmapName(configMapName)
+	configMapName := key.GetConfigmapName(config.ClusterName, t.teleportClient.AppName)
 
 	data := map[string]string{
 		"values": t.getConfigmapValues(config),
@@ -72,12 +70,12 @@ func (t *TeleportApp) ensureConfigmap(ctx context.Context, config *AppConfig) er
 	}
 
 	cm := corev1.ConfigMap{}
-	err := t.ctrlClient.Get(ctx, client.ObjectKey{Name: name, Namespace: config.InstallNamespace}, &cm)
+	err := t.ctrlClient.Get(ctx, client.ObjectKey{Name: configMapName, Namespace: config.InstallNamespace}, &cm)
 	if errors.IsNotFound(err) {
 		logger.Info("Configmap does not exist.")
 		cm := corev1.ConfigMap{
 			ObjectMeta: metav1.ObjectMeta{
-				Name:      name,
+				Name:      configMapName,
 				Namespace: config.InstallNamespace,
 				Labels: map[string]string{
 					label.ManagedBy: key.TeleportOperatorLabelValue,
@@ -124,7 +122,7 @@ func (t *TeleportApp) ensureApp(ctx context.Context, config *AppConfig) error {
 		Namespace:  key.TeleportKubeAppNamespace,
 		UserConfig: appv1alpha1.AppSpecUserConfig{
 			ConfigMap: appv1alpha1.AppSpecUserConfigConfigMap{
-				Name:      key.GetConfigmapName(appName),
+				Name:      key.GetConfigmapName(config.ClusterName, t.teleportClient.AppName),
 				Namespace: config.InstallNamespace,
 			},
 		},

@@ -15,8 +15,8 @@ const (
 	TeleportJoinTokenValidity     = 24 * time.Hour
 )
 
-func GetConfigmapName(appName string) string {
-	return fmt.Sprintf("%s-config", appName)
+func GetConfigmapName(clusterName string, appName string) string {
+	return fmt.Sprintf("%s-%s-config", clusterName, appName)
 }
 
 func GetSecretName(clusterName string) string {

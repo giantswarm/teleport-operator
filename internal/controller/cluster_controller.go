@@ -118,7 +118,6 @@ func (r *ClusterReconciler) ensureClusterDeletion(ctx context.Context, log logr.
 		if cluster.Name == r.TeleportClient.ManagementClusterName {
 			registerName = cluster.Name
 		}
-		log.Info(fmt.Sprintf("registerName = %s", registerName))
 
 		if err := r.ensureClusterDeregistered(ctx, log, registerName); err != nil {
 			return microerror.Mask(err)
@@ -322,11 +321,11 @@ func (r *ClusterReconciler) generateJoinToken(ctx context.Context, registerName 
 
 func (r *ClusterReconciler) deleteConfigMap(ctx context.Context, log logr.Logger, cluster *capi.Cluster) error {
 	log.Info("Deleting config map...")
-	configMapName := fmt.Sprintf("%s-%s", cluster.Name, r.TeleportClient.AppName)
+	configMapName := key.GetConfigmapName(cluster.Name, r.TeleportClient.AppName)
 
 	cm := corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      key.GetConfigmapName(configMapName),
+			Name:      configMapName,
 			Namespace: cluster.Namespace,
 		},
 	}
