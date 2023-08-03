@@ -79,7 +79,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return ctrl.Result{}, nil
 		}
 
-		return ctrl.Result{}, err
+		return ctrl.Result{}, microerror.Mask(err)
 	}
 
 	// Check if the cluster instance is marked to be deleted, which is indicated by the deletion timestamp being set.
@@ -90,7 +90,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// Register teleport for MC/WC
 	if err := r.registerTeleport(ctx, log, cluster); err != nil {
-		return ctrl.Result{}, err
+		return ctrl.Result{}, microerror.Mask(err)
 	}
 
 	// We need to constantly requeue to check the token validity
@@ -170,20 +170,20 @@ func (r *ClusterReconciler) ensureSecret(ctx context.Context, log logr.Logger, c
 			log.Info(fmt.Sprintf("Secret does not exist: %s", secretName))
 			joinToken, err := r.generateJoinToken(ctx, config.RegisterName)
 			if err != nil {
-				return err
+				return microerror.Mask(err)
 			}
 			log.Info("Generated node join token.")
 			secret.StringData = map[string]string{
 				"joinToken": joinToken,
 			}
 			if err := r.Create(ctx, secret); err != nil {
-				return fmt.Errorf("failed to create Secret: %w", err)
+				return microerror.Mask(fmt.Errorf("failed to create Secret: %w", err))
 			} else {
 				log.Info(fmt.Sprintf("Secret created: %s", secretName))
 				return nil
 			}
 		} else {
-			return fmt.Errorf("failed to get Secret: %w", err)
+			return microerror.Mask(fmt.Errorf("failed to get Secret: %w", err))
 		}
 	}
 
@@ -196,13 +196,13 @@ func (r *ClusterReconciler) ensureSecret(ctx context.Context, log logr.Logger, c
 
 	isTokenValid, err := r.TeleportClient.IsTokenValid(ctx, string(oldTokenBytes), config.RegisterName)
 	if err != nil {
-		return fmt.Errorf("failed to verify token validity: %w", err)
+		return microerror.Mask(fmt.Errorf("failed to verify token validity: %w", err))
 	}
 	if !isTokenValid {
 		log.Info("Join token has expired.")
 		joinToken, err := r.generateJoinToken(ctx, config.RegisterName)
 		if err != nil {
-			return err
+			return microerror.Mask(err)
 		}
 		log.Info("Join token re-generated")
 		secret.StringData = map[string]string{
@@ -235,7 +235,7 @@ func (r *ClusterReconciler) deleteSecret(ctx context.Context, log logr.Logger, c
 			return nil
 		}
 
-		return fmt.Errorf("failed to create Secret: %w", err)
+		return microerror.Mask(fmt.Errorf("failed to create Secret: %w", err))
 	}
 
 	log.Info("Secret deleted.")
@@ -290,7 +290,7 @@ func (r *ClusterReconciler) registerTeleport(ctx context.Context, log logr.Logge
 func (r *ClusterReconciler) ensureClusterRegistered(ctx context.Context, log logr.Logger, config *ClusterRegisterConfig) error {
 	isRegistered, _, err := r.TeleportClient.IsClusterRegistered(ctx, config.RegisterName)
 	if err != nil {
-		return err
+		return microerror.Mask(err)
 	}
 
 	if isRegistered {
@@ -301,7 +301,7 @@ func (r *ClusterReconciler) ensureClusterRegistered(ctx context.Context, log log
 
 	joinToken, err := r.generateJoinToken(ctx, config.RegisterName)
 	if err != nil {
-		return err
+		return microerror.Mask(err)
 	}
 
 	installAppConfig := teleportapp.AppConfig{
@@ -322,7 +322,7 @@ func (r *ClusterReconciler) ensureClusterRegistered(ctx context.Context, log log
 func (r *ClusterReconciler) generateJoinToken(ctx context.Context, registerName string) (string, error) {
 	joinToken, err := r.TeleportClient.GetToken(ctx, registerName)
 	if err != nil {
-		return "", fmt.Errorf("failed to generate token: %w", err)
+		return "", microerror.Mask(fmt.Errorf("failed to generate token: %w", err))
 	}
 	return joinToken, nil
 }

@@ -12,6 +12,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
+	"github.com/giantswarm/microerror"
 	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 )
 
@@ -30,63 +31,63 @@ func New(namespace string) (*TeleportClient, error) {
 	// Get a config to talk to the apiserver
 	cfg, err := config.GetConfig()
 	if err != nil {
-		return nil, fmt.Errorf("unable to get config to talk to the apiserver: %s", err)
+		return nil, microerror.Mask(fmt.Errorf("unable to get config to talk to the apiserver: %s", err))
 	}
 
 	// Create a new client
 	c, err := client.New(cfg, client.Options{})
 	if err != nil {
-		return nil, fmt.Errorf("unable to create a new client: %s", err)
+		return nil, microerror.Mask(fmt.Errorf("unable to create a new client: %s", err))
 	}
 
 	// Check if the Secret exists
 	secret := &corev1.Secret{}
 	secretNamespacedName := types.NamespacedName{
 		Name:      key.TeleportOperatorSecretName,
-		Namespace: namespace, // Replace with the correct namespace
+		Namespace: namespace,
 	}
 	if err := c.Get(context.Background(), secretNamespacedName, secret); err != nil {
-		return nil, err
+		return nil, microerror.Mask(err)
 	}
 
 	proxyAddr, err := getSecretString(secret, "proxyAddr")
 	if err != nil {
-		return nil, err
+		return nil, microerror.Mask(err)
 	}
 
 	identityFile, err := getSecretString(secret, "identityFile")
 	if err != nil {
-		return nil, err
+		return nil, microerror.Mask(err)
 	}
 
 	managementClusterName, err := getSecretString(secret, "managementClusterName")
 	if err != nil {
-		return nil, err
+		return nil, microerror.Mask(err)
 	}
 
 	teleportVersion, err := getSecretString(secret, "teleportVersion")
 	if err != nil {
-		return nil, err
+		return nil, microerror.Mask(err)
 	}
 
 	appName, err := getSecretString(secret, "appName")
 	if err != nil {
-		return nil, err
+		return nil, microerror.Mask(err)
 	}
 
 	appVersion, err := getSecretString(secret, "appVersion")
 	if err != nil {
-		return nil, err
+		return nil, microerror.Mask(err)
 	}
 
 	appCatalog, err := getSecretString(secret, "appCatalog")
 	if err != nil {
-		return nil, err
+		return nil, microerror.Mask(err)
 	}
 
 	client, err := getClient(context.TODO(), proxyAddr, identityFile)
 	if err != nil {
-		return nil, err
+		return nil, microerror.Mask(err)
 	}
 
 	return &TeleportClient{
@@ -112,12 +113,12 @@ func getClient(ctx context.Context, proxyAddr, identityFile string) (*tc.Client,
 	})
 
 	if err != nil {
-		return nil, err
+		return nil, microerror.Mask(err)
 	}
 
 	_, err = c.Ping(ctx)
 	if err != nil {
-		return nil, err
+		return nil, microerror.Mask(err)
 	}
 
 	return c, nil
