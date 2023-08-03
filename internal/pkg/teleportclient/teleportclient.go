@@ -13,6 +13,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	"github.com/giantswarm/microerror"
+
 	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 )
 

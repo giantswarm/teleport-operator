@@ -209,7 +209,7 @@ func (r *ClusterReconciler) ensureSecret(ctx context.Context, log logr.Logger, c
 			"joinToken": joinToken,
 		}
 		if err := r.Update(ctx, secret); err != nil {
-			return fmt.Errorf("failed to update Secret: %w", err)
+			return microerror.Mask(fmt.Errorf("failed to update Secret: %w", err))
 		} else {
 			log.Info(fmt.Sprintf("Secret updated: %s", secretName))
 		}
