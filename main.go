@@ -36,8 +36,7 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 
 	"github.com/giantswarm/teleport-operator/internal/controller"
-	"github.com/giantswarm/teleport-operator/internal/pkg/teleportapp"
-	"github.com/giantswarm/teleport-operator/internal/pkg/teleportclient"
+	"github.com/giantswarm/teleport-operator/internal/pkg/teleport"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -98,29 +97,26 @@ func main() {
 		os.Exit(1)
 	}
 
-	teleportClient, err := teleportclient.New(namespace)
-	if err != nil {
-		setupLog.Error(err, "unable to create teleport client")
-		os.Exit(1)
-	}
-	setupLog.Info("teleport client created", "proxy address", teleportClient.ProxyAddr)
-
-	teleportApp, err := teleportapp.New(teleportapp.Config{
-		CtrlClient:     mgr.GetClient(),
-		Logger:         ctrl.Log.WithName("teleportapp"),
-		TeleportClient: teleportClient,
+	_teleport := teleport.New(&teleport.Config{
+		Namespace: namespace,
 	})
 	if err != nil {
-		setupLog.Error(err, "unable to create teleport app helper")
+		setupLog.Error(err, "unable to get teleport client")
 		os.Exit(1)
 	}
 
+	_teleport.Client, err = _teleport.GetClient()
+	if err != nil {
+		setupLog.Error(err, "unable to connect to teleport cluster")
+		os.Exit(1)
+	}
+	setupLog.Info("Connected to teleport cluster", "proxyAddr", _teleport.Secret.ProxyAddr)
+
 	if err = (&controller.ClusterReconciler{
-		Client:         mgr.GetClient(),
-		Log:            ctrl.Log.WithName("controllers").WithName("Cluster"),
-		Scheme:         mgr.GetScheme(),
-		TeleportApp:    teleportApp,
-		TeleportClient: teleportClient,
+		Client:   mgr.GetClient(),
+		Log:      ctrl.Log.WithName("controllers").WithName("Cluster"),
+		Scheme:   mgr.GetScheme(),
+		Teleport: _teleport,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 		os.Exit(1)

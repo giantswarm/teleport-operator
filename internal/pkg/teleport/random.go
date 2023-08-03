@@ -1,4 +1,4 @@
-package teleportclient
+package teleport
 
 import (
 	"time"
