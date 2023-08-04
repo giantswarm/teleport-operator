@@ -82,6 +82,7 @@ func (t *Teleport) getConfigmapValues(config *AppConfig) string {
 authToken: "%s"
 proxyAddr: "%s"
 kubeClusterName: "%s"
+apps: []
 `
 	return fmt.Sprintf(dateTpl, config.JoinToken, t.Config.ProxyAddr, config.RegisterName)
 }
