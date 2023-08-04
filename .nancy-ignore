@@ -31,3 +31,5 @@ CVE-2022-42708
 CVE-2021-32026
 #pkg:golang/go.mongodb.org/mongo-driver@v1.1.2
 CVE-2021-20329
+#pkg:golang/golang.org/x/net@v0.10.0
+CVE-2023-3978
