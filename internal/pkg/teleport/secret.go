@@ -7,8 +7,9 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 
 	"github.com/giantswarm/microerror"
-	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+
+	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"

@@ -12,8 +12,9 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 
 	"github.com/giantswarm/microerror"
-	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+
+	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 )
 
 type Teleport struct {
@@ -24,9 +25,16 @@ type Teleport struct {
 	Namespace  string
 }
 
-func New(config *Config) *Teleport {
+type ClusterRegisterConfig struct {
+	ClusterName         string
+	RegisterName        string
+	InstallNamespace    string
+	IsManagementCluster bool
+}
+
+func New(namespace string) *Teleport {
 	return &Teleport{
-		Namespace: config.Namespace,
+		Namespace: namespace,
 	}
 }
 

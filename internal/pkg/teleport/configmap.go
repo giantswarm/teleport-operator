@@ -6,9 +6,10 @@ import (
 
 	"github.com/giantswarm/k8smetadata/pkg/label"
 	"github.com/giantswarm/microerror"
-	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/api/errors"
+
+	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -21,7 +22,7 @@ func (t *Teleport) EnsureConfigmap(ctx context.Context, config *InstallAppConfig
 	configMapName := key.GetConfigmapName(config.ClusterName, t.Secret.AppName)
 
 	data := map[string]string{
-		"values": t.GetConfigmapValues(config),
+		"values": t.getConfigmapValues(config),
 	}
 
 	if t.Secret.TeleportVersion != "" {
@@ -56,15 +57,6 @@ func (t *Teleport) EnsureConfigmap(ctx context.Context, config *InstallAppConfig
 	return nil
 }
 
-func (t *Teleport) GetConfigmapValues(config *InstallAppConfig) string {
-	dateTpl := `roles: "kube"
-authToken: "%s"
-proxyAddr: "%s"
-kubeClusterName: "%s"
-`
-	return fmt.Sprintf(dateTpl, config.JoinToken, t.Secret.ProxyAddr, config.RegisterName)
-}
-
 func (t *Teleport) DeleteConfigMap(ctx context.Context, cluster *capi.Cluster) error {
 	t.Logger.Info("Deleting config map...")
 	configMapName := key.GetConfigmapName(cluster.Name, t.Secret.AppName)
@@ -83,4 +75,13 @@ func (t *Teleport) DeleteConfigMap(ctx context.Context, cluster *capi.Cluster) e
 	}
 	t.Logger.Info("ConfigMap deleted.")
 	return nil
+}
+
+func (t *Teleport) getConfigmapValues(config *InstallAppConfig) string {
+	dateTpl := `roles: "kube"
+authToken: "%s"
+proxyAddr: "%s"
+kubeClusterName: "%s"
+`
+	return fmt.Sprintf(dateTpl, config.JoinToken, t.Secret.ProxyAddr, config.RegisterName)
 }

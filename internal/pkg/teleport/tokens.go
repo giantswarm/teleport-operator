@@ -6,8 +6,9 @@ import (
 	"time"
 
 	"github.com/giantswarm/microerror"
-	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 	tt "github.com/gravitational/teleport/api/types"
+
+	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 )
 
 func (t *Teleport) IsTokenValid(ctx context.Context, oldToken string, registerName string) (bool, error) {

@@ -97,9 +97,7 @@ func main() {
 		os.Exit(1)
 	}
 
-	_teleport := teleport.New(&teleport.Config{
-		Namespace: namespace,
-	})
+	_teleport := teleport.New(namespace)
 	if err != nil {
 		setupLog.Error(err, "unable to get teleport client")
 		os.Exit(1)

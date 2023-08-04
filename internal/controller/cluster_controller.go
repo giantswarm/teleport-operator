@@ -21,12 +21,13 @@ import (
 	"time"
 
 	"github.com/giantswarm/microerror"
-	"github.com/giantswarm/teleport-operator/internal/pkg/teleport"
 	"github.com/go-logr/logr"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
+
+	"github.com/giantswarm/teleport-operator/internal/pkg/teleport"
 
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
