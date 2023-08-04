@@ -17,7 +17,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (t *Teleport) EnsureClusterConfigmap(ctx context.Context, config *InstallAppConfig) error {
+func (t *Teleport) EnsureClusterConfigmap(ctx context.Context, config *AppConfig) error {
 	logger := t.Logger.WithValues("cluster", config.ClusterName)
 	configMapName := key.GetConfigmapName(config.ClusterName, t.Config.AppName)
 
@@ -77,7 +77,7 @@ func (t *Teleport) DeleteClusterConfigMap(ctx context.Context, cluster *capi.Clu
 	return nil
 }
 
-func (t *Teleport) getConfigmapValues(config *InstallAppConfig) string {
+func (t *Teleport) getConfigmapValues(config *AppConfig) string {
 	dateTpl := `roles: "kube"
 authToken: "%s"
 proxyAddr: "%s"

@@ -13,7 +13,7 @@ import (
 	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 )
 
-type InstallAppConfig struct {
+type AppConfig struct {
 	InstallNamespace    string
 	RegisterName        string
 	ClusterName         string
@@ -21,7 +21,7 @@ type InstallAppConfig struct {
 	IsManagementCluster bool
 }
 
-func (t *Teleport) InstallApp(ctx context.Context, config *InstallAppConfig) error {
+func (t *Teleport) InstallApp(ctx context.Context, config *AppConfig) error {
 	if err := t.EnsureClusterConfigmap(ctx, config); err != nil {
 		return microerror.Mask(err)
 	}
@@ -33,7 +33,7 @@ func (t *Teleport) InstallApp(ctx context.Context, config *InstallAppConfig) err
 	return nil
 }
 
-func (t *Teleport) ensureApp(ctx context.Context, config *InstallAppConfig) error {
+func (t *Teleport) ensureApp(ctx context.Context, config *AppConfig) error {
 	logger := t.Logger.WithValues("cluster", config.ClusterName)
 
 	appSpecKubeConfig := appv1alpha1.AppSpecKubeConfig{

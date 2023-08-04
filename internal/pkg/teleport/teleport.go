@@ -146,14 +146,14 @@ func (t *Teleport) ensureClusterRegistered(ctx context.Context, config *ClusterR
 	if err != nil {
 		return microerror.Mask(err)
 	}
-	installAppConfig := InstallAppConfig{
+
+	err = t.InstallApp(ctx, &AppConfig{
 		InstallNamespace:    config.InstallNamespace,
 		RegisterName:        config.RegisterName,
 		ClusterName:         config.ClusterName,
 		JoinToken:           joinToken,
 		IsManagementCluster: config.IsManagementCluster,
-	}
-	err = t.InstallApp(ctx, &installAppConfig)
+	})
 	if err != nil {
 		return microerror.Mask(err)
 	}
