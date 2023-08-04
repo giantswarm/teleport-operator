@@ -22,20 +22,6 @@ type AppConfig struct {
 }
 
 func (t *Teleport) InstallApp(ctx context.Context, config *AppConfig) error {
-	if err := t.EnsureClusterConfigmap(ctx, config); err != nil {
-		return microerror.Mask(err)
-	}
-
-	if err := t.ensureApp(ctx, config); err != nil {
-		return microerror.Mask(err)
-	}
-
-	return nil
-}
-
-func (t *Teleport) ensureApp(ctx context.Context, config *AppConfig) error {
-	logger := t.Logger.WithValues("cluster", config.ClusterName)
-
 	appSpecKubeConfig := appv1alpha1.AppSpecKubeConfig{
 		InCluster: config.IsManagementCluster,
 	}
@@ -83,16 +69,16 @@ func (t *Teleport) ensureApp(ctx context.Context, config *AppConfig) error {
 	app := appv1alpha1.App{}
 	err := t.CtrlClient.Get(ctx, client.ObjectKey{Name: appName, Namespace: config.InstallNamespace}, &app)
 	if errors.IsNotFound(err) {
-		logger.Info("Installing teleport-kube-agent app...")
+		t.Logger.Info("Installing teleport-kube-agent app...")
 		if err = t.CtrlClient.Create(ctx, &desiredApp); err != nil {
 			return microerror.Mask(err)
 		}
-		logger.Info("App created.")
+		t.Logger.Info("App created.")
 		return nil
 	} else if err != nil {
 		return microerror.Mask(err)
 	}
 
-	logger.Info("App already exists.")
+	t.Logger.Info("App already exists.")
 	return nil
 }

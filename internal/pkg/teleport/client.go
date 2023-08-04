@@ -26,7 +26,7 @@ func (t *Teleport) GetClient() (*tc.Client, error) {
 	}
 
 	if t.Config, err = t.GetConfigFromSecret(ctx); err != nil {
-		return nil, microerror.Mask(fmt.Errorf("unable to create get config from secret: %s", err))
+		return nil, microerror.Mask(fmt.Errorf("unable to get config from secret: %s", err))
 	}
 
 	teleportClient, err := tc.New(ctx, tc.Config{
