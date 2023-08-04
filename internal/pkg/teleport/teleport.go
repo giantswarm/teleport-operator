@@ -18,7 +18,7 @@ import (
 )
 
 type Teleport struct {
-	Secret     *TeleportSecret
+	Config     *Config
 	Logger     logr.Logger
 	CtrlClient client.Client
 	Client     *tc.Client
@@ -38,42 +38,19 @@ func New(namespace string) *Teleport {
 	}
 }
 
-func (t *Teleport) IsClusterRegistered(ctx context.Context, registerName string) (bool, tt.KubeServer, error) {
-	ks, err := t.Client.GetKubernetesServers(ctx)
-	if err != nil {
-		return false, nil, err
-	}
-
-	for _, k := range ks {
-		if k.GetCluster().GetName() == registerName {
-			return true, k, nil
-		}
-	}
-
-	return false, nil, nil
-}
-
-func (t *Teleport) DeregisterCluster(ctx context.Context, ks tt.KubeServer) error {
-	if err := t.Client.DeleteKubernetesServer(ctx, ks.GetHostID(), ks.GetCluster().GetName()); err != nil {
-		return err
-	}
-
-	return nil
-}
-
-func (t *Teleport) RegisterTeleport(ctx context.Context, cluster *capi.Cluster) error {
+func (t *Teleport) EnsureClusterRegistered(ctx context.Context, cluster *capi.Cluster) error {
 	var installNamespace string
 	var registerName string
 	var isManagementCluster bool
 
-	if cluster.Name == t.Secret.ManagementClusterName {
+	if cluster.Name == t.Config.ManagementClusterName {
 		isManagementCluster = true
 		installNamespace = key.MCTeleportAppDefaultNamespace
 		registerName = cluster.Name
 	} else {
 		isManagementCluster = false
 		installNamespace = cluster.Namespace
-		registerName = key.GetRegisterName(t.Secret.ManagementClusterName, cluster.Name)
+		registerName = key.GetRegisterName(t.Config.ManagementClusterName, cluster.Name)
 	}
 
 	clusterRegisterConfig := ClusterRegisterConfig{
@@ -83,7 +60,7 @@ func (t *Teleport) RegisterTeleport(ctx context.Context, cluster *capi.Cluster) 
 		IsManagementCluster: isManagementCluster,
 	}
 
-	if err := t.EnsureSecret(ctx, &clusterRegisterConfig); err != nil {
+	if err := t.EnsureClusterSecret(ctx, &clusterRegisterConfig); err != nil {
 		return microerror.Mask(err)
 	}
 
@@ -106,21 +83,26 @@ func (t *Teleport) RegisterTeleport(ctx context.Context, cluster *capi.Cluster) 
 	return nil
 }
 
-func (t *Teleport) EnsureClusterDeletion(ctx context.Context, cluster *capi.Cluster) error {
+func (t *Teleport) EnsureClusterDeregistered(ctx context.Context, cluster *capi.Cluster) error {
 	if controllerutil.ContainsFinalizer(cluster, key.TeleportOperatorFinalizer) {
-		if err := t.DeleteSecret(ctx, cluster); err != nil {
+		// Clean up secrets and configmaps for the cluster
+		if err := t.DeleteClusterSecret(ctx, cluster); err != nil {
 			return microerror.Mask(err)
 		}
-		if err := t.DeleteConfigMap(ctx, cluster); err != nil {
+		if err := t.DeleteClusterConfigMap(ctx, cluster); err != nil {
 			return microerror.Mask(err)
 		}
-		registerName := key.GetRegisterName(t.Secret.ManagementClusterName, cluster.Name)
-		if cluster.Name == t.Secret.ManagementClusterName {
+
+		// De-register the cluster from teleport cluster
+		registerName := key.GetRegisterName(t.Config.ManagementClusterName, cluster.Name)
+		if cluster.Name == t.Config.ManagementClusterName {
 			registerName = cluster.Name
 		}
 		if err := t.ensureClusterDeregistered(ctx, registerName); err != nil {
 			return microerror.Mask(err)
 		}
+
+		// Remove the finalizer
 		patchHelper, err := patch.NewHelper(cluster, t.CtrlClient)
 		if err != nil {
 			return errors.WithStack(err)
@@ -135,33 +117,23 @@ func (t *Teleport) EnsureClusterDeletion(ctx context.Context, cluster *capi.Clus
 	return nil
 }
 
-func (t *Teleport) ensureClusterDeregistered(ctx context.Context, registerName string) error {
-	t.Logger.Info("Checking if cluster is registered in teleport...")
-	exists, ks, err := t.IsClusterRegistered(ctx, registerName)
+func (t *Teleport) isClusterRegistered(ctx context.Context, registerName string) (bool, tt.KubeServer, error) {
+	ks, err := t.Client.GetKubernetesServers(ctx)
 	if err != nil {
-		return microerror.Mask(err)
+		return false, nil, err
 	}
-	if !exists {
-		t.Logger.Info("Cluster does not exist in teleport.")
-		return nil
-	}
-	t.Logger.Info("De-registering cluster from teleport...")
-	if err := t.deregisterCluster(ctx, ks); err != nil {
-		return microerror.Mask(err)
-	}
-	t.Logger.Info("Cluster de-registered from teleport.")
-	return nil
-}
 
-func (t *Teleport) deregisterCluster(ctx context.Context, ks tt.KubeServer) error {
-	if err := t.Client.DeleteKubernetesServer(ctx, ks.GetHostID(), ks.GetCluster().GetName()); err != nil {
-		return microerror.Mask(err)
+	for _, k := range ks {
+		if k.GetCluster().GetName() == registerName {
+			return true, k, nil
+		}
 	}
-	return nil
+
+	return false, nil, nil
 }
 
 func (t *Teleport) ensureClusterRegistered(ctx context.Context, config *ClusterRegisterConfig) error {
-	isRegistered, _, err := t.IsClusterRegistered(ctx, config.RegisterName)
+	isRegistered, _, err := t.isClusterRegistered(ctx, config.RegisterName)
 	if err != nil {
 		return microerror.Mask(err)
 	}
@@ -183,6 +155,31 @@ func (t *Teleport) ensureClusterRegistered(ctx context.Context, config *ClusterR
 	}
 	err = t.InstallApp(ctx, &installAppConfig)
 	if err != nil {
+		return microerror.Mask(err)
+	}
+	return nil
+}
+
+func (t *Teleport) ensureClusterDeregistered(ctx context.Context, registerName string) error {
+	t.Logger.Info("Checking if cluster is registered in teleport...")
+	exists, ks, err := t.isClusterRegistered(ctx, registerName)
+	if err != nil {
+		return microerror.Mask(err)
+	}
+	if !exists {
+		t.Logger.Info("Cluster does not exist in teleport.")
+		return nil
+	}
+	t.Logger.Info("De-registering cluster from teleport...")
+	if err := t.deregisterCluster(ctx, ks); err != nil {
+		return microerror.Mask(err)
+	}
+	t.Logger.Info("Cluster de-registered from teleport.")
+	return nil
+}
+
+func (t *Teleport) deregisterCluster(ctx context.Context, ks tt.KubeServer) error {
+	if err := t.Client.DeleteKubernetesServer(ctx, ks.GetHostID(), ks.GetCluster().GetName()); err != nil {
 		return microerror.Mask(err)
 	}
 	return nil

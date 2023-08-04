@@ -69,11 +69,11 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// Check if the cluster instance is marked to be deleted, which is indicated by the deletion timestamp being set.
 	// if it is, delete the cluster from teleport
 	if !cluster.DeletionTimestamp.IsZero() {
-		return ctrl.Result{}, r.Teleport.EnsureClusterDeletion(ctx, cluster)
+		return ctrl.Result{}, r.Teleport.EnsureClusterDeregistered(ctx, cluster)
 	}
 
 	// Register teleport for MC/WC
-	if err := r.Teleport.RegisterTeleport(ctx, cluster); err != nil {
+	if err := r.Teleport.EnsureClusterRegistered(ctx, cluster); err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 

@@ -22,7 +22,7 @@ type InstallAppConfig struct {
 }
 
 func (t *Teleport) InstallApp(ctx context.Context, config *InstallAppConfig) error {
-	if err := t.EnsureConfigmap(ctx, config); err != nil {
+	if err := t.EnsureClusterConfigmap(ctx, config); err != nil {
 		return microerror.Mask(err)
 	}
 
@@ -50,19 +50,19 @@ func (t *Teleport) ensureApp(ctx context.Context, config *InstallAppConfig) erro
 		}
 	}
 
-	appName := key.GetAppName(config.ClusterName, t.Secret.AppName)
+	appName := key.GetAppName(config.ClusterName, t.Config.AppName)
 	appSpec := appv1alpha1.AppSpec{
-		Catalog:    t.Secret.AppCatalog,
+		Catalog:    t.Config.AppCatalog,
 		KubeConfig: appSpecKubeConfig,
-		Name:       t.Secret.AppName,
+		Name:       t.Config.AppName,
 		Namespace:  key.TeleportKubeAppNamespace,
 		UserConfig: appv1alpha1.AppSpecUserConfig{
 			ConfigMap: appv1alpha1.AppSpecUserConfigConfigMap{
-				Name:      key.GetConfigmapName(config.ClusterName, t.Secret.AppName),
+				Name:      key.GetConfigmapName(config.ClusterName, t.Config.AppName),
 				Namespace: config.InstallNamespace,
 			},
 		},
-		Version: t.Secret.AppVersion,
+		Version: t.Config.AppVersion,
 	}
 
 	desiredApp := appv1alpha1.App{

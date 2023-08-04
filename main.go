@@ -108,7 +108,7 @@ func main() {
 		setupLog.Error(err, "unable to connect to teleport cluster")
 		os.Exit(1)
 	}
-	setupLog.Info("Connected to teleport cluster", "proxyAddr", _teleport.Secret.ProxyAddr)
+	setupLog.Info("Connected to teleport cluster", "proxyAddr", _teleport.Config.ProxyAddr)
 
 	if err = (&controller.ClusterReconciler{
 		Client:   mgr.GetClient(),

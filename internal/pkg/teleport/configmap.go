@@ -17,16 +17,16 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (t *Teleport) EnsureConfigmap(ctx context.Context, config *InstallAppConfig) error {
+func (t *Teleport) EnsureClusterConfigmap(ctx context.Context, config *InstallAppConfig) error {
 	logger := t.Logger.WithValues("cluster", config.ClusterName)
-	configMapName := key.GetConfigmapName(config.ClusterName, t.Secret.AppName)
+	configMapName := key.GetConfigmapName(config.ClusterName, t.Config.AppName)
 
 	data := map[string]string{
 		"values": t.getConfigmapValues(config),
 	}
 
-	if t.Secret.TeleportVersion != "" {
-		data["values"] = fmt.Sprintf("%steleportVersionOverride: %q", data["values"], t.Secret.TeleportVersion)
+	if t.Config.TeleportVersion != "" {
+		data["values"] = fmt.Sprintf("%steleportVersionOverride: %q", data["values"], t.Config.TeleportVersion)
 	}
 
 	cm := corev1.ConfigMap{}
@@ -57,9 +57,9 @@ func (t *Teleport) EnsureConfigmap(ctx context.Context, config *InstallAppConfig
 	return nil
 }
 
-func (t *Teleport) DeleteConfigMap(ctx context.Context, cluster *capi.Cluster) error {
+func (t *Teleport) DeleteClusterConfigMap(ctx context.Context, cluster *capi.Cluster) error {
 	t.Logger.Info("Deleting config map...")
-	configMapName := key.GetConfigmapName(cluster.Name, t.Secret.AppName)
+	configMapName := key.GetConfigmapName(cluster.Name, t.Config.AppName)
 	cm := corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      configMapName,
@@ -83,5 +83,5 @@ authToken: "%s"
 proxyAddr: "%s"
 kubeClusterName: "%s"
 `
-	return fmt.Sprintf(dateTpl, config.JoinToken, t.Secret.ProxyAddr, config.RegisterName)
+	return fmt.Sprintf(dateTpl, config.JoinToken, t.Config.ProxyAddr, config.RegisterName)
 }

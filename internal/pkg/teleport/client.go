@@ -25,16 +25,16 @@ func (t *Teleport) GetClient() (*tc.Client, error) {
 		return nil, microerror.Mask(fmt.Errorf("unable to create a new kubernetes client: %s", err))
 	}
 
-	if t.Secret, err = t.GetSecret(ctx); err != nil {
-		return nil, microerror.Mask(fmt.Errorf("unable to create get secret: %s", err))
+	if t.Config, err = t.GetConfigFromSecret(ctx); err != nil {
+		return nil, microerror.Mask(fmt.Errorf("unable to create get config from secret: %s", err))
 	}
 
 	teleportClient, err := tc.New(ctx, tc.Config{
 		Addrs: []string{
-			t.Secret.ProxyAddr,
+			t.Config.ProxyAddr,
 		},
 		Credentials: []tc.Credentials{
-			tc.LoadIdentityFileFromString(t.Secret.IdentityFile),
+			tc.LoadIdentityFileFromString(t.Config.IdentityFile),
 		},
 	})
 	if err != nil {

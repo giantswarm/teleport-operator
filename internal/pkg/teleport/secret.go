@@ -16,7 +16,7 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 )
 
-type TeleportSecret struct {
+type Config struct {
 	ProxyAddr             string
 	IdentityFile          string
 	TeleportVersion       string
@@ -26,7 +26,7 @@ type TeleportSecret struct {
 	AppCatalog            string
 }
 
-func (t *Teleport) GetSecret(ctx context.Context) (*TeleportSecret, error) {
+func (t *Teleport) GetConfigFromSecret(ctx context.Context) (*Config, error) {
 	secret := &corev1.Secret{}
 
 	if err := t.CtrlClient.Get(ctx, types.NamespacedName{
@@ -71,7 +71,7 @@ func (t *Teleport) GetSecret(ctx context.Context) (*TeleportSecret, error) {
 		return nil, microerror.Mask(err)
 	}
 
-	return &TeleportSecret{
+	return &Config{
 		IdentityFile:          identityFile,
 		ProxyAddr:             proxyAddr,
 		ManagementClusterName: managementClusterName,
@@ -82,7 +82,7 @@ func (t *Teleport) GetSecret(ctx context.Context) (*TeleportSecret, error) {
 	}, nil
 }
 
-func (t *Teleport) EnsureSecret(ctx context.Context, config *ClusterRegisterConfig) error {
+func (t *Teleport) EnsureClusterSecret(ctx context.Context, config *ClusterRegisterConfig) error {
 	secretName := key.GetSecretName(config.ClusterName) //#nosec G101
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
@@ -141,7 +141,7 @@ func (t *Teleport) EnsureSecret(ctx context.Context, config *ClusterRegisterConf
 	return nil
 }
 
-func (t *Teleport) DeleteSecret(ctx context.Context, cluster *capi.Cluster) error {
+func (t *Teleport) DeleteClusterSecret(ctx context.Context, cluster *capi.Cluster) error {
 	secretName := key.GetSecretName(cluster.Name) //#nosec G101
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
