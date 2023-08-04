@@ -82,34 +82,6 @@ func (t *Teleport) GetSecret(ctx context.Context) (*TeleportSecret, error) {
 	}, nil
 }
 
-func (t *Teleport) DeleteSecret(ctx context.Context, cluster *capi.Cluster) error {
-	secretName := key.GetSecretName(cluster.Name) //#nosec G101
-	secret := &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      secretName,
-			Namespace: cluster.Namespace,
-		},
-	}
-	t.Logger.Info("Deleting secret...")
-	if err := t.CtrlClient.Delete(ctx, secret); err != nil {
-		if apierrors.IsNotFound(err) {
-			t.Logger.Info("Secret does not exists.")
-			return nil
-		}
-		return microerror.Mask(fmt.Errorf("failed to create Secret: %w", err))
-	}
-	t.Logger.Info("Secret deleted.")
-	return nil
-}
-
-func getSecretString(secret *corev1.Secret, key string) (string, error) {
-	b, ok := secret.Data[key]
-	if !ok {
-		return "", fmt.Errorf("malformed Secret: required key %q not found", key)
-	}
-	return string(b), nil
-}
-
 func (t *Teleport) EnsureSecret(ctx context.Context, config *ClusterRegisterConfig) error {
 	secretName := key.GetSecretName(config.ClusterName) //#nosec G101
 	secret := &corev1.Secret{
@@ -167,4 +139,32 @@ func (t *Teleport) EnsureSecret(ctx context.Context, config *ClusterRegisterConf
 		t.Logger.Info("Join token is valid, nothing to do.")
 	}
 	return nil
+}
+
+func (t *Teleport) DeleteSecret(ctx context.Context, cluster *capi.Cluster) error {
+	secretName := key.GetSecretName(cluster.Name) //#nosec G101
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: cluster.Namespace,
+		},
+	}
+	t.Logger.Info("Deleting secret...")
+	if err := t.CtrlClient.Delete(ctx, secret); err != nil {
+		if apierrors.IsNotFound(err) {
+			t.Logger.Info("Secret does not exists.")
+			return nil
+		}
+		return microerror.Mask(fmt.Errorf("failed to create Secret: %w", err))
+	}
+	t.Logger.Info("Secret deleted.")
+	return nil
+}
+
+func getSecretString(secret *corev1.Secret, key string) (string, error) {
+	b, ok := secret.Data[key]
+	if !ok {
+		return "", fmt.Errorf("malformed Secret: required key %q not found", key)
+	}
+	return string(b), nil
 }
