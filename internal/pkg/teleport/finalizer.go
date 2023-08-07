@@ -4,11 +4,12 @@ import (
 	"context"
 
 	"github.com/giantswarm/microerror"
-	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 	"github.com/pkg/errors"
 	"sigs.k8s.io/cluster-api/util/patch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
+
+	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 )
 
 func RemoveFinalizer(ctx context.Context, config *TeleportConfig) error {
