@@ -76,6 +76,6 @@ func (t *Teleport) InstallKubeAgentApp(ctx context.Context, config *TeleportConf
 		return microerror.Mask(err)
 	}
 
-	config.Log.Info("App installed", "appName", appName)
+	config.Log.Info("Installed teleport kube agent app", "appName", appName)
 	return nil
 }

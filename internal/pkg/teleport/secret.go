@@ -142,7 +142,7 @@ func (t *Teleport) CreateSecret(ctx context.Context, config *TeleportConfig, tok
 	if err := config.CtrlClient.Create(ctx, secret); err != nil {
 		return microerror.Mask(fmt.Errorf("failed to create Secret: %w", err))
 	}
-	config.Log.Info("Secret created with new teleport join token", "secretName", secretName)
+	config.Log.Info("Created secret with new teleport join token", "secretName", secretName)
 	return nil
 }
 
@@ -160,7 +160,7 @@ func (t *Teleport) UpdateSecret(ctx context.Context, config *TeleportConfig, tok
 	if err := config.CtrlClient.Update(ctx, secret); err != nil {
 		return microerror.Mask(fmt.Errorf("failed to update Secret: %w", err))
 	}
-	config.Log.Info("Secret updated with new teleport join token", "secretName", secretName)
+	config.Log.Info("Updated secret with new teleport join token", "secretName", secretName)
 	return nil
 }
 
