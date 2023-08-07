@@ -7,82 +7,85 @@ import (
 	"github.com/giantswarm/k8smetadata/pkg/label"
 	"github.com/giantswarm/microerror"
 	corev1 "k8s.io/api/core/v1"
-	"k8s.io/apimachinery/pkg/api/errors"
 
 	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (t *Teleport) EnsureClusterConfigmap(ctx context.Context, config *AppConfig) error {
-	logger := t.Logger.WithValues("cluster", config.ClusterName)
-	configMapName := key.GetConfigmapName(config.ClusterName, t.Config.AppName)
+func (t *Teleport) CreateConfigMap(ctx context.Context, config *TeleportConfig, token string) error {
+	configMapName := key.GetConfigmapName(config.Cluster.Name, t.SecretConfig.AppName)
 
-	data := map[string]string{
-		"values": t.getConfigmapValues(config),
-	}
-
-	if t.Config.TeleportVersion != "" {
-		data["values"] = fmt.Sprintf("%steleportVersionOverride: %q", data["values"], t.Config.TeleportVersion)
+	configMapData := map[string]string{
+		"values": t.getConfigMapData(config, token),
 	}
 
 	cm := corev1.ConfigMap{}
-	err := t.CtrlClient.Get(ctx, client.ObjectKey{Name: configMapName, Namespace: config.InstallNamespace}, &cm)
-	if errors.IsNotFound(err) {
-		logger.Info("Configmap does not exist.")
-		cm := corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{
-				Name:      configMapName,
-				Namespace: config.InstallNamespace,
-				Labels: map[string]string{
-					label.ManagedBy: key.TeleportOperatorLabelValue,
+	if err := config.CtrlClient.Get(ctx, client.ObjectKey{Name: configMapName, Namespace: config.InstallNamespace}, &cm); err != nil {
+		if apierrors.IsNotFound(err) {
+			cm := corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      configMapName,
+					Namespace: config.InstallNamespace,
+					Labels: map[string]string{
+						label.ManagedBy: key.TeleportOperatorLabelValue,
+					},
 				},
-			},
-			Data: data,
-		}
+				Data: configMapData,
+			}
 
-		err = t.CtrlClient.Create(ctx, &cm)
-		if err != nil {
-			return microerror.Mask(err)
-		}
+			if err = config.CtrlClient.Create(ctx, &cm); err != nil {
+				return microerror.Mask(err)
+			}
 
-		logger.Info("Configmap created.")
-		return nil
+			config.Log.Info("ConfigMap created", "configMapName", configMapName)
+			return nil
+		}
 	}
 
-	logger.Info("Configmap exists.")
 	return nil
 }
 
-func (t *Teleport) DeleteClusterConfigMap(ctx context.Context, cluster *capi.Cluster) error {
-	t.Logger.Info("Deleting config map...")
-	configMapName := key.GetConfigmapName(cluster.Name, t.Config.AppName)
+func (t *Teleport) DeleteConfigMap(ctx context.Context, config *TeleportConfig) error {
+	configMapName := key.GetConfigmapName(config.Cluster.Name, t.SecretConfig.AppName)
 	cm := corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      configMapName,
-			Namespace: cluster.Namespace,
+			Namespace: config.Cluster.Namespace,
 		},
 	}
-	if err := t.CtrlClient.Delete(ctx, &cm); err != nil {
+
+	if err := config.CtrlClient.Delete(ctx, &cm); err != nil {
 		if apierrors.IsNotFound(err) {
-			t.Logger.Info("ConfigMap does not exist.")
 			return nil
 		}
 		return microerror.Mask(err)
 	}
-	t.Logger.Info("ConfigMap deleted.")
+
+	config.Log.Info("Deleted configmap", "configMap", configMapName)
 	return nil
 }
 
-func (t *Teleport) getConfigmapValues(config *AppConfig) string {
-	dateTpl := `roles: "kube"
+func (t *Teleport) getConfigMapData(config *TeleportConfig, token string) string {
+	var (
+		authToken               = token
+		proxyAddr               = t.SecretConfig.ProxyAddr
+		kubeClusterName         = config.RegisterName
+		teleportVersionOverride = t.SecretConfig.TeleportVersion
+	)
+
+	dataTpl := `roles: "kube"
 authToken: "%s"
 proxyAddr: "%s"
 kubeClusterName: "%s"
 apps: []
 `
-	return fmt.Sprintf(dateTpl, config.JoinToken, t.Config.ProxyAddr, config.RegisterName)
+
+	if t.SecretConfig.TeleportVersion != "" {
+		dataTpl = fmt.Sprintf("%steleportVersionOverride: %q", dataTpl, teleportVersionOverride)
+	}
+
+	return fmt.Sprintf(dataTpl, authToken, proxyAddr, kubeClusterName)
 }

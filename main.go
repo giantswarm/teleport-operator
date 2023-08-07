@@ -97,24 +97,24 @@ func main() {
 		os.Exit(1)
 	}
 
-	_teleport := teleport.New(namespace)
+	secretConfig, err := teleport.GetConfigFromSecret(namespace)
 	if err != nil {
-		setupLog.Error(err, "unable to get teleport client")
+		setupLog.Error(err, "unable to get secret config")
 		os.Exit(1)
 	}
 
-	_teleport.Client, err = _teleport.GetClient()
-	if err != nil {
-		setupLog.Error(err, "unable to connect to teleport cluster")
+	tele := teleport.New(namespace, secretConfig)
+	if tele.TeleportClient, err = tele.GetTeleportClient(); err != nil {
+		setupLog.Error(err, "unable to create teleport client")
 		os.Exit(1)
 	}
-	setupLog.Info("Connected to teleport cluster", "proxyAddr", _teleport.Config.ProxyAddr)
+	setupLog.Info("Connected to the teleport cluster", "proxyAddr", tele.SecretConfig.ProxyAddr)
 
 	if err = (&controller.ClusterReconciler{
 		Client:   mgr.GetClient(),
 		Log:      ctrl.Log.WithName("controllers").WithName("Cluster"),
 		Scheme:   mgr.GetScheme(),
-		Teleport: _teleport,
+		Teleport: tele,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 		os.Exit(1)

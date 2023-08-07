@@ -12,7 +12,7 @@ const (
 	TeleportKubeAppNamespace      = "kube-system"
 	TeleportOperatorLabelValue    = "teleport-operator"
 	TeleportOperatorSecretName    = "teleport-operator"
-	TeleportJoinTokenValidity     = 24 * time.Hour
+	TeleportTokenValidity         = 24 * time.Hour
 )
 
 func GetConfigmapName(clusterName string, appName string) string {

@@ -4,9 +4,9 @@ registry:
   domain: docker.io
 
 teleport:
-  appCatalog: giantswarm-playground-test
+  appCatalog: giantswarm-catalog
   appName: teleport-kube-agent
-  appVersion: 0.1.0-9b59f0bf85e7314aa9820e247e0a3bef21ea02cc
+  appVersion: 0.3.0
   managementClusterName: ""
   proxyAddr: test.teleport.giantswarm.io:443
   teleportVersion: 13.1.5
