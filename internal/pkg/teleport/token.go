@@ -29,10 +29,11 @@ func (t *Teleport) IsTokenValid(ctx context.Context, config *TeleportConfig, old
 }
 
 func (t *Teleport) GenerateToken(ctx context.Context, config *TeleportConfig) (string, error) {
-	var (
-		tokenValidity = time.Now().Add(key.TeleportTokenValidity)
-		randomToken   = utils.CryptoRandomHex(key.TeleportTokenLength)
-	)
+	tokenValidity := time.Now().Add(key.TeleportTokenValidity)
+	randomToken, err := utils.CryptoRandomHex(key.TeleportTokenLength)
+	if err != nil {
+		return "", err
+	}
 
 	token, err := tt.NewProvisionToken(randomToken, []tt.SystemRole{tt.RoleKube, tt.RoleNode}, tokenValidity)
 	if err != nil {
