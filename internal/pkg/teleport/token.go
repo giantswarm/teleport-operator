@@ -5,7 +5,6 @@ import (
 	"time"
 
 	tt "github.com/gravitational/teleport/api/types"
-	"github.com/gravitational/teleport/lib/utils"
 
 	"github.com/giantswarm/microerror"
 
@@ -30,7 +29,7 @@ func (t *Teleport) IsTokenValid(ctx context.Context, config *TeleportConfig, old
 
 func (t *Teleport) GenerateToken(ctx context.Context, config *TeleportConfig) (string, error) {
 	tokenValidity := time.Now().Add(key.TeleportTokenValidity)
-	randomToken, err := utils.CryptoRandomHex(key.TeleportTokenLength)
+	randomToken, err := key.CryptoRandomHex(key.TeleportTokenLength)
 	if err != nil {
 		return "", err
 	}
