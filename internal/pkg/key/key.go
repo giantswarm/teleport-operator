@@ -13,6 +13,7 @@ const (
 	TeleportOperatorLabelValue    = "teleport-operator"
 	TeleportOperatorSecretName    = "teleport-operator"
 	TeleportTokenValidity         = 24 * time.Hour
+	TeleportTokenLength           = 16
 )
 
 func GetConfigmapName(clusterName string, appName string) string {

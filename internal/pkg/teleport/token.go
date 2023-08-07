@@ -2,11 +2,10 @@ package teleport
 
 import (
 	"context"
-	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	tt "github.com/gravitational/teleport/api/types"
+	"github.com/gravitational/teleport/lib/utils"
 
 	"github.com/giantswarm/microerror"
 
@@ -32,10 +31,10 @@ func (t *Teleport) IsTokenValid(ctx context.Context, config *TeleportConfig, old
 func (t *Teleport) GenerateToken(ctx context.Context, config *TeleportConfig) (string, error) {
 	var (
 		tokenValidity = time.Now().Add(key.TeleportTokenValidity)
-		uniqueToken   = strings.Replace(uuid.NewString(), "-", "", -1)
+		randomToken   = utils.CryptoRandomHex(key.TeleportTokenLength)
 	)
 
-	token, err := tt.NewProvisionToken(uniqueToken, []tt.SystemRole{tt.RoleKube, tt.RoleNode}, tokenValidity)
+	token, err := tt.NewProvisionToken(randomToken, []tt.SystemRole{tt.RoleKube, tt.RoleNode}, tokenValidity)
 	if err != nil {
 		return "", err
 	}
