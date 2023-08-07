@@ -14,7 +14,7 @@ import (
 func (t *Teleport) IsTokenValid(ctx context.Context, config *TeleportConfig, oldToken string) (bool, error) {
 	tokens, err := t.TeleportClient.GetTokens(ctx)
 	if err != nil {
-		return false, err
+		return false, microerror.Mask(err)
 	}
 	for _, token := range tokens {
 		if token.GetMetadata().Labels["cluster"] == config.RegisterName {
@@ -31,12 +31,12 @@ func (t *Teleport) GenerateToken(ctx context.Context, config *TeleportConfig) (s
 	tokenValidity := time.Now().Add(key.TeleportTokenValidity)
 	randomToken, err := key.CryptoRandomHex(key.TeleportTokenLength)
 	if err != nil {
-		return "", err
+		return "", microerror.Mask(err)
 	}
 
 	token, err := tt.NewProvisionToken(randomToken, []tt.SystemRole{tt.RoleKube, tt.RoleNode}, tokenValidity)
 	if err != nil {
-		return "", err
+		return "", microerror.Mask(err)
 	}
 	// Set cluster label to token
 	{
@@ -46,7 +46,7 @@ func (t *Teleport) GenerateToken(ctx context.Context, config *TeleportConfig) (s
 		}
 		token.SetMetadata(m)
 		if err := t.TeleportClient.UpsertToken(ctx, token); err != nil {
-			return "", err
+			return "", microerror.Mask(err)
 		}
 	}
 	return token.GetName(), nil
