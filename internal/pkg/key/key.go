@@ -35,3 +35,18 @@ func GetAppSpecKubeConfigSecretName(clusterName string) string {
 func GetAppName(clusterName string, appName string) string {
 	return fmt.Sprintf("%s-%s", clusterName, appName)
 }
+
+func GetConfigmapDataFromTemplate(authToken string, proxyAddr string, kubeClusterName string, teleportVersion string) string {
+	dataTpl := `roles: "kube"
+authToken: "%s"
+proxyAddr: "%s"
+kubeClusterName: "%s"
+apps: []
+`
+
+	if teleportVersion != "" {
+		dataTpl = fmt.Sprintf("%steleportVersionOverride: %q", dataTpl, teleportVersion)
+	}
+
+	return fmt.Sprintf(dataTpl, authToken, proxyAddr, kubeClusterName)
+}

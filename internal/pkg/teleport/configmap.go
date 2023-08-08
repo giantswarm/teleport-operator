@@ -2,7 +2,6 @@ package teleport
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/giantswarm/k8smetadata/pkg/label"
 	"github.com/giantswarm/microerror"
@@ -79,16 +78,5 @@ func (t *Teleport) getConfigMapData(registerName string, token string) string {
 		teleportVersionOverride = t.SecretConfig.TeleportVersion
 	)
 
-	dataTpl := `roles: "kube"
-authToken: "%s"
-proxyAddr: "%s"
-kubeClusterName: "%s"
-apps: []
-`
-
-	if t.SecretConfig.TeleportVersion != "" {
-		dataTpl = fmt.Sprintf("%steleportVersionOverride: %q", dataTpl, teleportVersionOverride)
-	}
-
-	return fmt.Sprintf(dataTpl, authToken, proxyAddr, kubeClusterName)
+	return key.GetConfigmapDataFromTemplate(authToken, proxyAddr, kubeClusterName, teleportVersionOverride)
 }
