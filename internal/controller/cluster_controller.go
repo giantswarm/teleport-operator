@@ -68,56 +68,43 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	var (
-		installNamespace    string
-		registerName        string
-		isManagementCluster bool
+		installNamespace    = key.TeleportKubeAppDefaultNamespace
+		registerName        = cluster.Name
+		isManagementCluster = true
 	)
 
-	if cluster.Name == r.Teleport.SecretConfig.ManagementClusterName {
-		isManagementCluster = true
-		installNamespace = key.MCTeleportAppDefaultNamespace
-		registerName = cluster.Name
-	} else {
-		isManagementCluster = false
+	if cluster.Name != r.Teleport.SecretConfig.ManagementClusterName {
 		installNamespace = cluster.Namespace
 		registerName = key.GetRegisterName(r.Teleport.SecretConfig.ManagementClusterName, cluster.Name)
-	}
-
-	teleportConfig := &teleport.TeleportConfig{
-		Log:                 log,
-		CtrlClient:          r.Client,
-		Cluster:             cluster,
-		RegisterName:        registerName,
-		InstallNamespace:    installNamespace,
-		IsManagementCluster: isManagementCluster,
+		isManagementCluster = false
 	}
 
 	// Check if the cluster instance is marked to be deleted, which is indicated by the deletion timestamp being set.
 	// if it is, delete the cluster from teleport
 	if !cluster.DeletionTimestamp.IsZero() {
 		// Delete teleport token for the cluster
-		if err := r.Teleport.DeleteToken(ctx, teleportConfig); err != nil {
+		if err := r.Teleport.DeleteToken(ctx, log, registerName); err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
 
 		// Delete teleport kubernetes resource for the cluster
-		if err := r.Teleport.DeleteClusterFromTeleport(ctx, teleportConfig); err != nil {
+		if err := r.Teleport.DeleteClusterFromTeleport(ctx, log, registerName); err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
 
 		// Delete Secret for the cluster
-		if err := r.Teleport.DeleteSecret(ctx, teleportConfig); err != nil {
+		if err := r.Teleport.DeleteSecret(ctx, log, r.Client, cluster.Name, cluster.Namespace); err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
 
 		// Delete ConfigMap for the cluster
-		if err := r.Teleport.DeleteConfigMap(ctx, teleportConfig); err != nil {
+		if err := r.Teleport.DeleteConfigMap(ctx, log, r.Client, cluster.Name, cluster.Namespace); err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
 
 		// Remove finalizer from the Cluster CR
 		if controllerutil.ContainsFinalizer(cluster, key.TeleportOperatorFinalizer) {
-			if err := teleport.RemoveFinalizer(ctx, teleportConfig); err != nil {
+			if err := teleport.RemoveFinalizer(ctx, log, cluster, r.Client); err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
 		}
@@ -127,23 +114,23 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// Add finalizer to cluster CR if it's not there
 	if !controllerutil.ContainsFinalizer(cluster, key.TeleportOperatorFinalizer) {
-		if err := teleport.AddFinalizer(ctx, teleportConfig); err != nil {
+		if err := teleport.AddFinalizer(ctx, log, cluster, r.Client); err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
 	}
 
 	// Check if the secret exists in the cluster, if not, generate teleport token and create the secret
 	// if it is, check teleport token validity, and update the secret if teleport token has expired
-	secret, err := r.Teleport.GetSecret(ctx, teleportConfig)
+	secret, err := r.Teleport.GetSecret(ctx, log, r.Client, cluster.Name, cluster.Namespace)
 	if err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 	if secret == nil {
-		token, err := r.Teleport.GenerateToken(ctx, teleportConfig, "node")
+		token, err := r.Teleport.GenerateToken(ctx, registerName, "node")
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
-		if err := r.Teleport.CreateSecret(ctx, teleportConfig, token); err != nil {
+		if err := r.Teleport.CreateSecret(ctx, log, r.Client, cluster.Name, cluster.Namespace, token); err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
 	} else {
@@ -151,16 +138,16 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
-		tokenValid, err := r.Teleport.IsTokenValid(ctx, teleportConfig, token, "node")
+		tokenValid, err := r.Teleport.IsTokenValid(ctx, registerName, token, "node")
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
 		if !tokenValid {
-			token, err := r.Teleport.GenerateToken(ctx, teleportConfig, "node")
+			token, err := r.Teleport.GenerateToken(ctx, registerName, "node")
 			if err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
-			if err := r.Teleport.UpdateSecret(ctx, teleportConfig, token); err != nil {
+			if err := r.Teleport.UpdateSecret(ctx, log, r.Client, cluster.Name, cluster.Namespace, token); err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
 		} else {
@@ -170,7 +157,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// Check if the cluster is registered in teleport, if not, check if app is teleport-kube-agent app installed
 	// if app is not installed, installed it
-	clusterRegisteredInTeleport, err := r.Teleport.IsClusterRegisteredInTeleport(ctx, teleportConfig)
+	clusterRegisteredInTeleport, err := r.Teleport.IsClusterRegisteredInTeleport(ctx, log, registerName)
 	if err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
 	}
@@ -178,19 +165,19 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if !clusterRegisteredInTeleport {
 		// Check if teleport-kube-agent app is installed for the cluster, if not,
 		// create configmap with newly generated teleport token and install the app
-		kubeAgentAppInstalled, err := r.Teleport.IsKubeAgentAppInstalled(ctx, teleportConfig)
+		kubeAgentAppInstalled, err := r.Teleport.IsKubeAgentAppInstalled(ctx, r.Client, cluster.Name, installNamespace)
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
 		if !kubeAgentAppInstalled {
-			token, err := r.Teleport.GenerateToken(ctx, teleportConfig, "kube")
+			token, err := r.Teleport.GenerateToken(ctx, registerName, "kube")
 			if err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
-			if err := r.Teleport.CreateConfigMap(ctx, teleportConfig, token); err != nil {
+			if err := r.Teleport.CreateConfigMap(ctx, log, r.Client, cluster.Name, registerName, installNamespace, token); err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
-			if err := r.Teleport.InstallKubeAgentApp(ctx, teleportConfig); err != nil {
+			if err := r.Teleport.InstallKubeAgentApp(ctx, log, r.Client, cluster.Name, registerName, installNamespace, isManagementCluster); err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
 		}

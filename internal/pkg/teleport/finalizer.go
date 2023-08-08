@@ -4,7 +4,9 @@ import (
 	"context"
 
 	"github.com/giantswarm/microerror"
+	"github.com/go-logr/logr"
 	"github.com/pkg/errors"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	"sigs.k8s.io/cluster-api/util/patch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
@@ -12,32 +14,32 @@ import (
 	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 )
 
-func RemoveFinalizer(ctx context.Context, config *TeleportConfig) error {
-	patchHelper, err := patch.NewHelper(config.Cluster, config.CtrlClient)
+func RemoveFinalizer(ctx context.Context, log logr.Logger, cluster *capi.Cluster, ctrlClient client.Client) error {
+	patchHelper, err := patch.NewHelper(cluster, ctrlClient)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	controllerutil.RemoveFinalizer(config.Cluster, key.TeleportOperatorFinalizer)
-	if err := patchHelper.Patch(ctx, config.Cluster); err != nil {
-		config.Log.Error(err, "failed to remove finalizer")
+	controllerutil.RemoveFinalizer(cluster, key.TeleportOperatorFinalizer)
+	if err := patchHelper.Patch(ctx, cluster); err != nil {
+		log.Error(err, "failed to remove finalizer")
 		return microerror.Mask(client.IgnoreNotFound(err))
 	}
-	config.Log.Info("Removed finalizer", "finalizer_name", key.TeleportOperatorFinalizer)
+	log.Info("Removed finalizer", "finalizer_name", key.TeleportOperatorFinalizer)
 	return nil
 }
 
-func AddFinalizer(ctx context.Context, config *TeleportConfig) error {
-	patchHelper, err := patch.NewHelper(config.Cluster, config.CtrlClient)
+func AddFinalizer(ctx context.Context, log logr.Logger, cluster *capi.Cluster, ctrlClient client.Client) error {
+	patchHelper, err := patch.NewHelper(cluster, ctrlClient)
 	if err != nil {
 		return errors.WithStack(err)
 	}
 
-	controllerutil.AddFinalizer(config.Cluster, key.TeleportOperatorFinalizer)
-	if err := patchHelper.Patch(ctx, config.Cluster); err != nil {
-		config.Log.Error(err, "failed to add finalizer")
+	controllerutil.AddFinalizer(cluster, key.TeleportOperatorFinalizer)
+	if err := patchHelper.Patch(ctx, cluster); err != nil {
+		log.Error(err, "failed to add finalizer")
 		return microerror.Mask(client.IgnoreNotFound(err))
 	}
-	config.Log.Info("Added finalizer", "finalizer_name", key.TeleportOperatorFinalizer)
+	log.Info("Added finalizer", "finalizer_name", key.TeleportOperatorFinalizer)
 	return nil
 }

@@ -9,6 +9,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client/config"
 
 	"github.com/giantswarm/microerror"
+	"github.com/go-logr/logr"
 
 	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 
@@ -97,10 +98,10 @@ func GetConfigFromSecret(namespace string) (*SecretConfig, error) {
 	}, nil
 }
 
-func (t *Teleport) GetSecret(ctx context.Context, config *TeleportConfig) (*corev1.Secret, error) {
+func (t *Teleport) GetSecret(ctx context.Context, log logr.Logger, ctrlClient client.Client, clusterName string, clusterNamespace string) (*corev1.Secret, error) {
 	var (
-		secretName           = key.GetSecretName(config.Cluster.Name) //#nosec G101
-		secretNamespace      = config.Cluster.Namespace
+		secretName           = key.GetSecretName(clusterName) //#nosec G101
+		secretNamespace      = clusterNamespace
 		secretNamespacedName = types.NamespacedName{Name: secretName, Namespace: secretNamespace}
 		secret               = &corev1.Secret{
 			ObjectMeta: metav1.ObjectMeta{
@@ -110,7 +111,7 @@ func (t *Teleport) GetSecret(ctx context.Context, config *TeleportConfig) (*core
 		}
 	)
 
-	if err := config.CtrlClient.Get(ctx, secretNamespacedName, secret); err != nil {
+	if err := ctrlClient.Get(ctx, secretNamespacedName, secret); err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil, nil
 		}
@@ -128,57 +129,57 @@ func (t *Teleport) GetTokenFromSecret(ctx context.Context, secret *corev1.Secret
 	return string(tokenBytes), nil
 }
 
-func (t *Teleport) CreateSecret(ctx context.Context, config *TeleportConfig, token string) error {
-	secretName := key.GetSecretName(config.Cluster.Name) //#nosec G101
+func (t *Teleport) CreateSecret(ctx context.Context, log logr.Logger, ctrlClient client.Client, clusterName string, clusterNamespace string, token string) error {
+	secretName := key.GetSecretName(clusterName) //#nosec G101
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
-			Namespace: config.Cluster.Namespace,
+			Namespace: clusterNamespace,
 		},
 		StringData: map[string]string{
 			"joinToken": token,
 		},
 	}
-	if err := config.CtrlClient.Create(ctx, secret); err != nil {
+	if err := ctrlClient.Create(ctx, secret); err != nil {
 		return microerror.Mask(fmt.Errorf("failed to create Secret: %w", err))
 	}
-	config.Log.Info("Created secret with new teleport join token", "secretName", secretName)
+	log.Info("Created secret with new teleport join token", "secretName", secretName)
 	return nil
 }
 
-func (t *Teleport) UpdateSecret(ctx context.Context, config *TeleportConfig, token string) error {
-	secretName := key.GetSecretName(config.Cluster.Name) //#nosec G101
+func (t *Teleport) UpdateSecret(ctx context.Context, log logr.Logger, ctrlClient client.Client, clusterName string, clusterNamespace string, token string) error {
+	secretName := key.GetSecretName(clusterName) //#nosec G101
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
-			Namespace: config.Cluster.Namespace,
+			Namespace: clusterNamespace,
 		},
 		StringData: map[string]string{
 			"joinToken": token,
 		},
 	}
-	if err := config.CtrlClient.Update(ctx, secret); err != nil {
+	if err := ctrlClient.Update(ctx, secret); err != nil {
 		return microerror.Mask(fmt.Errorf("failed to update Secret: %w", err))
 	}
-	config.Log.Info("Updated secret with new teleport join token", "secretName", secretName)
+	log.Info("Updated secret with new teleport join token", "secretName", secretName)
 	return nil
 }
 
-func (t *Teleport) DeleteSecret(ctx context.Context, config *TeleportConfig) error {
-	secretName := key.GetSecretName(config.Cluster.Name) //#nosec G101
+func (t *Teleport) DeleteSecret(ctx context.Context, log logr.Logger, ctrlClient client.Client, clusterName string, clusterNamespace string) error {
+	secretName := key.GetSecretName(clusterName) //#nosec G101
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
-			Namespace: config.Cluster.Namespace,
+			Namespace: clusterNamespace,
 		},
 	}
-	if err := config.CtrlClient.Delete(ctx, secret); err != nil {
+	if err := ctrlClient.Delete(ctx, secret); err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil
 		}
 		return microerror.Mask(fmt.Errorf("failed to delete Secret: %w", err))
 	}
-	config.Log.Info("Deleted secret", "secretName", secretName)
+	log.Info("Deleted secret", "secretName", secretName)
 	return nil
 }
 

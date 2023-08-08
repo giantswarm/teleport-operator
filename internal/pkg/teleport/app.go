@@ -6,6 +6,7 @@ import (
 	appv1alpha1 "github.com/giantswarm/apiextensions-application/api/v1alpha1"
 	"github.com/giantswarm/k8smetadata/pkg/label"
 	"github.com/giantswarm/microerror"
+	"github.com/go-logr/logr"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -13,11 +14,11 @@ import (
 	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 )
 
-func (t *Teleport) IsKubeAgentAppInstalled(ctx context.Context, config *TeleportConfig) (bool, error) {
-	appName := key.GetAppName(config.Cluster.Name, t.SecretConfig.AppName)
+func (t *Teleport) IsKubeAgentAppInstalled(ctx context.Context, ctrlClient client.Client, clusterName string, installNamespace string) (bool, error) {
+	appName := key.GetAppName(clusterName, t.SecretConfig.AppName)
 	app := appv1alpha1.App{}
 
-	err := config.CtrlClient.Get(ctx, client.ObjectKey{Name: appName, Namespace: config.InstallNamespace}, &app)
+	err := ctrlClient.Get(ctx, client.ObjectKey{Name: appName, Namespace: installNamespace}, &app)
 	if apierrors.IsNotFound(err) {
 		return false, nil
 	} else if err != nil {
@@ -27,22 +28,22 @@ func (t *Teleport) IsKubeAgentAppInstalled(ctx context.Context, config *Teleport
 	return true, nil
 }
 
-func (t *Teleport) InstallKubeAgentApp(ctx context.Context, config *TeleportConfig) error {
+func (t *Teleport) InstallKubeAgentApp(ctx context.Context, log logr.Logger, ctrlClient client.Client, clusterName string, registerName string, installNamespace string, isManagementCluster bool) error {
 	appSpecKubeConfig := appv1alpha1.AppSpecKubeConfig{
-		InCluster: config.IsManagementCluster,
+		InCluster: isManagementCluster,
 	}
 
-	if !config.IsManagementCluster {
+	if !isManagementCluster {
 		appSpecKubeConfig.Context = appv1alpha1.AppSpecKubeConfigContext{
-			Name: config.RegisterName,
+			Name: registerName,
 		}
 		appSpecKubeConfig.Secret = appv1alpha1.AppSpecKubeConfigSecret{
-			Name:      key.GetAppSpecKubeConfigSecretName(config.Cluster.Name),
-			Namespace: config.InstallNamespace,
+			Name:      key.GetAppSpecKubeConfigSecretName(clusterName),
+			Namespace: installNamespace,
 		}
 	}
 
-	appName := key.GetAppName(config.Cluster.Name, t.SecretConfig.AppName)
+	appName := key.GetAppName(clusterName, t.SecretConfig.AppName)
 	appSpec := appv1alpha1.AppSpec{
 		Catalog:    t.SecretConfig.AppCatalog,
 		KubeConfig: appSpecKubeConfig,
@@ -50,8 +51,8 @@ func (t *Teleport) InstallKubeAgentApp(ctx context.Context, config *TeleportConf
 		Namespace:  key.TeleportKubeAppNamespace,
 		UserConfig: appv1alpha1.AppSpecUserConfig{
 			ConfigMap: appv1alpha1.AppSpecUserConfigConfigMap{
-				Name:      key.GetConfigmapName(config.Cluster.Name, t.SecretConfig.AppName),
-				Namespace: config.InstallNamespace,
+				Name:      key.GetConfigmapName(clusterName, t.SecretConfig.AppName),
+				Namespace: installNamespace,
 			},
 		},
 		Version: t.SecretConfig.AppVersion,
@@ -60,22 +61,22 @@ func (t *Teleport) InstallKubeAgentApp(ctx context.Context, config *TeleportConf
 	desiredApp := appv1alpha1.App{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      appName,
-			Namespace: config.InstallNamespace,
+			Namespace: installNamespace,
 			Labels: map[string]string{
 				label.ManagedBy: key.TeleportOperatorLabelValue,
-				label.Cluster:   config.Cluster.Name,
+				label.Cluster:   clusterName,
 			},
 		},
 		Spec: appSpec,
 	}
-	if config.IsManagementCluster {
+	if isManagementCluster {
 		desiredApp.Labels[label.AppOperatorVersion] = key.AppOperatorVersion
 	}
 
-	if err := config.CtrlClient.Create(ctx, &desiredApp); err != nil {
+	if err := ctrlClient.Create(ctx, &desiredApp); err != nil {
 		return microerror.Mask(err)
 	}
 
-	config.Log.Info("Installed teleport kube agent app", "appName", appName)
+	log.Info("Installed teleport kube agent app", "appName", appName)
 	return nil
 }

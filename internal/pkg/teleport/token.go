@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/go-logr/logr"
 	"github.com/google/uuid"
 	tt "github.com/gravitational/teleport/api/types"
 
@@ -12,13 +13,13 @@ import (
 	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 )
 
-func (t *Teleport) IsTokenValid(ctx context.Context, config *TeleportConfig, oldToken string, tokenType string) (bool, error) {
+func (t *Teleport) IsTokenValid(ctx context.Context, registerName string, oldToken string, tokenType string) (bool, error) {
 	tokens, err := t.TeleportClient.GetTokens(ctx)
 	if err != nil {
 		return false, microerror.Mask(err)
 	}
 	for _, token := range tokens {
-		if token.GetMetadata().Labels["cluster"] == config.RegisterName && token.GetMetadata().Labels["type"] == tokenType {
+		if token.GetMetadata().Labels["cluster"] == registerName && token.GetMetadata().Labels["type"] == tokenType {
 			if token.GetName() == oldToken {
 				return true, nil
 			}
@@ -28,7 +29,7 @@ func (t *Teleport) IsTokenValid(ctx context.Context, config *TeleportConfig, old
 	return false, nil
 }
 
-func (t *Teleport) GenerateToken(ctx context.Context, config *TeleportConfig, tokenType string) (string, error) {
+func (t *Teleport) GenerateToken(ctx context.Context, registerName string, tokenType string) (string, error) {
 	var (
 		tokenValidity time.Time
 		tokenRole     tt.SystemRole
@@ -51,7 +52,7 @@ func (t *Teleport) GenerateToken(ctx context.Context, config *TeleportConfig, to
 	{
 		m := token.GetMetadata()
 		m.Labels = map[string]string{
-			"cluster": config.RegisterName,
+			"cluster": registerName,
 			"type":    tokenType,
 		}
 		token.SetMetadata(m)
@@ -62,17 +63,17 @@ func (t *Teleport) GenerateToken(ctx context.Context, config *TeleportConfig, to
 	return token.GetName(), nil
 }
 
-func (t *Teleport) DeleteToken(ctx context.Context, config *TeleportConfig) error {
+func (t *Teleport) DeleteToken(ctx context.Context, log logr.Logger, registerName string) error {
 	tokens, err := t.TeleportClient.GetTokens(ctx)
 	if err != nil {
 		return err
 	}
 	for _, token := range tokens {
-		if token.GetMetadata().Labels["cluster"] == config.RegisterName {
+		if token.GetMetadata().Labels["cluster"] == registerName {
 			if err := t.TeleportClient.DeleteToken(ctx, token.GetName()); err != nil {
 				return microerror.Mask(err)
 			}
-			config.Log.Info("Deleted join token from teleport", "registerName", config.RegisterName)
+			log.Info("Deleted join token from teleport", "registerName", registerName)
 			return nil
 		}
 	}

@@ -6,14 +6,14 @@ import (
 )
 
 const (
-	AppOperatorVersion            = "0.0.0"
-	TeleportOperatorFinalizer     = "teleport.finalizer.giantswarm.io"
-	MCTeleportAppDefaultNamespace = "giantswarm"
-	TeleportKubeAppNamespace      = "kube-system"
-	TeleportOperatorLabelValue    = "teleport-operator"
-	TeleportOperatorSecretName    = "teleport-operator"
-	TeleportKubeTokenValidity     = 1 * time.Hour
-	TeleportNodeTokenValidity     = 24 * time.Hour
+	AppOperatorVersion              = "0.0.0"
+	TeleportOperatorFinalizer       = "teleport.finalizer.giantswarm.io"
+	TeleportKubeAppDefaultNamespace = "giantswarm"
+	TeleportKubeAppNamespace        = "kube-system"
+	TeleportOperatorLabelValue      = "teleport-operator"
+	TeleportOperatorSecretName      = "teleport-operator"
+	TeleportKubeTokenValidity       = 1 * time.Hour
+	TeleportNodeTokenValidity       = 24 * time.Hour
 )
 
 func GetConfigmapName(clusterName string, appName string) string {

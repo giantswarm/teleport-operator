@@ -6,6 +6,7 @@ import (
 
 	"github.com/giantswarm/k8smetadata/pkg/label"
 	"github.com/giantswarm/microerror"
+	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
 
 	"github.com/giantswarm/teleport-operator/internal/pkg/key"
@@ -15,20 +16,20 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-func (t *Teleport) CreateConfigMap(ctx context.Context, config *TeleportConfig, token string) error {
-	configMapName := key.GetConfigmapName(config.Cluster.Name, t.SecretConfig.AppName)
+func (t *Teleport) CreateConfigMap(ctx context.Context, log logr.Logger, ctrlClient client.Client, clusterName string, registerName string, installNamespace string, token string) error {
+	configMapName := key.GetConfigmapName(clusterName, t.SecretConfig.AppName)
 
 	configMapData := map[string]string{
-		"values": t.getConfigMapData(config, token),
+		"values": t.getConfigMapData(registerName, token),
 	}
 
 	cm := corev1.ConfigMap{}
-	if err := config.CtrlClient.Get(ctx, client.ObjectKey{Name: configMapName, Namespace: config.InstallNamespace}, &cm); err != nil {
+	if err := ctrlClient.Get(ctx, client.ObjectKey{Name: configMapName, Namespace: installNamespace}, &cm); err != nil {
 		if apierrors.IsNotFound(err) {
 			cm := corev1.ConfigMap{
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      configMapName,
-					Namespace: config.InstallNamespace,
+					Namespace: installNamespace,
 					Labels: map[string]string{
 						label.ManagedBy: key.TeleportOperatorLabelValue,
 					},
@@ -36,11 +37,11 @@ func (t *Teleport) CreateConfigMap(ctx context.Context, config *TeleportConfig, 
 				Data: configMapData,
 			}
 
-			if err = config.CtrlClient.Create(ctx, &cm); err != nil {
+			if err = ctrlClient.Create(ctx, &cm); err != nil {
 				return microerror.Mask(err)
 			}
 
-			config.Log.Info("Created configmap", "configMapName", configMapName)
+			log.Info("Created configmap", "configMapName", configMapName)
 			return nil
 		}
 
@@ -50,31 +51,31 @@ func (t *Teleport) CreateConfigMap(ctx context.Context, config *TeleportConfig, 
 	return nil
 }
 
-func (t *Teleport) DeleteConfigMap(ctx context.Context, config *TeleportConfig) error {
-	configMapName := key.GetConfigmapName(config.Cluster.Name, t.SecretConfig.AppName)
+func (t *Teleport) DeleteConfigMap(ctx context.Context, log logr.Logger, ctrlClient client.Client, clusterName string, clusterNamespace string) error {
+	configMapName := key.GetConfigmapName(clusterName, t.SecretConfig.AppName)
 	cm := corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      configMapName,
-			Namespace: config.Cluster.Namespace,
+			Namespace: clusterNamespace,
 		},
 	}
 
-	if err := config.CtrlClient.Delete(ctx, &cm); err != nil {
+	if err := ctrlClient.Delete(ctx, &cm); err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil
 		}
 		return microerror.Mask(err)
 	}
 
-	config.Log.Info("Deleted configmap", "configMap", configMapName)
+	log.Info("Deleted configmap", "configMap", configMapName)
 	return nil
 }
 
-func (t *Teleport) getConfigMapData(config *TeleportConfig, token string) string {
+func (t *Teleport) getConfigMapData(registerName string, token string) string {
 	var (
 		authToken               = token
 		proxyAddr               = t.SecretConfig.ProxyAddr
-		kubeClusterName         = config.RegisterName
+		kubeClusterName         = registerName
 		teleportVersionOverride = t.SecretConfig.TeleportVersion
 	)
 
