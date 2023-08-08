@@ -67,8 +67,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 
-	log.Info("Reconciling cluster", "clusterName", cluster.GetName())
-
 	var (
 		installNamespace    string
 		registerName        string
