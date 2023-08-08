@@ -136,39 +136,37 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// Check if the secret exists in the cluster, if not, generate teleport token and create the secret
 	// if it is, check teleport token validity, and update the secret if teleport token has expired
-	{
-		secret, err := r.Teleport.GetSecret(ctx, teleportConfig)
+	secret, err := r.Teleport.GetSecret(ctx, teleportConfig)
+	if err != nil {
+		return ctrl.Result{}, microerror.Mask(err)
+	}
+	if secret == nil {
+		token, err := r.Teleport.GenerateToken(ctx, teleportConfig, "node")
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
-		if secret == nil {
+		if err := r.Teleport.CreateSecret(ctx, teleportConfig, token); err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
+		}
+	} else {
+		token, err := r.Teleport.GetTokenFromSecret(ctx, secret)
+		if err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
+		}
+		tokenValid, err := r.Teleport.IsTokenValid(ctx, teleportConfig, token, "node")
+		if err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
+		}
+		if !tokenValid {
 			token, err := r.Teleport.GenerateToken(ctx, teleportConfig, "node")
 			if err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
-			if err := r.Teleport.CreateSecret(ctx, teleportConfig, token); err != nil {
+			if err := r.Teleport.UpdateSecret(ctx, teleportConfig, token); err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
 		} else {
-			token, err := r.Teleport.GetTokenFromSecret(ctx, secret)
-			if err != nil {
-				return ctrl.Result{}, microerror.Mask(err)
-			}
-			tokenValid, err := r.Teleport.IsTokenValid(ctx, teleportConfig, token, "node")
-			if err != nil {
-				return ctrl.Result{}, microerror.Mask(err)
-			}
-			if !tokenValid {
-				token, err := r.Teleport.GenerateToken(ctx, teleportConfig, "node")
-				if err != nil {
-					return ctrl.Result{}, microerror.Mask(err)
-				}
-				if err := r.Teleport.UpdateSecret(ctx, teleportConfig, token); err != nil {
-					return ctrl.Result{}, microerror.Mask(err)
-				}
-			} else {
-				log.Info("Secret has valid teleport join token", "secretName", secret.GetName())
-			}
+			log.Info("Secret has valid teleport join token", "secretName", secret.GetName())
 		}
 	}
 
