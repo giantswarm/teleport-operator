@@ -2,6 +2,7 @@ package teleport
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -42,6 +43,8 @@ func (t *Teleport) GenerateToken(ctx context.Context, registerName string, token
 	case "node":
 		tokenValidity = time.Now().Add(key.TeleportNodeTokenValidity)
 		tokenRole = tt.RoleNode
+	default:
+		return "", microerror.Mask(fmt.Errorf("token type %s is not supported", tokenType))
 	}
 
 	token, err := tt.NewProvisionToken(uuid.NewString(), []tt.SystemRole{tokenRole}, tokenValidity)
