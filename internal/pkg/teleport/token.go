@@ -73,7 +73,8 @@ func (t *Teleport) DeleteToken(ctx context.Context, log logr.Logger, registerNam
 			if err := t.TeleportClient.DeleteToken(ctx, token.GetName()); err != nil {
 				return microerror.Mask(err)
 			}
-			log.Info("Deleted join token from teleport", "registerName", registerName)
+			tokenType := token.GetMetadata().Labels["type"]
+			log.Info("Deleted join token from teleport", "registerName", registerName, "tokenType", tokenType)
 			return nil
 		}
 	}
