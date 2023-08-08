@@ -23,7 +23,7 @@ func RemoveFinalizer(ctx context.Context, config *TeleportConfig) error {
 		config.Log.Error(err, "failed to remove finalizer")
 		return microerror.Mask(client.IgnoreNotFound(err))
 	}
-	config.Log.Info("Finalizer removed", "finalizer_name", key.TeleportOperatorFinalizer)
+	config.Log.Info("Removed finalizer", "finalizer_name", key.TeleportOperatorFinalizer)
 	return nil
 }
 
@@ -38,6 +38,6 @@ func AddFinalizer(ctx context.Context, config *TeleportConfig) error {
 		config.Log.Error(err, "failed to add finalizer")
 		return microerror.Mask(client.IgnoreNotFound(err))
 	}
-	config.Log.Info("Finalizer added", "finalizer_name", key.TeleportOperatorFinalizer)
+	config.Log.Info("Added finalizer", "finalizer_name", key.TeleportOperatorFinalizer)
 	return nil
 }

@@ -142,7 +142,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return ctrl.Result{}, microerror.Mask(err)
 		}
 		if secret == nil {
-			token, err := r.Teleport.GenerateToken(ctx, teleportConfig)
+			token, err := r.Teleport.GenerateToken(ctx, teleportConfig, "node")
 			if err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
@@ -154,12 +154,12 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			if err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
-			tokenValid, err := r.Teleport.IsTokenValid(ctx, teleportConfig, token)
+			tokenValid, err := r.Teleport.IsTokenValid(ctx, teleportConfig, token, "node")
 			if err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
 			if !tokenValid {
-				token, err := r.Teleport.GenerateToken(ctx, teleportConfig)
+				token, err := r.Teleport.GenerateToken(ctx, teleportConfig, "node")
 				if err != nil {
 					return ctrl.Result{}, microerror.Mask(err)
 				}
@@ -187,7 +187,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return ctrl.Result{}, microerror.Mask(err)
 		}
 		if !kubeAgentAppInstalled {
-			token, err := r.Teleport.GenerateToken(ctx, teleportConfig)
+			token, err := r.Teleport.GenerateToken(ctx, teleportConfig, "kube")
 			if err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}

@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/google/uuid"
 	tt "github.com/gravitational/teleport/api/types"
 
 	"github.com/giantswarm/microerror"
@@ -11,13 +12,13 @@ import (
 	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 )
 
-func (t *Teleport) IsTokenValid(ctx context.Context, config *TeleportConfig, oldToken string) (bool, error) {
+func (t *Teleport) IsTokenValid(ctx context.Context, config *TeleportConfig, oldToken string, tokenType string) (bool, error) {
 	tokens, err := t.TeleportClient.GetTokens(ctx)
 	if err != nil {
 		return false, microerror.Mask(err)
 	}
 	for _, token := range tokens {
-		if token.GetMetadata().Labels["cluster"] == config.RegisterName {
+		if token.GetMetadata().Labels["cluster"] == config.RegisterName && token.GetMetadata().Labels["type"] == tokenType {
 			if token.GetName() == oldToken {
 				return true, nil
 			}
@@ -27,14 +28,22 @@ func (t *Teleport) IsTokenValid(ctx context.Context, config *TeleportConfig, old
 	return false, nil
 }
 
-func (t *Teleport) GenerateToken(ctx context.Context, config *TeleportConfig) (string, error) {
-	tokenValidity := time.Now().Add(key.TeleportTokenValidity)
-	randomToken, err := key.CryptoRandomHex(key.TeleportTokenLength)
-	if err != nil {
-		return "", microerror.Mask(err)
+func (t *Teleport) GenerateToken(ctx context.Context, config *TeleportConfig, tokenType string) (string, error) {
+	var (
+		tokenValidity time.Time
+		tokenRole     tt.SystemRole
+	)
+
+	switch tokenType {
+	case "kube":
+		tokenValidity = time.Now().Add(key.TeleportKubeTokenValidity)
+		tokenRole = tt.RoleKube
+	case "node":
+		tokenValidity = time.Now().Add(key.TeleportNodeTokenValidity)
+		tokenRole = tt.RoleNode
 	}
 
-	token, err := tt.NewProvisionToken(randomToken, []tt.SystemRole{tt.RoleKube, tt.RoleNode}, tokenValidity)
+	token, err := tt.NewProvisionToken(uuid.NewString(), []tt.SystemRole{tokenRole}, tokenValidity)
 	if err != nil {
 		return "", microerror.Mask(err)
 	}
@@ -43,6 +52,7 @@ func (t *Teleport) GenerateToken(ctx context.Context, config *TeleportConfig) (s
 		m := token.GetMetadata()
 		m.Labels = map[string]string{
 			"cluster": config.RegisterName,
+			"type":    tokenType,
 		}
 		token.SetMetadata(m)
 		if err := t.TeleportClient.UpsertToken(ctx, token); err != nil {

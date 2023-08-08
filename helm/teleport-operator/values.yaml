@@ -4,7 +4,7 @@ registry:
   domain: docker.io
 
 teleport:
-  appCatalog: giantswarm-test-catalog
+  appCatalog: giantswarm
   appName: teleport-kube-agent
   appVersion: 0.3.0
   managementClusterName: ""

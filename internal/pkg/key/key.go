@@ -1,8 +1,6 @@
 package key
 
 import (
-	"crypto/rand"
-	"encoding/hex"
 	"fmt"
 	"time"
 )
@@ -14,8 +12,8 @@ const (
 	TeleportKubeAppNamespace      = "kube-system"
 	TeleportOperatorLabelValue    = "teleport-operator"
 	TeleportOperatorSecretName    = "teleport-operator"
-	TeleportTokenValidity         = 24 * time.Hour
-	TeleportTokenLength           = 16
+	TeleportKubeTokenValidity     = 1 * time.Hour
+	TeleportNodeTokenValidity     = 24 * time.Hour
 )
 
 func GetConfigmapName(clusterName string, appName string) string {
@@ -36,12 +34,4 @@ func GetAppSpecKubeConfigSecretName(clusterName string) string {
 
 func GetAppName(clusterName string, appName string) string {
 	return fmt.Sprintf("%s-%s", clusterName, appName)
-}
-
-func CryptoRandomHex(length int) (string, error) {
-	randomBytes := make([]byte, length)
-	if _, err := rand.Read(randomBytes); err != nil {
-		return "", err
-	}
-	return hex.EncodeToString(randomBytes), nil
 }
