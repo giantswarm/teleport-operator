@@ -43,6 +43,8 @@ func (t *Teleport) CreateConfigMap(ctx context.Context, config *TeleportConfig, 
 			config.Log.Info("Created configmap", "configMapName", configMapName)
 			return nil
 		}
+
+		return microerror.Mask(err)
 	}
 
 	return nil
