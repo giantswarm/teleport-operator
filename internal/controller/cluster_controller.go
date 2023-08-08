@@ -95,13 +95,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// Check if the cluster instance is marked to be deleted, which is indicated by the deletion timestamp being set.
 	// if it is, delete the cluster from teleport
 	if !cluster.DeletionTimestamp.IsZero() {
-		// Remove finalizer from the Cluster CR
-		if controllerutil.ContainsFinalizer(cluster, key.TeleportOperatorFinalizer) {
-			if err := teleport.RemoveFinalizer(ctx, teleportConfig); err != nil {
-				return ctrl.Result{}, microerror.Mask(err)
-			}
-		}
-
 		// Delete teleport token for the cluster
 		if err := r.Teleport.DeleteToken(ctx, teleportConfig); err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
@@ -120,6 +113,13 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// Delete ConfigMap for the cluster
 		if err := r.Teleport.DeleteConfigMap(ctx, teleportConfig); err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
+		}
+
+		// Remove finalizer from the Cluster CR
+		if controllerutil.ContainsFinalizer(cluster, key.TeleportOperatorFinalizer) {
+			if err := teleport.RemoveFinalizer(ctx, teleportConfig); err != nil {
+				return ctrl.Result{}, microerror.Mask(err)
+			}
 		}
 
 		return ctrl.Result{}, nil
