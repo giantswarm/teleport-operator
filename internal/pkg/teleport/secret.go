@@ -34,13 +34,13 @@ func GetConfigFromSecret(namespace string) (*SecretConfig, error) {
 	// Get a config to talk to the apiserver
 	cfg, err := config.GetConfig()
 	if err != nil {
-		return nil, microerror.Mask(fmt.Errorf("unable to get config to talk to the apiserver: %s", err))
+		return nil, microerror.Mask(fmt.Errorf("unable to get config to talk to the apiserver: %w", err))
 	}
 
 	// Create a new client
 	ctrlClient, err := client.New(cfg, client.Options{})
 	if err != nil {
-		return nil, microerror.Mask(fmt.Errorf("unable to create a new kubernetes client: %s", err))
+		return nil, microerror.Mask(fmt.Errorf("unable to create a new kubernetes client: %w", err))
 	}
 
 	secret := &corev1.Secret{}
