@@ -17,6 +17,7 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"os"
 
@@ -97,14 +98,15 @@ func main() {
 		os.Exit(1)
 	}
 
-	secretConfig, err := teleport.GetConfigFromSecret(namespace)
+	ctx := context.TODO()
+	secretConfig, err := teleport.GetConfigFromSecret(ctx, namespace)
 	if err != nil {
 		setupLog.Error(err, "unable to get secret config")
 		os.Exit(1)
 	}
 
 	tele := teleport.New(namespace, secretConfig)
-	if tele.TeleportClient, err = tele.GetTeleportClient(); err != nil {
+	if tele.TeleportClient, err = tele.GetTeleportClient(ctx); err != nil {
 		setupLog.Error(err, "unable to create teleport client")
 		os.Exit(1)
 	}

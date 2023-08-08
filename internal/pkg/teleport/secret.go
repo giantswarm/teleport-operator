@@ -28,9 +28,7 @@ type SecretConfig struct {
 	AppCatalog            string
 }
 
-func GetConfigFromSecret(namespace string) (*SecretConfig, error) {
-	ctx := context.TODO()
-
+func GetConfigFromSecret(ctx context.Context, namespace string) (*SecretConfig, error) {
 	// Get a config to talk to the apiserver
 	cfg, err := config.GetConfig()
 	if err != nil {

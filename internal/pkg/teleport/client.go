@@ -8,9 +8,7 @@ import (
 	"github.com/giantswarm/microerror"
 )
 
-func (t *Teleport) GetTeleportClient() (*tc.Client, error) {
-	ctx := context.TODO()
-
+func (t *Teleport) GetTeleportClient(ctx context.Context) (*tc.Client, error) {
 	// Create new teleport client
 	teleportClient, err := tc.New(ctx, tc.Config{
 		Addrs: []string{
