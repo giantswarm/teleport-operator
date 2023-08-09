@@ -17,12 +17,15 @@ limitations under the License.
 package main
 
 import (
+	"context"
 	"flag"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 
+	appv1alpha1 "github.com/giantswarm/apiextensions-application/api/v1alpha1"
+	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
@@ -34,7 +37,7 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 
 	"github.com/giantswarm/teleport-operator/internal/controller"
-	"github.com/giantswarm/teleport-operator/internal/pkg/teleportclient"
+	"github.com/giantswarm/teleport-operator/internal/pkg/teleport"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -46,6 +49,8 @@ var (
 func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(capi.AddToScheme(scheme))
+	utilruntime.Must(appv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(corev1.AddToScheme(scheme))
 
 	//+kubebuilder:scaffold:scheme
 }
@@ -93,17 +98,25 @@ func main() {
 		os.Exit(1)
 	}
 
-	teleportClient, err := teleportclient.New(namespace)
+	ctx := context.TODO()
+	secretConfig, err := teleport.GetConfigFromSecret(ctx, namespace)
 	if err != nil {
-		setupLog.Error(err, "unable to create teleport client")
+		setupLog.Error(err, "unable to get secret config")
 		os.Exit(1)
 	}
 
+	tele := teleport.New(namespace, secretConfig)
+	if tele.TeleportClient, err = tele.GetTeleportClient(ctx); err != nil {
+		setupLog.Error(err, "unable to create teleport client")
+		os.Exit(1)
+	}
+	setupLog.Info("Connected to the teleport cluster", "proxyAddr", tele.SecretConfig.ProxyAddr)
+
 	if err = (&controller.ClusterReconciler{
-		Client:         mgr.GetClient(),
-		Log:            ctrl.Log.WithName("controllers").WithName("Cluster"),
-		Scheme:         mgr.GetScheme(),
-		TeleportClient: teleportClient,
+		Client:   mgr.GetClient(),
+		Log:      ctrl.Log.WithName("controllers").WithName("Cluster"),
+		Scheme:   mgr.GetScheme(),
+		Teleport: tele,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 		os.Exit(1)
