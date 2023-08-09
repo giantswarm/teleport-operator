@@ -9,4 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-[Unreleased]: https://github.com/giantswarm/teleport-operator/tree/main
+## [0.1.0] - 2023-08-09
+
+[Unreleased]: https://github.com/giantswarm/teleport-operator/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/giantswarm/teleport-operator/releases/tag/v0.1.0
