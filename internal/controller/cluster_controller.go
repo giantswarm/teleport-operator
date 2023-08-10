@@ -67,16 +67,9 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 
-	var (
-		installNamespace    = key.TeleportKubeAppDefaultNamespace
-		registerName        = cluster.Name
-		isManagementCluster = true
-	)
-
+	registerName := cluster.Name
 	if cluster.Name != r.Teleport.SecretConfig.ManagementClusterName {
-		installNamespace = cluster.Namespace
 		registerName = key.GetRegisterName(r.Teleport.SecretConfig.ManagementClusterName, cluster.Name)
-		isManagementCluster = false
 	}
 
 	// Check if the cluster instance is marked to be deleted, which is indicated by the deletion timestamp being set.
@@ -84,11 +77,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if !cluster.DeletionTimestamp.IsZero() {
 		// Delete teleport token for the cluster
 		if err := r.Teleport.DeleteToken(ctx, log, registerName); err != nil {
-			return ctrl.Result{}, microerror.Mask(err)
-		}
-
-		// Delete teleport kubernetes resource for the cluster
-		if err := r.Teleport.DeleteClusterFromTeleport(ctx, log, registerName); err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
 
@@ -151,35 +139,44 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 				return ctrl.Result{}, microerror.Mask(err)
 			}
 		} else {
-			log.Info("Secret has valid teleport join token", "secretName", secret.GetName())
+			log.Info("Secret has valid teleport node join token", "secretName", secret.GetName())
 		}
 	}
 
-	// Check if the cluster is registered in teleport, if not, check if app is teleport-kube-agent app installed
-	// if app is not installed, installed it
-	clusterRegisteredInTeleport, err := r.Teleport.IsClusterRegisteredInTeleport(ctx, log, registerName)
+	// Check if the confimap exists in the cluster, if not, generate teleport token and create the secret
+	// if it is, check teleport token validity, and update the configmap if teleport token has expired
+	configMap, err := r.Teleport.GetConfigMap(ctx, log, r.Client, cluster.Name, cluster.Namespace)
 	if err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 
-	if !clusterRegisteredInTeleport {
-		// Check if teleport-kube-agent app is installed for the cluster, if not,
-		// create configmap with newly generated teleport token and install the app
-		kubeAgentAppInstalled, err := r.Teleport.IsKubeAgentAppInstalled(ctx, r.Client, cluster.Name, installNamespace)
+	if configMap != nil {
+		token, err := r.Teleport.GetTokenFromConfigMap(ctx, configMap)
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
-		if !kubeAgentAppInstalled {
+		tokenValid, err := r.Teleport.IsTokenValid(ctx, registerName, token, "kube")
+		if err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
+		}
+		if !tokenValid {
 			token, err := r.Teleport.GenerateToken(ctx, registerName, "kube")
 			if err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
-			if err := r.Teleport.CreateConfigMap(ctx, log, r.Client, cluster.Name, registerName, installNamespace, token); err != nil {
+			if err := r.Teleport.UpdateConfigMap(ctx, log, r.Client, configMap, token); err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
-			if err := r.Teleport.InstallKubeAgentApp(ctx, log, r.Client, cluster.Name, registerName, installNamespace, isManagementCluster); err != nil {
-				return ctrl.Result{}, microerror.Mask(err)
-			}
+		} else {
+			log.Info("ConfigMap has valid teleport kube join token", "configMapName", configMap.GetName())
+		}
+	} else {
+		token, err := r.Teleport.GenerateToken(ctx, registerName, "kube")
+		if err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
+		}
+		if err := r.Teleport.CreateConfigMap(ctx, log, r.Client, cluster.Name, cluster.Namespace, registerName, token); err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
 		}
 	}
 

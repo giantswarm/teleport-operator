@@ -141,7 +141,7 @@ func (t *Teleport) CreateSecret(ctx context.Context, log logr.Logger, ctrlClient
 	if err := ctrlClient.Create(ctx, secret); err != nil {
 		return microerror.Mask(fmt.Errorf("failed to create Secret: %w", err))
 	}
-	log.Info("Created secret with new teleport join token", "secretName", secretName)
+	log.Info("Created secret with new teleport node join token", "secretName", secretName)
 	return nil
 }
 
@@ -159,7 +159,7 @@ func (t *Teleport) UpdateSecret(ctx context.Context, log logr.Logger, ctrlClient
 	if err := ctrlClient.Update(ctx, secret); err != nil {
 		return microerror.Mask(fmt.Errorf("failed to update Secret: %w", err))
 	}
-	log.Info("Updated secret with new teleport join token", "secretName", secretName)
+	log.Info("Updated secret with new teleport node join token", "secretName", secretName)
 	return nil
 }
 
