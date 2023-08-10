@@ -38,17 +38,17 @@ func (t *Teleport) GetTokenFromConfigMap(ctx context.Context, configMap *corev1.
 		return "", microerror.Mask(fmt.Errorf("malformed ConfigMap: key `values` not found"))
 	}
 
-	var parsedContent map[string]interface{}
-	if err := yaml.Unmarshal([]byte(valuesBytes), &parsedContent); err != nil {
+	var valuesYaml map[string]interface{}
+	if err := yaml.Unmarshal([]byte(valuesBytes), &valuesYaml); err != nil {
 		return "", microerror.Mask(fmt.Errorf("failed to parse YAML: %w", err))
 	}
 
-	authToken, ok := parsedContent["authToken"].(string)
+	token, ok := valuesYaml["authToken"].(string)
 	if !ok {
 		return "", microerror.Mask(fmt.Errorf("malformed ConfigMap: key `authToken` not found"))
 	}
 
-	return authToken, nil
+	return token, nil
 }
 
 func (t *Teleport) CreateConfigMap(ctx context.Context, log logr.Logger, ctrlClient client.Client, clusterName string, clusterNamespace string, registerName string, token string) error {
@@ -84,26 +84,26 @@ func (t *Teleport) CreateConfigMap(ctx context.Context, log logr.Logger, ctrlCli
 }
 
 func (t *Teleport) UpdateConfigMap(ctx context.Context, log logr.Logger, ctrlClient client.Client, configMap *corev1.ConfigMap, token string) error {
-	yamlContent, exists := configMap.Data["values"]
-	if !exists {
-		return fmt.Errorf("key 'values' not found in the ConfigMap")
+	valuesBytes, ok := configMap.Data["values"]
+	if !ok {
+		return microerror.Mask(fmt.Errorf("malformed ConfigMap: key `values` not found"))
 	}
 
-	var parsedContent map[string]interface{}
-	if err := yaml.Unmarshal([]byte(yamlContent), &parsedContent); err != nil {
-		return fmt.Errorf("failed to parse YAML: %v", err)
+	var valuesYaml map[string]interface{}
+	if err := yaml.Unmarshal([]byte(valuesBytes), &valuesYaml); err != nil {
+		return microerror.Mask(fmt.Errorf("failed to parse YAML: %w", err))
 	}
 
 	// Modify the authToken value
-	parsedContent["authToken"] = token
+	valuesYaml["authToken"] = token
 
-	updatedYamlContent, err := yaml.Marshal(parsedContent)
+	updatedValuesYaml, err := yaml.Marshal(valuesYaml)
 	if err != nil {
-		return fmt.Errorf("failed to marshal updated content into YAML: %v", err)
+		return fmt.Errorf("failed to marshal updated content into YAML: %w", err)
 	}
 
 	// Update the ConfigMap's data with the modified value
-	configMap.Data["values"] = string(updatedYamlContent)
+	configMap.Data["values"] = string(updatedValuesYaml)
 	if err := ctrlClient.Update(ctx, configMap); err != nil {
 		return microerror.Mask(fmt.Errorf("failed to update ConfigMap: %w", err))
 	}
