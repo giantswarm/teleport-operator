@@ -66,6 +66,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 		return ctrl.Result{}, microerror.Mask(err)
 	}
+	log.Info("Reconciling cluster", "cluster", cluster)
 
 	registerName := cluster.Name
 	if cluster.Name != r.Teleport.SecretConfig.ManagementClusterName {

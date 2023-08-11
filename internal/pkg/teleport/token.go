@@ -47,11 +47,7 @@ func (t *Teleport) GenerateToken(ctx context.Context, registerName string, token
 		return "", microerror.Mask(fmt.Errorf("token type %s is not supported", tokenType))
 	}
 
-	randomToken := uuid.NewString()
-
-	fmt.Println("randomToken", randomToken)
-
-	token, err := tt.NewProvisionToken(randomToken, []tt.SystemRole{tokenRole}, tokenValidity)
+	token, err := tt.NewProvisionToken(uuid.NewString(), []tt.SystemRole{tokenRole}, tokenValidity)
 	if err != nil {
 		return "", microerror.Mask(err)
 	}
