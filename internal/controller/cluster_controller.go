@@ -144,7 +144,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
-	// Check if the confimap exists in the cluster, if not, generate teleport token and create the secret
+	// Check if the confimap exists in the cluster, if not, generate teleport token and create the config map
 	// if it is, check teleport token validity, and update the configmap if teleport token has expired
 	configMap, err := r.Teleport.GetConfigMap(ctx, log, r.Client, cluster.Name, cluster.Namespace)
 	if err != nil {
