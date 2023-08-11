@@ -267,7 +267,7 @@ func Test_SecretCRUD(t *testing.T) {
 				err = teleport.DeleteSecret(ctx, log, ctrlClient, tc.clusterName, tc.namespace)
 				test.CheckError(t, tc.expectError, err)
 				if err == nil {
-					actualSecret, err = loadSecret(ctx, ctrlClient, tc.secretToDelete)
+					_, err = loadSecret(ctx, ctrlClient, tc.secretToDelete)
 					if err != nil && !errors.IsNotFound(err) {
 						t.Fatalf("unexpected error %v", err)
 					}

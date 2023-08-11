@@ -63,7 +63,10 @@ func Test_GenerateToken(t *testing.T) {
 			}
 
 			generatedToken, err := teleport.TeleportClient.GetToken(ctx, tokenName)
-			test.CheckToken(t, tc.expectedToken, generatedToken)
+			test.CheckError(t, false, err)
+			if err == nil {
+				test.CheckToken(t, tc.expectedToken, generatedToken)
+			}
 		})
 	}
 }
