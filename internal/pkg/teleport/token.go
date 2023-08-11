@@ -76,8 +76,7 @@ func (t *Teleport) DeleteToken(ctx context.Context, log logr.Logger, registerNam
 			if err := t.TeleportClient.DeleteToken(ctx, token.GetName()); err != nil {
 				return microerror.Mask(err)
 			}
-			tokenType := token.GetMetadata().Labels["type"]
-			log.Info("Deleted join token from teleport", "registerName", registerName, "tokenType", tokenType)
+			log.Info("Deleted teleport node/kube join token for the cluster", "registerName", registerName)
 			return nil
 		}
 	}
