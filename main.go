@@ -19,7 +19,6 @@ package main
 import (
 	"context"
 	"flag"
-	"github.com/giantswarm/teleport-operator/internal/pkg/token"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -40,6 +39,7 @@ import (
 
 	"github.com/giantswarm/teleport-operator/internal/controller"
 	"github.com/giantswarm/teleport-operator/internal/pkg/teleport"
+	"github.com/giantswarm/teleport-operator/internal/pkg/token"
 	//+kubebuilder:scaffold:imports
 )
 

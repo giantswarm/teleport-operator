@@ -2,11 +2,10 @@ package test
 
 import (
 	"fmt"
-	"github.com/giantswarm/k8smetadata/pkg/label"
-	"github.com/giantswarm/teleport-operator/internal/pkg/token"
 	"time"
 
 	appv1alpha1 "github.com/giantswarm/apiextensions-application/api/v1alpha1"
+	"github.com/giantswarm/k8smetadata/pkg/label"
 	teleportTypes "github.com/gravitational/teleport/api/types"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -17,6 +16,7 @@ import (
 	clientfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
 	"github.com/giantswarm/teleport-operator/internal/pkg/key"
+	"github.com/giantswarm/teleport-operator/internal/pkg/token"
 )
 
 const (
