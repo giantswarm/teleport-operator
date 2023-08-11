@@ -1,18 +1,20 @@
 package teleport
 
 import (
-	tc "github.com/gravitational/teleport/api/client"
+	"github.com/giantswarm/teleport-operator/internal/pkg/token"
 )
 
 type Teleport struct {
 	SecretConfig   *SecretConfig
-	TeleportClient *tc.Client
+	TeleportClient Client
 	Namespace      string
+	TokenGenerator token.Generator
 }
 
-func New(namespace string, secretConfig *SecretConfig) *Teleport {
+func New(namespace string, secretConfig *SecretConfig, tokenGenerator token.Generator) *Teleport {
 	return &Teleport{
-		SecretConfig: secretConfig,
-		Namespace:    namespace,
+		SecretConfig:   secretConfig,
+		Namespace:      namespace,
+		TokenGenerator: tokenGenerator,
 	}
 }

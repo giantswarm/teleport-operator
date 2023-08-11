@@ -19,6 +19,7 @@ package main
 import (
 	"context"
 	"flag"
+	"github.com/giantswarm/teleport-operator/internal/pkg/token"
 	"os"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
@@ -100,22 +101,24 @@ func main() {
 		os.Exit(1)
 	}
 
+	ctrlClient := mgr.GetClient()
+
 	ctx := context.TODO()
-	secretConfig, err := teleport.GetConfigFromSecret(ctx, namespace)
+	secretConfig, err := teleport.GetConfigFromSecret(ctx, ctrlClient, namespace)
 	if err != nil {
 		setupLog.Error(err, "unable to get secret config")
 		os.Exit(1)
 	}
 
-	tele := teleport.New(namespace, secretConfig)
-	if tele.TeleportClient, err = tele.GetTeleportClient(ctx); err != nil {
+	tele := teleport.New(namespace, secretConfig, token.NewGenerator())
+	if tele.TeleportClient, err = teleport.NewClient(ctx, secretConfig.ProxyAddr, secretConfig.IdentityFile); err != nil {
 		setupLog.Error(err, "unable to create teleport client")
 		os.Exit(1)
 	}
 	setupLog.Info("Connected to teleport cluster", "proxyAddr", tele.SecretConfig.ProxyAddr)
 
 	if err = (&controller.ClusterReconciler{
-		Client:   mgr.GetClient(),
+		Client:   ctrlClient,
 		Log:      ctrl.Log.WithName("controllers").WithName("Cluster"),
 		Scheme:   mgr.GetScheme(),
 		Teleport: tele,
