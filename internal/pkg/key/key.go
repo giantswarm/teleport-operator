@@ -41,7 +41,6 @@ func GetConfigmapDataFromTemplate(authToken string, proxyAddr string, kubeCluste
 authToken: "%s"
 proxyAddr: "%s"
 kubeClusterName: "%s"
-apps: []
 `
 
 	if teleportVersion != "" {

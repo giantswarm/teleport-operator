@@ -25,6 +25,7 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 
 	appv1alpha1 "github.com/giantswarm/apiextensions-application/api/v1alpha1"
+	"go.uber.org/zap/zapcore"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -68,6 +69,7 @@ func main() {
 	flag.StringVar(&namespace, "namespace", "", "Namespace where operator is deployed")
 	opts := zap.Options{
 		Development: true,
+		TimeEncoder: zapcore.ISO8601TimeEncoder,
 	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
@@ -110,7 +112,7 @@ func main() {
 		setupLog.Error(err, "unable to create teleport client")
 		os.Exit(1)
 	}
-	setupLog.Info("Connected to the teleport cluster", "proxyAddr", tele.SecretConfig.ProxyAddr)
+	setupLog.Info("Connected to teleport cluster", "proxyAddr", tele.SecretConfig.ProxyAddr)
 
 	if err = (&controller.ClusterReconciler{
 		Client:   mgr.GetClient(),
