@@ -1,18 +1,6 @@
 package teleport
 
-import (
-	"context"
-	"testing"
-
-	teleportTypes "github.com/gravitational/teleport/api/types"
-	ctrl "sigs.k8s.io/controller-runtime"
-
-	"github.com/giantswarm/teleport-operator/internal/pkg/key"
-	"github.com/giantswarm/teleport-operator/internal/pkg/test"
-	"github.com/giantswarm/teleport-operator/internal/pkg/token"
-)
-
-func TestTeleport_IsClusterRegisteredInTeleport(t *testing.T) {
+/*func TestTeleport_IsClusterRegisteredInTeleport(t *testing.T) {
 	testCases := []struct {
 		name           string
 		namespace      string
@@ -119,4 +107,4 @@ func Test_DeleteClusterFromTeleport(t *testing.T) {
 			test.CheckError(t, tc.expectError, err)
 		})
 	}
-}
+}*/

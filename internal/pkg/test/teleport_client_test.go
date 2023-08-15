@@ -8,30 +8,18 @@ import (
 	"github.com/gravitational/teleport/api/types"
 )
 
-const (
-	hostId  = "test-host-id"
-	host1Id = "test-host-1-id"
-	host2Id = "test-host-2-id"
-
-	hostName  = "test-host-name"
-	host1Name = "test-host-1-name"
-	host2Name = "test-host-2-name"
-)
-
 func Test_FakeTeleportClient(t *testing.T) {
 	testCases := []struct {
-		name                  string
-		config                FakeTeleportClientConfig
-		tokenName             string
-		storedToken           types.ProvisionToken
-		upsertedToken         types.ProvisionToken
-		expectedTokens        []types.ProvisionToken
-		expectedToken         types.ProvisionToken
-		expectedK8sServers    []types.KubeServer
-		expectClientErrors    bool
-		expectTokensError     bool
-		expectTokenError      bool
-		expectK8sServersError bool
+		name               string
+		config             FakeTeleportClientConfig
+		tokenName          string
+		storedToken        types.ProvisionToken
+		upsertedToken      types.ProvisionToken
+		expectedTokens     []types.ProvisionToken
+		expectedToken      types.ProvisionToken
+		expectClientErrors bool
+		expectTokensError  bool
+		expectTokenError   bool
 	}{
 		{
 			name:               "case 0: Return valid client and perform all tasks successfully",
@@ -97,40 +85,14 @@ func Test_FakeTeleportClient(t *testing.T) {
 			expectTokenError:   true,
 		},
 		{
-			name: "case 6: Return expected list of Kubernetes servers",
-			config: FakeTeleportClientConfig{
-				KubernetesServers: []types.KubeServer{
-					NewKubeServer(ClusterName, host1Id, host1Name),
-					NewKubeServer(ManagementClusterName, host2Id, host2Name),
-				},
-			},
-			expectedK8sServers: []types.KubeServer{
-				NewKubeServer(ClusterName, host1Id, host1Name),
-				NewKubeServer(ManagementClusterName, host2Id, host2Name),
-			},
-			expectClientErrors: false,
-		},
-		{
-			name: "case 7: Fail to return list of Kubernetes servers",
-			config: FakeTeleportClientConfig{
-				KubernetesServers: []types.KubeServer{
-					NewKubeServer(ClusterName, host1Id, host1Name),
-					NewKubeServer(ManagementClusterName, host2Id, host2Name),
-				},
-			},
-			expectClientErrors:    false,
-			expectTokensError:     true,
-			expectK8sServersError: true,
-		},
-		{
-			name:               "case 8: Store token",
+			name:               "case 6: Store token",
 			config:             FakeTeleportClientConfig{},
 			storedToken:        NewToken(TokenName, ClusterName, TokenTypeKube),
 			expectClientErrors: false,
 			expectTokensError:  false,
 		},
 		{
-			name:               "case 9: Upsert token",
+			name:               "case 7: Upsert token",
 			config:             FakeTeleportClientConfig{},
 			upsertedToken:      NewToken(TokenName, ClusterName, TokenTypeNode),
 			expectClientErrors: false,
@@ -166,15 +128,6 @@ func Test_FakeTeleportClient(t *testing.T) {
 				}
 			}
 
-			if tc.expectedK8sServers != nil && len(tc.expectedK8sServers) > 0 {
-				var servers []types.KubeServer
-				servers, err = fakeClient.GetKubernetesServers(ctx)
-				CheckError(t, tc.expectK8sServersError, err)
-				if err == nil {
-					CheckK8sServers(t, tc.expectedK8sServers, servers)
-				}
-			}
-
 			token = NewToken(uuid.NewString(), ClusterName, TokenTypeKube)
 			err = fakeClient.CreateToken(ctx, token)
 			CheckError(t, tc.expectClientErrors, err)
@@ -186,9 +139,6 @@ func Test_FakeTeleportClient(t *testing.T) {
 			CheckError(t, tc.expectClientErrors, err)
 
 			err = fakeClient.UpsertToken(ctx, token)
-			CheckError(t, tc.expectClientErrors, err)
-
-			err = fakeClient.DeleteKubernetesServer(ctx, hostId, hostName)
 			CheckError(t, tc.expectClientErrors, err)
 
 			if tc.storedToken != nil {

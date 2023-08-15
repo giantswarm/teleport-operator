@@ -5,8 +5,8 @@ import (
 	"reflect"
 	"testing"
 
-	appv1alpha1 "github.com/giantswarm/apiextensions-application/api/v1alpha1"
 	"github.com/gravitational/teleport/api/types"
+	"gopkg.in/yaml.v2"
 	corev1 "k8s.io/api/core/v1"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 )
@@ -65,48 +65,24 @@ func CheckConfigMap(t *testing.T, expected, actual *corev1.ConfigMap) {
 
 	expectedName := fmt.Sprintf("%s/%s", expected.Namespace, expected.Name)
 	actualName := fmt.Sprintf("%s/%s", actual.Namespace, actual.Name)
-
-	expectedValues := expected.Data["values"]
-	actualValues := actual.Data["values"]
-
-	if expectedName != actualName || expectedValues != actualValues {
+	if expectedName != actualName {
 		t.Fatalf("config maps do not match:\nexpected %v\nactual %v", expected, actual)
 	}
-}
 
-func CheckApp(t *testing.T, expected, actual *appv1alpha1.App) {
-	if expected == nil && actual == nil {
-		return
-	}
-	if expected == nil {
-		t.Fatalf("apps do not match:\nexpected nil\nactual %v", actual)
-	}
-	if actual == nil {
-		t.Fatalf("apps do not match:\nexpected %v\nactual nil", expected)
+	var expectedValues map[string]string
+	err := yaml.Unmarshal([]byte(expected.Data["values"]), &expectedValues)
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
 	}
 
-	expectedName := fmt.Sprintf("%s/%s", expected.Namespace, expected.Name)
-	actualName := fmt.Sprintf("%s/%s", actual.Namespace, actual.Name)
-
-	expectedCatalog := expected.Spec.Catalog
-	actualCatalog := actual.Spec.Catalog
-
-	expectedAppName := fmt.Sprintf("%s/%s", expected.Spec.Namespace, expected.Spec.Name)
-	actualAppName := fmt.Sprintf("%s/%s", actual.Spec.Namespace, actual.Spec.Name)
-
-	expectedConfigMap := fmt.Sprintf("%s/%s", expected.Spec.UserConfig.ConfigMap.Namespace, expected.Spec.UserConfig.ConfigMap.Name)
-	actualConfigMap := fmt.Sprintf("%s/%s", actual.Spec.UserConfig.ConfigMap.Namespace, actual.Spec.UserConfig.ConfigMap.Name)
-
-	if expectedName != actualName || expectedCatalog != actualCatalog || expectedAppName != actualAppName || expectedConfigMap != actualConfigMap {
-		t.Fatalf("apps do not match:\nexpected %v\nactual %v", expected, actual)
+	var actualValues map[string]string
+	err = yaml.Unmarshal([]byte(actual.Data["values"]), &actualValues)
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
 	}
 
-	if !reflect.DeepEqual(expected.Labels, actual.Labels) {
-		t.Fatalf("apps do not match:\nexpected %v\nactual %v", expected, actual)
-	}
-
-	if !reflect.DeepEqual(expected.Spec.KubeConfig, actual.Spec.KubeConfig) {
-		t.Fatalf("apps do not match:\nexpected %v\nactual %v", expected, actual)
+	if !reflect.DeepEqual(expectedValues, actualValues) {
+		t.Fatalf("config maps do not match:\nexpected %v\nactual %v", expected, actual)
 	}
 }
 

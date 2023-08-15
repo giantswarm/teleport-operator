@@ -14,11 +14,9 @@ type Client interface {
 	Ping(ctx context.Context) (proto.PingResponse, error)
 	GetToken(ctx context.Context, name string) (types.ProvisionToken, error)
 	GetTokens(ctx context.Context) ([]types.ProvisionToken, error)
-	GetKubernetesServers(ctx context.Context) ([]types.KubeServer, error)
 	CreateToken(ctx context.Context, token types.ProvisionToken) error
 	UpsertToken(ctx context.Context, token types.ProvisionToken) error
 	DeleteToken(ctx context.Context, name string) error
-	DeleteKubernetesServer(ctx context.Context, hostID, name string) error
 }
 
 func NewClient(ctx context.Context, proxyAddr, identityFile string) (Client, error) {

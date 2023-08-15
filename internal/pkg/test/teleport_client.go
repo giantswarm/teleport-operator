@@ -10,14 +10,13 @@ import (
 )
 
 type FakeTeleportClientConfig struct {
-	FailsPing         bool
-	FailsGet          bool
-	FailsList         bool
-	FailsCreate       bool
-	FailsUpsert       bool
-	FailsDelete       bool
-	Tokens            []types.ProvisionToken
-	KubernetesServers []types.KubeServer
+	FailsPing   bool
+	FailsGet    bool
+	FailsList   bool
+	FailsCreate bool
+	FailsUpsert bool
+	FailsDelete bool
+	Tokens      []types.ProvisionToken
 }
 
 type FakeTeleportClient struct {
@@ -28,7 +27,6 @@ type FakeTeleportClient struct {
 	failsUpsert bool
 	failsDelete bool
 	tokens      map[string]types.ProvisionToken
-	servers     map[string]types.KubeServer
 }
 
 func NewTeleportClient(config FakeTeleportClientConfig) *FakeTeleportClient {
@@ -36,13 +34,6 @@ func NewTeleportClient(config FakeTeleportClientConfig) *FakeTeleportClient {
 	if config.Tokens != nil {
 		for _, token := range config.Tokens {
 			tokens[token.GetName()] = token
-		}
-	}
-
-	servers := make(map[string]types.KubeServer)
-	if config.KubernetesServers != nil {
-		for _, server := range config.KubernetesServers {
-			servers[server.GetName()] = server
 		}
 	}
 
@@ -54,7 +45,6 @@ func NewTeleportClient(config FakeTeleportClientConfig) *FakeTeleportClient {
 		failsUpsert: config.FailsDelete,
 		failsDelete: config.FailsDelete,
 		tokens:      tokens,
-		servers:     servers,
 	}
 }
 
@@ -88,17 +78,6 @@ func (c *FakeTeleportClient) GetTokens(ctx context.Context) ([]types.ProvisionTo
 	return tokens, nil
 }
 
-func (c *FakeTeleportClient) GetKubernetesServers(ctx context.Context) ([]types.KubeServer, error) {
-	if c.failsList {
-		return nil, errors.New("mock teleport client failed to get kubernetes servers")
-	}
-	var servers []types.KubeServer
-	for _, server := range c.servers {
-		servers = append(servers, server)
-	}
-	return servers, nil
-}
-
 func (c *FakeTeleportClient) CreateToken(ctx context.Context, token types.ProvisionToken) error {
 	if c.failsCreate {
 		return errors.New("mock teleport client failed to create token")
@@ -120,13 +99,5 @@ func (c *FakeTeleportClient) DeleteToken(ctx context.Context, name string) error
 		return errors.New("mock teleport client failed to delete token")
 	}
 	delete(c.tokens, name)
-	return nil
-}
-
-func (c *FakeTeleportClient) DeleteKubernetesServer(ctx context.Context, hostID, name string) error {
-	if c.failsDelete {
-		return errors.New("mock teleport client failed to delete Kubernetes server")
-	}
-	delete(c.servers, name)
 	return nil
 }

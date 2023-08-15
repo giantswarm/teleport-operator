@@ -25,17 +25,14 @@ func Test_ClusterController(t *testing.T) {
 		name              string
 		namespace         string
 		token             string
-		servers           []teleportTypes.KubeServer
 		tokens            []teleportTypes.ProvisionToken
 		secretConfig      *teleport.SecretConfig
 		cluster           *capi.Cluster
 		secret            *corev1.Secret
 		configMap         *corev1.ConfigMap
-		app               *appv1alpha1.App
 		expectedCluster   *capi.Cluster
 		expectedSecret    *corev1.Secret
 		expectedConfigMap *corev1.ConfigMap
-		expectedApp       *appv1alpha1.App
 	}{
 		{
 			name:              "case 0: Register cluster and create Secret, ConfigMap and App resources in case they do not exist",
@@ -46,7 +43,6 @@ func Test_ClusterController(t *testing.T) {
 			expectedCluster:   test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
 			expectedSecret:    test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
 			expectedConfigMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
-			expectedApp:       test.NewApp(test.ClusterName, test.AppName, test.NamespaceName, false),
 		},
 		{
 			name:              "case 1: Register cluster and update Secret, ConfigMap and App resources in case they exist",
@@ -56,11 +52,9 @@ func Test_ClusterController(t *testing.T) {
 			cluster:           test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
 			secret:            test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
 			configMap:         test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
-			app:               test.NewApp(test.ClusterName, test.AppName, test.NamespaceName, false),
 			expectedCluster:   test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
 			expectedSecret:    test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
 			expectedConfigMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
-			expectedApp:       test.NewApp(test.ClusterName, test.AppName, test.NamespaceName, false),
 		},
 		{
 			name:              "case 2: Update Secret and ConfigMap resources in case join token changes",
@@ -70,11 +64,9 @@ func Test_ClusterController(t *testing.T) {
 			cluster:           test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
 			secret:            test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
 			configMap:         test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
-			app:               test.NewApp(test.ClusterName, test.AppName, test.NamespaceName, false),
 			expectedCluster:   test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
 			expectedSecret:    test.NewSecret(test.ClusterName, test.NamespaceName, test.NewTokenName),
-			expectedConfigMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
-			expectedApp:       test.NewApp(test.ClusterName, test.AppName, test.NamespaceName, false),
+			expectedConfigMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.NewTokenName),
 		},
 		{
 			name:         "case 3: Deregister cluster and delete resources in case the cluster is deleted",
@@ -84,8 +76,6 @@ func Test_ClusterController(t *testing.T) {
 			cluster:      test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Now()),
 			secret:       test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
 			configMap:    test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
-			app:          test.NewApp(test.ClusterName, test.AppName, test.NamespaceName, false),
-			expectedApp:  test.NewApp(test.ClusterName, test.AppName, test.NamespaceName, false),
 		},
 	}
 
@@ -100,9 +90,6 @@ func Test_ClusterController(t *testing.T) {
 			}
 			if tc.configMap != nil {
 				runtimeObjects = append(runtimeObjects, tc.configMap)
-			}
-			if tc.app != nil {
-				runtimeObjects = append(runtimeObjects, tc.app)
 			}
 
 			ctrlClient, err := test.NewFakeK8sClient(runtimeObjects)
@@ -120,8 +107,7 @@ func Test_ClusterController(t *testing.T) {
 				Teleport: teleport.New(tc.namespace, tc.secretConfig, test.NewMockTokenGenerator(tc.token)),
 			}
 			controller.Teleport.TeleportClient = test.NewTeleportClient(test.FakeTeleportClientConfig{
-				KubernetesServers: tc.servers,
-				Tokens:            tc.tokens,
+				Tokens: tc.tokens,
 			})
 
 			req := ctrl.Request{
@@ -182,14 +168,6 @@ func Test_ClusterController(t *testing.T) {
 			err = ctrlClient.List(ctx, appList, client.InNamespace(tc.namespace))
 			if err != nil {
 				t.Fatalf("unexpected error %v", err)
-			}
-			if tc.expectedApp != nil {
-				if len(appList.Items) == 0 {
-					t.Fatalf("unexpected result: app list is empty\n%v", secretList)
-				}
-				test.CheckApp(t, tc.expectedApp, &appList.Items[0])
-			} else if len(appList.Items) > 0 {
-				t.Fatalf("unexpected result: app list is not empty\n%v", secretList)
 			}
 		})
 	}

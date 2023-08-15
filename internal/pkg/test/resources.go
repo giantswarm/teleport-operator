@@ -5,7 +5,6 @@ import (
 	"time"
 
 	appv1alpha1 "github.com/giantswarm/apiextensions-application/api/v1alpha1"
-	"github.com/giantswarm/k8smetadata/pkg/label"
 	teleportTypes "github.com/gravitational/teleport/api/types"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -34,13 +33,12 @@ const (
 
 	AppCatalog            = "app-catalog"
 	AppVersion            = "appVersion"
-	AppSpecNamespaceName  = "kube-system"
 	ManagementClusterName = "management-cluster"
 	ProxyAddr             = "127.0.0.1"
 	IdentityFileValue     = "identity-file-value"
 	TeleportVersion       = "1.0.0"
 
-	ConfigMapValuesFormat = "roles: \"kube\"\nauthToken: \"%s\"\nproxyAddr: \"%s\"\nkubeClusterName: \"%s\"\napps: []\nteleportVersionOverride: %q"
+	ConfigMapValuesFormat = "authToken: %s\nproxyAddr: %s\nroles: kube\nkubeClusterName: %s\nteleportVersionOverride: %s"
 )
 
 type MockTokenGenerator struct {
@@ -81,48 +79,6 @@ func NewConfigMap(clusterName, appName, namespaceName, tokenName string) *corev1
 			"values": fmt.Sprintf(ConfigMapValuesFormat, tokenName, ProxyAddr, registerName, TeleportVersion),
 		},
 	}
-}
-
-func NewApp(clusterName, appName, namespaceName string, isManagementCluster bool) *appv1alpha1.App {
-	app := &appv1alpha1.App{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      key.GetAppName(clusterName, appName),
-			Namespace: namespaceName,
-			Labels: map[string]string{
-				label.ManagedBy: key.TeleportOperatorLabelValue,
-				label.Cluster:   clusterName,
-			},
-		},
-		Spec: appv1alpha1.AppSpec{
-			Catalog: AppCatalog,
-			KubeConfig: appv1alpha1.AppSpecKubeConfig{
-				InCluster: isManagementCluster,
-			},
-			Name:      appName,
-			Namespace: AppSpecNamespaceName,
-			UserConfig: appv1alpha1.AppSpecUserConfig{
-				ConfigMap: appv1alpha1.AppSpecUserConfigConfigMap{
-					Name:      key.GetConfigmapName(clusterName, appName),
-					Namespace: namespaceName,
-				},
-			},
-		},
-	}
-
-	if !isManagementCluster {
-		registerName := key.GetRegisterName(ManagementClusterName, clusterName)
-		app.Spec.KubeConfig.Context = appv1alpha1.AppSpecKubeConfigContext{
-			Name: registerName,
-		}
-		app.Spec.KubeConfig.Secret = appv1alpha1.AppSpecKubeConfigSecret{
-			Name:      key.GetAppSpecKubeConfigSecretName(clusterName),
-			Namespace: namespaceName,
-		}
-	} else {
-		app.ObjectMeta.Labels[label.AppOperatorVersion] = key.AppOperatorVersion
-	}
-
-	return app
 }
 
 func NewToken(tokenName, clusterName, tokenType string) teleportTypes.ProvisionToken {

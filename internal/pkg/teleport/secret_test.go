@@ -280,11 +280,11 @@ func Test_SecretCRUD(t *testing.T) {
 	}
 }
 
-func loadSecret(ctx context.Context, ctrlClient client.Client, expectedSecret *corev1.Secret) (*corev1.Secret, error) {
-	actualSecret := &corev1.Secret{}
-	err := ctrlClient.Get(ctx, test.ObjectKeyFromObjectMeta(expectedSecret.ObjectMeta), actualSecret)
+func loadSecret(ctx context.Context, ctrlClient client.Client, expected *corev1.Secret) (*corev1.Secret, error) {
+	actual := &corev1.Secret{}
+	err := ctrlClient.Get(ctx, test.ObjectKeyFromObjectMeta(expected.ObjectMeta), actual)
 	if err != nil {
 		return nil, err
 	}
-	return actualSecret, nil
+	return actual, nil
 }
