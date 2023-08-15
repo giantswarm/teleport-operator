@@ -124,7 +124,7 @@ func main() {
 	setupLog.Info("Connected to teleport cluster", "proxyAddr", tele.SecretConfig.ProxyAddr)
 
 	if err = (&controller.ClusterReconciler{
-		Client:   ctrlClient,
+		Client:   mgr.GetClient(),
 		Log:      ctrl.Log.WithName("controllers").WithName("Cluster"),
 		Scheme:   mgr.GetScheme(),
 		Teleport: tele,
