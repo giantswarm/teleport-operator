@@ -4,18 +4,15 @@ import (
 	"context"
 	"fmt"
 
-	apierrors "k8s.io/apimachinery/pkg/api/errors"
-	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/client/config"
-
 	"github.com/giantswarm/microerror"
 	"github.com/go-logr/logr"
-
-	"github.com/giantswarm/teleport-operator/internal/pkg/key"
-
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 )
 
 type SecretConfig struct {
@@ -28,19 +25,7 @@ type SecretConfig struct {
 	AppCatalog            string
 }
 
-func GetConfigFromSecret(ctx context.Context, namespace string) (*SecretConfig, error) {
-	// Get a config to talk to the apiserver
-	cfg, err := config.GetConfig()
-	if err != nil {
-		return nil, microerror.Mask(fmt.Errorf("unable to get config to talk to the apiserver: %w", err))
-	}
-
-	// Create a new client
-	ctrlClient, err := client.New(cfg, client.Options{})
-	if err != nil {
-		return nil, microerror.Mask(fmt.Errorf("unable to create a new kubernetes client: %w", err))
-	}
-
+func GetConfigFromSecret(ctx context.Context, ctrlClient client.Client, namespace string) (*SecretConfig, error) {
 	secret := &corev1.Secret{}
 
 	if err := ctrlClient.Get(ctx, types.NamespacedName{
@@ -50,37 +35,37 @@ func GetConfigFromSecret(ctx context.Context, namespace string) (*SecretConfig, 
 		return nil, microerror.Mask(err)
 	}
 
-	proxyAddr, err := getSecretString(secret, "proxyAddr")
+	proxyAddr, err := getSecretString(secret, key.ProxyAddr)
 	if err != nil {
 		return nil, microerror.Mask(err)
 	}
 
-	identityFile, err := getSecretString(secret, "identityFile")
+	identityFile, err := getSecretString(secret, key.IdentityFile)
 	if err != nil {
 		return nil, microerror.Mask(err)
 	}
 
-	managementClusterName, err := getSecretString(secret, "managementClusterName")
+	managementClusterName, err := getSecretString(secret, key.ManagementClusterName)
 	if err != nil {
 		return nil, microerror.Mask(err)
 	}
 
-	teleportVersion, err := getSecretString(secret, "teleportVersion")
+	teleportVersion, err := getSecretString(secret, key.TeleportVersion)
 	if err != nil {
 		return nil, microerror.Mask(err)
 	}
 
-	appName, err := getSecretString(secret, "appName")
+	appName, err := getSecretString(secret, key.AppName)
 	if err != nil {
 		return nil, microerror.Mask(err)
 	}
 
-	appVersion, err := getSecretString(secret, "appVersion")
+	appVersion, err := getSecretString(secret, key.AppVersion)
 	if err != nil {
 		return nil, microerror.Mask(err)
 	}
 
-	appCatalog, err := getSecretString(secret, "appCatalog")
+	appCatalog, err := getSecretString(secret, key.AppCatalog)
 	if err != nil {
 		return nil, microerror.Mask(err)
 	}

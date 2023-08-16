@@ -14,6 +14,14 @@ const (
 	TeleportOperatorSecretName      = "teleport-operator"
 	TeleportKubeTokenValidity       = 1 * time.Hour
 	TeleportNodeTokenValidity       = 24 * time.Hour
+
+	AppCatalog            = "appCatalog"
+	AppName               = "appName"
+	AppVersion            = "appVersion"
+	IdentityFile          = "identityFile"
+	ManagementClusterName = "managementClusterName"
+	ProxyAddr             = "proxyAddr"
+	TeleportVersion       = "teleportVersion"
 )
 
 func GetConfigmapName(clusterName string, appName string) string {

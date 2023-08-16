@@ -32,6 +32,7 @@ import (
 	clientgoscheme "k8s.io/client-go/kubernetes/scheme"
 	_ "k8s.io/client-go/plugin/pkg/client/auth"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
 
@@ -39,6 +40,7 @@ import (
 
 	"github.com/giantswarm/teleport-operator/internal/controller"
 	"github.com/giantswarm/teleport-operator/internal/pkg/teleport"
+	"github.com/giantswarm/teleport-operator/internal/pkg/token"
 	//+kubebuilder:scaffold:imports
 )
 
@@ -76,7 +78,8 @@ func main() {
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
-	mgr, err := ctrl.NewManager(ctrl.GetConfigOrDie(), ctrl.Options{
+	restConfig := ctrl.GetConfigOrDie()
+	mgr, err := ctrl.NewManager(restConfig, ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
 		Port:                   9443,
@@ -100,15 +103,21 @@ func main() {
 		os.Exit(1)
 	}
 
-	ctx := context.TODO()
-	secretConfig, err := teleport.GetConfigFromSecret(ctx, namespace)
+	ctrlClient, err := client.New(restConfig, client.Options{})
+	if err != nil {
+		setupLog.Error(err, "unable to start manager")
+		os.Exit(1)
+	}
+
+	ctx := context.Background()
+	secretConfig, err := teleport.GetConfigFromSecret(ctx, ctrlClient, namespace)
 	if err != nil {
 		setupLog.Error(err, "unable to get secret config")
 		os.Exit(1)
 	}
 
-	tele := teleport.New(namespace, secretConfig)
-	if tele.TeleportClient, err = tele.GetTeleportClient(ctx); err != nil {
+	tele := teleport.New(namespace, secretConfig, token.NewGenerator())
+	if tele.TeleportClient, err = teleport.NewClient(ctx, secretConfig.ProxyAddr, secretConfig.IdentityFile); err != nil {
 		setupLog.Error(err, "unable to create teleport client")
 		os.Exit(1)
 	}

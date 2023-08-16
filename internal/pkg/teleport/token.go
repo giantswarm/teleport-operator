@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	"github.com/google/uuid"
 	tt "github.com/gravitational/teleport/api/types"
 
 	"github.com/giantswarm/microerror"
@@ -47,7 +46,7 @@ func (t *Teleport) GenerateToken(ctx context.Context, registerName string, token
 		return "", microerror.Mask(fmt.Errorf("token type %s is not supported", tokenType))
 	}
 
-	token, err := tt.NewProvisionToken(uuid.NewString(), []tt.SystemRole{tokenRole}, tokenValidity)
+	token, err := tt.NewProvisionToken(t.TokenGenerator.Generate(), []tt.SystemRole{tokenRole}, tokenValidity)
 	if err != nil {
 		return "", microerror.Mask(err)
 	}
