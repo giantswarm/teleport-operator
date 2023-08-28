@@ -27,6 +27,7 @@ func NewClient(ctx context.Context, proxyAddr, identityFile string) (Client, err
 		Credentials: []tc.Credentials{
 			tc.LoadIdentityFileFromString(identityFile),
 		},
+		InsecureAddressDiscovery: true,
 	})
 	if err != nil {
 		return nil, microerror.Mask(err)
