@@ -34,6 +34,11 @@ spec:
         args:
         - "--namespace={{ include "resource.default.namespace"  . }}"
         securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          capabilities:
+            drop:
+              - ALL
           {{- with .Values.securityContext }}
             {{- . | toYaml | nindent 10 }}
           {{- end }}
