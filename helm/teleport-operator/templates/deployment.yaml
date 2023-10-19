@@ -34,12 +34,7 @@ spec:
         args:
         - "--namespace={{ include "resource.default.namespace"  . }}"
         securityContext:
-          allowPrivilegeEscalation: false
-          runAsNonRoot: true
-          capabilities:
-            drop:
-              - ALL
-          {{- with .Values.securityContext }}
+          {{- with .Values.containerSecurityContext }}
             {{- . | toYaml | nindent 10 }}
           {{- end }}
         resources:
