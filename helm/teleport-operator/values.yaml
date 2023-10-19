@@ -34,14 +34,12 @@ resources:
 podSecurityContext:
   seccompProfile:
     type: RuntimeDefault
-  allowPrivilegeEscalation: false
   runAsNonRoot: true
+
+# Add seccomp to container security context
+containerSecurityContext:
+  readOnlyRootFilesystem: true
+  allowPrivilegeEscalation: false
   capabilities:
     drop:
       - ALL
-
-# Add seccomp to container security context
-securityContext:
-  readOnlyRootFilesystem: true
-  seccompProfile:
-    type: RuntimeDefault
