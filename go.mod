@@ -7,12 +7,12 @@ require (
 	github.com/giantswarm/microerror v0.4.0
 	github.com/go-logr/logr v1.2.4
 	github.com/google/uuid v1.3.1
-	github.com/gravitational/teleport/api v0.0.0-20230607072028-2f3f42ef14ad
+	github.com/gravitational/teleport/api v14.1.0
 	github.com/onsi/ginkgo/v2 v2.13.0
 	github.com/onsi/gomega v1.28.1
 	github.com/pkg/errors v0.9.1
 	go.uber.org/zap v1.26.0
-	gopkg.in/yaml.v2 v2.4.0
+	gopkg.in/yaml.v3 v3.0.1
 	k8s.io/api v0.25.0
 	k8s.io/apimachinery v0.25.0
 	k8s.io/client-go v0.25.0
