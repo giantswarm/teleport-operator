@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Fixes broken architecture diagram in README
+
 ## [0.5.0] - 2023-10-31
 
 ### Added
@@ -22,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Adjust security context
 
 ### Fixed
+
 - x/net@v0.14.0 - CVE-2023-39325
 
 ## [0.3.0] - 2023-09-28
