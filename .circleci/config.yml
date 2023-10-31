@@ -84,3 +84,63 @@ workflows:
               ignore: /.*/
             tags:
               only: /^v.*/
+
+      - architect/push-to-app-collection:
+          context: architect
+          name: push-to-cloud-director-app-collection
+          app_name: "teleport-operator"
+          app_collection_repo: "cloud-director-app-collection"
+          requires:
+            - push-teleport-operator-to-quay
+            - push-teleport-operator-to-docker
+            - push-teleport-operator-to-app-catalog
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^v.*/
+
+      - architect/push-to-app-collection:
+          context: architect
+          name: push-to-capz-app-collection
+          app_name: "teleport-operator"
+          app_collection_repo: "capz-app-collection"
+          requires:
+            - push-teleport-operator-to-quay
+            - push-teleport-operator-to-docker
+            - push-teleport-operator-to-app-catalog
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^v.*/
+
+      - architect/push-to-app-collection:
+          context: architect
+          name: push-to-gcp-app-collection
+          app_name: "teleport-operator"
+          app_collection_repo: "gcp-app-collection"
+          requires:
+            - push-teleport-operator-to-quay
+            - push-teleport-operator-to-docker
+            - push-teleport-operator-to-app-catalog
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^v.*/
+
+      - architect/push-to-app-collection:
+          context: architect
+          name: push-to-vsphere-app-collection
+          app_name: "teleport-operator"
+          app_collection_repo: "vsphere-app-collection"
+          requires:
+            - push-teleport-operator-to-quay
+            - push-teleport-operator-to-docker
+            - push-teleport-operator-to-app-catalog
+          filters:
+            branches:
+              ignore: /.*/
+            tags:
+              only: /^v.*/
