@@ -59,6 +59,8 @@ spec:
             {{- with .Values.containerSecurityContext }}
               {{- . | toYaml | nindent 10 }}
             {{- end }}
+          resources:
+            {{- toYaml .Values.resources | nindent 10 }}
       serviceAccountName: {{ include "resource.default.name"  . }}
       volumes:
         - name: config
@@ -75,5 +77,4 @@ spec:
                   # `example.teleport.sh` must be replaced with the name of
                   # your Teleport cluster.
                   audience: test.teleport.giantwarm.io
-      resources:
-          {{- toYaml .Values.resources | nindent 10 }}
+
