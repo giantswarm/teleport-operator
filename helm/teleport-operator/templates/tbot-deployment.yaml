@@ -76,5 +76,4 @@ spec:
                   expirationSeconds: 600
                   # `example.teleport.sh` must be replaced with the name of
                   # your Teleport cluster.
-                  audience: test.teleport.giantwarm.io
-
+                  audience: gs-teleport-test

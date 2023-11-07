@@ -20,4 +20,8 @@ data:
     # Auth Server. Prefer the address of the Teleport Proxy.
     auth_server: test.teleport.giantswarm.io:443
     # outputs will be filled in during the completion of an access guide.
-    outputs: []
+    outputs:
+      - type: identity
+        destination:
+          type: kubernetes_secret
+          name: identity-output

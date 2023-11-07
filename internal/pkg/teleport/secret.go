@@ -40,10 +40,10 @@ func GetConfigFromSecret(ctx context.Context, ctrlClient client.Client, namespac
 		return nil, microerror.Mask(err)
 	}
 
-	identityFile, err := getSecretString(secret, key.IdentityFile)
-	if err != nil {
-		return nil, microerror.Mask(err)
-	}
+	// identityFile, err := getSecretString(secret, key.IdentityFile)
+	// if err != nil {
+	// 	return nil, microerror.Mask(err)
+	// }
 
 	managementClusterName, err := getSecretString(secret, key.ManagementClusterName)
 	if err != nil {
@@ -70,8 +70,22 @@ func GetConfigFromSecret(ctx context.Context, ctrlClient client.Client, namespac
 		return nil, microerror.Mask(err)
 	}
 
+	tbotSecret := &corev1.Secret{}
+
+	if err := ctrlClient.Get(ctx, types.NamespacedName{
+		Name:      "identity-output",
+		Namespace: namespace,
+	}, tbotSecret); err != nil {
+		return nil, microerror.Mask(err)
+	}
+
+	identity, err := getSecretString(tbotSecret, "identity")
+	if err != nil {
+		return nil, microerror.Mask(err)
+	}
+
 	return &SecretConfig{
-		IdentityFile:          identityFile,
+		IdentityFile:          identity,
 		ProxyAddr:             proxyAddr,
 		ManagementClusterName: managementClusterName,
 		TeleportVersion:       teleportVersion,
