@@ -27,6 +27,7 @@ type SecretConfig struct {
 
 func GetConfigFromSecret(ctx context.Context, ctrlClient client.Client, namespace string) (*SecretConfig, error) {
 	secret := &corev1.Secret{}
+	tbotSecret := &corev1.Secret{}
 
 	if err := ctrlClient.Get(ctx, types.NamespacedName{
 		Name:      key.TeleportOperatorSecretName,
@@ -35,12 +36,19 @@ func GetConfigFromSecret(ctx context.Context, ctrlClient client.Client, namespac
 		return nil, microerror.Mask(err)
 	}
 
+	if err := ctrlClient.Get(ctx, types.NamespacedName{
+		Name:      key.TeleportBotSecretName,
+		Namespace: namespace,
+	}, tbotSecret); err != nil {
+		return nil, microerror.Mask(err)
+	}
+
 	proxyAddr, err := getSecretString(secret, key.ProxyAddr)
 	if err != nil {
 		return nil, microerror.Mask(err)
 	}
 
-	identityFile, err := getSecretString(secret, key.IdentityFile)
+	identityFile, err := getSecretString(tbotSecret, key.Identity)
 	if err != nil {
 		return nil, microerror.Mask(err)
 	}
@@ -66,20 +74,6 @@ func GetConfigFromSecret(ctx context.Context, ctrlClient client.Client, namespac
 	}
 
 	appCatalog, err := getSecretString(secret, key.AppCatalog)
-	if err != nil {
-		return nil, microerror.Mask(err)
-	}
-
-	tbotSecret := &corev1.Secret{}
-
-	if err := ctrlClient.Get(ctx, types.NamespacedName{
-		Name:      "identity-output",
-		Namespace: namespace,
-	}, tbotSecret); err != nil {
-		return nil, microerror.Mask(err)
-	}
-
-	identityFile, err = getSecretString(tbotSecret, "identity")
 	if err != nil {
 		return nil, microerror.Mask(err)
 	}

@@ -12,6 +12,7 @@ const (
 	TeleportKubeAppNamespace        = "kube-system"
 	TeleportOperatorLabelValue      = "teleport-operator"
 	TeleportOperatorSecretName      = "teleport-operator"
+	TeleportBotSecretName           = "identity-output"
 	TeleportKubeTokenValidity       = 1 * time.Hour
 	TeleportNodeTokenValidity       = 24 * time.Hour
 
@@ -19,6 +20,7 @@ const (
 	AppName               = "appName"
 	AppVersion            = "appVersion"
 	IdentityFile          = "identityFile"
+	Identity              = "identity"
 	ManagementClusterName = "managementClusterName"
 	ProxyAddr             = "proxyAddr"
 	TeleportVersion       = "teleportVersion"
