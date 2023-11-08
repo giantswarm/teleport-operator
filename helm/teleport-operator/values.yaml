@@ -13,8 +13,8 @@ teleport:
   appVersion: 0.3.0
   managementClusterName: ""
   proxyAddr: test.teleport.giantswarm.io:443
-  teleportVersion: 13.1.5
-  identityFile: ""
+  teleportClusterName: gs-teleport-test
+  teleportVersion: 14.1.1
 
 pod:
   user:

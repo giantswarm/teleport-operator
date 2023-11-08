@@ -25,7 +25,7 @@ spec:
         {{- end }}
       containers:
       - name: tbot
-        image: public.ecr.aws/gravitational/teleport:14.1.1
+        image: public.ecr.aws/gravitational/teleport:{{ .Values.teleport.teleportVersion }}
         command:
           - tbot
         args:
@@ -45,11 +45,6 @@ spec:
           # volumeMount.
           - name: KUBERNETES_TOKEN_PATH
             value: /var/run/secrets/tokens/join-sa-token
-          # TELEPORT_ANONYMOUS_TELEMETRY enables the submission of anonymous
-          # usage telemetry.  This helps us shape the future development of
-          # `tbot`. You can disable this by omitting this.
-          - name: TELEPORT_ANONYMOUS_TELEMETRY
-            value: "1"
         volumeMounts:
           - mountPath: /config
             name: config
@@ -76,4 +71,4 @@ spec:
                   expirationSeconds: 600
                   # `example.teleport.sh` must be replaced with the name of
                   # your Teleport cluster.
-                  audience: gs-teleport-test
+                  audience: {{ .Values.teleport.teleportClusterName }}
