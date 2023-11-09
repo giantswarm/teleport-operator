@@ -41,6 +41,8 @@ const (
 	ConfigMapValuesFormat = "authToken: %s\nproxyAddr: %s\nroles: kube\nkubeClusterName: %s\nteleportVersionOverride: %s"
 )
 
+var LastReadValue = time.Now()
+
 type MockTokenGenerator struct {
 	token string
 }

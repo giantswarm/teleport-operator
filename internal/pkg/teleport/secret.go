@@ -3,6 +3,7 @@ package teleport
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/giantswarm/microerror"
 	"github.com/go-logr/logr"
@@ -17,6 +18,7 @@ import (
 
 type SecretConfig struct {
 	ProxyAddr             string
+	LastRead              time.Time
 	IdentityFile          string
 	TeleportVersion       string
 	ManagementClusterName string
@@ -80,6 +82,7 @@ func GetConfigFromSecret(ctx context.Context, ctrlClient client.Client, namespac
 
 	return &SecretConfig{
 		IdentityFile:          identityFile,
+		LastRead:              time.Now(),
 		ProxyAddr:             proxyAddr,
 		ManagementClusterName: managementClusterName,
 		TeleportVersion:       teleportVersion,

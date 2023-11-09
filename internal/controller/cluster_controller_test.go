@@ -101,10 +101,11 @@ func Test_ClusterController(t *testing.T) {
 			log := ctrl.Log.WithName("test")
 
 			controller := &ClusterReconciler{
-				Client:   ctrlClient,
-				Log:      log,
-				Scheme:   scheme.Scheme,
-				Teleport: teleport.New(tc.namespace, tc.secretConfig, test.NewMockTokenGenerator(tc.token)),
+				Client:    ctrlClient,
+				Log:       log,
+				Scheme:    scheme.Scheme,
+				Namespace: tc.namespace,
+				Teleport:  teleport.New(tc.namespace, tc.secretConfig, test.NewMockTokenGenerator(tc.token)),
 			}
 			controller.Teleport.TeleportClient = test.NewTeleportClient(test.FakeTeleportClientConfig{
 				Tokens: tc.tokens,
@@ -179,6 +180,7 @@ func newSecretConfig() *teleport.SecretConfig {
 		AppName:               test.AppName,
 		AppVersion:            test.AppVersion,
 		IdentityFile:          test.IdentityFileValue,
+		LastRead:              test.LastReadValue,
 		ManagementClusterName: test.ManagementClusterName,
 		ProxyAddr:             test.ProxyAddr,
 		TeleportVersion:       test.TeleportVersion,

@@ -124,10 +124,11 @@ func main() {
 	setupLog.Info("Connected to teleport cluster", "proxyAddr", tele.SecretConfig.ProxyAddr)
 
 	if err = (&controller.ClusterReconciler{
-		Client:   mgr.GetClient(),
-		Log:      ctrl.Log.WithName("controllers").WithName("Cluster"),
-		Scheme:   mgr.GetScheme(),
-		Teleport: tele,
+		Client:    mgr.GetClient(),
+		Log:       ctrl.Log.WithName("controllers").WithName("Cluster"),
+		Scheme:    mgr.GetScheme(),
+		Teleport:  tele,
+		Namespace: namespace,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 		os.Exit(1)

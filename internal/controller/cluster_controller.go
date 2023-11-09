@@ -18,6 +18,8 @@ package controller
 
 import (
 	"context"
+	"crypto/sha512"
+	"encoding/hex"
 	"time"
 
 	"github.com/giantswarm/microerror"
@@ -36,10 +38,11 @@ import (
 
 // ClusterReconciler reconciles a Cluster object
 type ClusterReconciler struct {
-	Client   client.Client
-	Log      logr.Logger
-	Scheme   *runtime.Scheme
-	Teleport *teleport.Teleport
+	Client    client.Client
+	Log       logr.Logger
+	Scheme    *runtime.Scheme
+	Teleport  *teleport.Teleport
+	Namespace string
 }
 
 //+kubebuilder:rbac:groups=cluster.x-k8s.io.giantswarm.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
@@ -67,6 +70,32 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 	log.Info("Reconciling cluster", "cluster", cluster)
+
+	now := time.Now()
+	diff := now.Sub(r.Teleport.SecretConfig.LastRead)
+	seconds := diff.Seconds()
+	minutes := seconds / 60
+	hasher := sha512.New()
+	hasher.Write([]byte(r.Teleport.SecretConfig.IdentityFile))
+	sum := hasher.Sum(nil)
+	hashString := hex.EncodeToString(sum)
+
+	log.Info("Teleport identity", "last-read-minutes-ago", minutes, "hash", hashString)
+
+	if time.Since(r.Teleport.SecretConfig.LastRead) > 1*time.Minute {
+		log.Info("Retrieving new identity", "secretName", key.TeleportBotSecretName)
+
+		newSecretConfig, err := teleport.GetConfigFromSecret(ctx, r.Client, r.Namespace)
+		if err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
+		}
+		r.Teleport.SecretConfig = newSecretConfig
+
+		if r.Teleport.TeleportClient, err = teleport.NewClient(ctx, newSecretConfig.ProxyAddr, newSecretConfig.IdentityFile); err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
+		}
+		log.Info("Re-connected to teleport cluster with new identity", "proxyAddr", newSecretConfig.ProxyAddr)
+	}
 
 	registerName := cluster.Name
 	if cluster.Name != r.Teleport.SecretConfig.ManagementClusterName {
