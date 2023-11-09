@@ -82,7 +82,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	log.Info("Teleport identity", "last-read-minutes-ago", minutes, "hash", hashString)
 
-	if time.Since(r.Teleport.SecretConfig.LastRead) > 1*time.Minute {
+	if time.Since(r.Teleport.SecretConfig.LastRead) > 20*time.Minute {
 		log.Info("Retrieving new identity", "secretName", key.TeleportBotSecretName)
 
 		newSecretConfig, err := teleport.GetConfigFromSecret(ctx, r.Client, r.Namespace)
