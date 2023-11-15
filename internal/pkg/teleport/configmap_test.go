@@ -2,7 +2,6 @@ package teleport
 
 import (
 	"context"
-	"github.com/giantswarm/teleport-operator/internal/pkg/config"
 	"testing"
 
 	corev1 "k8s.io/api/core/v1"
@@ -12,6 +11,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/giantswarm/teleport-operator/internal/pkg/config"
 	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 	"github.com/giantswarm/teleport-operator/internal/pkg/test"
 	"github.com/giantswarm/teleport-operator/internal/pkg/token"

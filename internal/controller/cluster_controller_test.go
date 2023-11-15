@@ -3,7 +3,6 @@ package controller
 import (
 	"context"
 	"errors"
-	"github.com/giantswarm/teleport-operator/internal/pkg/config"
 	"testing"
 	"time"
 
@@ -17,6 +16,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/giantswarm/teleport-operator/internal/pkg/config"
 	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 	"github.com/giantswarm/teleport-operator/internal/pkg/teleport"
 	"github.com/giantswarm/teleport-operator/internal/pkg/test"

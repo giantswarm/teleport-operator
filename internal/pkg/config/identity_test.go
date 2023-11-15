@@ -2,12 +2,14 @@ package config
 
 import (
 	"context"
-	"github.com/giantswarm/teleport-operator/internal/pkg/key"
-	"github.com/giantswarm/teleport-operator/internal/pkg/test"
+	"testing"
+
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
-	"testing"
+
+	"github.com/giantswarm/teleport-operator/internal/pkg/key"
+	"github.com/giantswarm/teleport-operator/internal/pkg/test"
 )
 
 func Test_GetIdentityConfigFromSecret(t *testing.T) {

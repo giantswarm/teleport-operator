@@ -2,12 +2,12 @@ package teleport
 
 import (
 	"context"
-	"github.com/giantswarm/teleport-operator/internal/pkg/config"
 	"testing"
 
 	"github.com/gravitational/teleport/api/types"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/giantswarm/teleport-operator/internal/pkg/config"
 	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 	"github.com/giantswarm/teleport-operator/internal/pkg/test"
 	"github.com/giantswarm/teleport-operator/internal/pkg/token"

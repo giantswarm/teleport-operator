@@ -5,12 +5,14 @@ import (
 	"crypto/sha512"
 	"encoding/hex"
 	"fmt"
+	"time"
+
 	"github.com/giantswarm/microerror"
-	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"time"
+
+	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 )
 
 type IdentityConfig struct {

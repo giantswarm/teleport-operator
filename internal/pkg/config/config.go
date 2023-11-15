@@ -3,11 +3,13 @@ package config
 import (
 	"context"
 	"fmt"
+
 	"github.com/giantswarm/microerror"
-	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 )
 
 type Config struct {

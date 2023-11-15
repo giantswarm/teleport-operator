@@ -18,7 +18,6 @@ package controller
 
 import (
 	"context"
-	"github.com/giantswarm/teleport-operator/internal/pkg/config"
 	"time"
 
 	"github.com/giantswarm/microerror"
@@ -28,6 +27,7 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/giantswarm/teleport-operator/internal/pkg/config"
 	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 	"github.com/giantswarm/teleport-operator/internal/pkg/teleport"
 
