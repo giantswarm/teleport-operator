@@ -4,7 +4,7 @@ metadata:
   name: tbot-secrets-admin
   namespace: {{ include "resource.default.namespace"  . }}
   labels:
-    {{ - include "labels.common" . | nindent 4 }}
+  {{- include "labels.common" . | nindent 4 }}
 rules:
   - apiGroups: [""]
     resources: ["secrets"]
@@ -16,7 +16,7 @@ metadata:
   name: tbot-secrets-admin
   namespace: {{ include "resource.default.namespace"  . }}
   labels:
-    {{ - include "labels.common" . | nindent 4 }}
+    {{- include "labels.common" . | nindent 4 }}
 subjects:
   - kind: ServiceAccount
     name: tbot
