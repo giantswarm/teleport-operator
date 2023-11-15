@@ -79,11 +79,11 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 		newIdentityConfig, err := config.GetIdentityConfigFromSecret(ctx, r.Client, r.Namespace)
 		if err != nil {
-			return ctrl.Result{}, microerror.Mask(err)
+			return ctrl.Result{RequeueAfter: 10 * time.Second}, microerror.Mask(err)
 		}
 
 		if r.Teleport.TeleportClient, err = teleport.NewClient(ctx, r.Teleport.Config.ProxyAddr, newIdentityConfig.IdentityFile); err != nil {
-			return ctrl.Result{}, microerror.Mask(err)
+			return ctrl.Result{RequeueAfter: 10 * time.Second}, microerror.Mask(err)
 		}
 		if r.Teleport.Identity == nil {
 			log.Info("Connected to teleport cluster", "proxyAddr", r.Teleport.Config.ProxyAddr)
