@@ -18,8 +18,7 @@ package controller
 
 import (
 	"context"
-	"crypto/sha512"
-	"encoding/hex"
+	"github.com/giantswarm/teleport-operator/internal/pkg/config"
 	"time"
 
 	"github.com/giantswarm/microerror"
@@ -71,35 +70,32 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 	log.Info("Reconciling cluster", "cluster", cluster)
 
-	now := time.Now()
-	diff := now.Sub(r.Teleport.SecretConfig.LastRead)
-	seconds := diff.Seconds()
-	minutes := seconds / 60
-	hasher := sha512.New()
-	hasher.Write([]byte(r.Teleport.SecretConfig.IdentityFile))
-	sum := hasher.Sum(nil)
-	hashString := hex.EncodeToString(sum)
+	if r.Teleport.Identity != nil {
+		log.Info("Teleport identity", "last-read-minutes-ago", r.Teleport.Identity.Age()/60, "hash", r.Teleport.Identity.Hash())
+	}
 
-	log.Info("Teleport identity", "last-read-minutes-ago", minutes, "hash", hashString)
-
-	if time.Since(r.Teleport.SecretConfig.LastRead) > 20*time.Minute {
+	if r.Teleport.Identity == nil || time.Since(r.Teleport.Identity.LastRead) > 20*time.Minute {
 		log.Info("Retrieving new identity", "secretName", key.TeleportBotSecretName)
 
-		newSecretConfig, err := teleport.GetConfigFromSecret(ctx, r.Client, r.Namespace)
+		newIdentityConfig, err := config.GetIdentityConfigFromSecret(ctx, r.Client, r.Namespace)
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
-		r.Teleport.SecretConfig = newSecretConfig
 
-		if r.Teleport.TeleportClient, err = teleport.NewClient(ctx, newSecretConfig.ProxyAddr, newSecretConfig.IdentityFile); err != nil {
+		if r.Teleport.TeleportClient, err = teleport.NewClient(ctx, r.Teleport.Config.ProxyAddr, newIdentityConfig.IdentityFile); err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
-		log.Info("Re-connected to teleport cluster with new identity", "proxyAddr", newSecretConfig.ProxyAddr)
+		if r.Teleport.Identity == nil {
+			log.Info("Connected to teleport cluster", "proxyAddr", r.Teleport.Config.ProxyAddr)
+		} else {
+			log.Info("Re-connected to teleport cluster with new identity", "proxyAddr", r.Teleport.Config.ProxyAddr)
+		}
+		r.Teleport.Identity = newIdentityConfig
 	}
 
 	registerName := cluster.Name
-	if cluster.Name != r.Teleport.SecretConfig.ManagementClusterName {
-		registerName = key.GetRegisterName(r.Teleport.SecretConfig.ManagementClusterName, cluster.Name)
+	if cluster.Name != r.Teleport.Config.ManagementClusterName {
+		registerName = key.GetRegisterName(r.Teleport.Config.ManagementClusterName, cluster.Name)
 	}
 
 	// Check if the cluster instance is marked to be deleted, which is indicated by the deletion timestamp being set.

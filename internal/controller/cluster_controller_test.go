@@ -2,6 +2,8 @@ package controller
 
 import (
 	"context"
+	"errors"
+	"github.com/giantswarm/teleport-operator/internal/pkg/config"
 	"testing"
 	"time"
 
@@ -26,19 +28,24 @@ func Test_ClusterController(t *testing.T) {
 		namespace         string
 		token             string
 		tokens            []teleportTypes.ProvisionToken
-		secretConfig      *teleport.SecretConfig
+		config            *config.Config
+		identity          *config.IdentityConfig
+		identitySecret    *corev1.Secret
 		cluster           *capi.Cluster
 		secret            *corev1.Secret
 		configMap         *corev1.ConfigMap
+		newTeleportClient func(ctx context.Context, proxyAddr, identityFile string) (teleport.Client, error)
 		expectedCluster   *capi.Cluster
 		expectedSecret    *corev1.Secret
 		expectedConfigMap *corev1.ConfigMap
+		expectedError     error
 	}{
 		{
 			name:              "case 0: Register cluster and create Secret, ConfigMap and App resources in case they do not exist",
 			namespace:         test.NamespaceName,
 			token:             test.TokenName,
-			secretConfig:      newSecretConfig(),
+			config:            newConfig(),
+			identity:          newIdentity(test.LastReadValue),
 			cluster:           test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
 			expectedCluster:   test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
 			expectedSecret:    test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
@@ -48,7 +55,8 @@ func Test_ClusterController(t *testing.T) {
 			name:              "case 1: Register cluster and update Secret, ConfigMap and App resources in case they exist",
 			namespace:         test.NamespaceName,
 			token:             test.TokenName,
-			secretConfig:      newSecretConfig(),
+			config:            newConfig(),
+			identity:          newIdentity(test.LastReadValue),
 			cluster:           test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
 			secret:            test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
 			configMap:         test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
@@ -60,7 +68,8 @@ func Test_ClusterController(t *testing.T) {
 			name:              "case 2: Update Secret and ConfigMap resources in case join token changes",
 			namespace:         test.NamespaceName,
 			token:             test.NewTokenName,
-			secretConfig:      newSecretConfig(),
+			config:            newConfig(),
+			identity:          newIdentity(test.LastReadValue),
 			cluster:           test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
 			secret:            test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
 			configMap:         test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
@@ -69,13 +78,45 @@ func Test_ClusterController(t *testing.T) {
 			expectedConfigMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.NewTokenName),
 		},
 		{
-			name:         "case 3: Deregister cluster and delete resources in case the cluster is deleted",
-			namespace:    test.NamespaceName,
-			token:        test.TokenName,
-			secretConfig: newSecretConfig(),
-			cluster:      test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Now()),
-			secret:       test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
-			configMap:    test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
+			name:      "case 3: Deregister cluster and delete resources in case the cluster is deleted",
+			namespace: test.NamespaceName,
+			token:     test.TokenName,
+			config:    newConfig(),
+			identity:  newIdentity(test.LastReadValue),
+			cluster:   test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Now()),
+			secret:    test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
+			configMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
+		},
+		{
+			name:           "case 4: Reconnect to Teleport when credentials are rotated",
+			namespace:      test.NamespaceName,
+			token:          test.NewTokenName,
+			config:         newConfig(),
+			identity:       newIdentity(time.Now().Add(-21 * time.Minute)),
+			cluster:        test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
+			secret:         test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
+			identitySecret: test.NewIdentitySecret(test.NamespaceName, test.IdentityFileValue),
+			configMap:      test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
+			newTeleportClient: func(ctx context.Context, proxyAddr, identityFile string) (teleport.Client, error) {
+				return test.NewTeleportClient(test.FakeTeleportClientConfig{Tokens: nil}), nil
+			},
+			expectedCluster:   test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
+			expectedSecret:    test.NewSecret(test.ClusterName, test.NamespaceName, test.NewTokenName),
+			expectedConfigMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.NewTokenName),
+		},
+		{
+			name:      "case 5: Return an error in case reconnection to Teleport fails after the credentials are rotated",
+			namespace: test.NamespaceName,
+			token:     test.TokenName,
+			config:    newConfig(),
+			identity:  newIdentity(time.Now().Add(-21 * time.Minute)),
+			cluster:   test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
+			secret:    test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
+			configMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
+			newTeleportClient: func(ctx context.Context, proxyAddr, identityFile string) (teleport.Client, error) {
+				return nil, errors.New("simulated error")
+			},
+			expectedError: errors.New("secrets \"identity-output\" not found"),
 		},
 	}
 
@@ -91,6 +132,17 @@ func Test_ClusterController(t *testing.T) {
 			if tc.configMap != nil {
 				runtimeObjects = append(runtimeObjects, tc.configMap)
 			}
+			if tc.identitySecret != nil {
+				runtimeObjects = append(runtimeObjects, tc.identitySecret)
+			}
+
+			newTeleportClient := teleport.NewClient
+			if tc.newTeleportClient != nil {
+				teleport.NewClient = tc.newTeleportClient
+			}
+			defer func() {
+				teleport.NewClient = newTeleportClient
+			}()
 
 			ctrlClient, err := test.NewFakeK8sClient(runtimeObjects)
 			if err != nil {
@@ -105,11 +157,12 @@ func Test_ClusterController(t *testing.T) {
 				Log:       log,
 				Scheme:    scheme.Scheme,
 				Namespace: tc.namespace,
-				Teleport:  teleport.New(tc.namespace, tc.secretConfig, test.NewMockTokenGenerator(tc.token)),
+				Teleport:  teleport.New(tc.namespace, tc.config, test.NewMockTokenGenerator(tc.token)),
 			}
 			controller.Teleport.TeleportClient = test.NewTeleportClient(test.FakeTeleportClientConfig{
 				Tokens: tc.tokens,
 			})
+			controller.Teleport.Identity = tc.identity
 
 			req := ctrl.Request{
 				NamespacedName: types.NamespacedName{
@@ -120,7 +173,14 @@ func Test_ClusterController(t *testing.T) {
 
 			_, err = controller.Reconcile(ctx, req)
 			if err != nil {
+				if tc.expectedError != nil && err.Error() != tc.expectedError.Error() {
+					t.Fatalf("unexpected error: expected %v, actual %v", tc.expectedError, err)
+				} else if tc.expectedError != nil {
+					return
+				}
 				t.Fatalf("unexpected error %v", err)
+			} else if tc.expectedError != nil {
+				t.Fatalf("did not receive an expected error %v", tc.expectedError)
 			}
 
 			clusterList := &capi.ClusterList{}
@@ -142,12 +202,23 @@ func Test_ClusterController(t *testing.T) {
 			if err != nil {
 				t.Fatalf("unexpected error %v", err)
 			}
+			expectedSecretListLength := 1
+			if tc.identitySecret != nil {
+				expectedSecretListLength = 2
+			}
 			if tc.expectedSecret != nil {
-				if len(secretList.Items) == 0 {
+				if len(secretList.Items) < expectedSecretListLength {
 					t.Fatalf("unexpected result: secret list is empty\n%v", secretList)
 				}
-				test.CheckSecret(t, tc.expectedSecret, &secretList.Items[0])
-			} else if len(secretList.Items) > 0 {
+				var actualSecret *corev1.Secret
+				for _, secret := range secretList.Items {
+					if secret.Name == tc.expectedSecret.Name {
+						actualSecret = &secret
+						break
+					}
+				}
+				test.CheckSecret(t, tc.expectedSecret, actualSecret)
+			} else if len(secretList.Items) > expectedSecretListLength-1 {
 				t.Fatalf("unexpected result: secret list is not empty\n%v", secretList)
 			}
 
@@ -158,11 +229,11 @@ func Test_ClusterController(t *testing.T) {
 			}
 			if tc.expectedConfigMap != nil {
 				if len(configMapList.Items) == 0 {
-					t.Fatalf("unexpected result: secret list is empty\n%v", secretList)
+					t.Fatalf("unexpected result: config map list is empty\n%v", configMapList)
 				}
 				test.CheckConfigMap(t, tc.expectedConfigMap, &configMapList.Items[0])
 			} else if len(configMapList.Items) > 0 {
-				t.Fatalf("unexpected result: config map list is not empty\n%v", secretList)
+				t.Fatalf("unexpected result: config map list is not empty\n%v", configMapList)
 			}
 
 			appList := &appv1alpha1.AppList{}
@@ -174,15 +245,20 @@ func Test_ClusterController(t *testing.T) {
 	}
 }
 
-func newSecretConfig() *teleport.SecretConfig {
-	return &teleport.SecretConfig{
+func newConfig() *config.Config {
+	return &config.Config{
 		AppCatalog:            test.AppCatalog,
 		AppName:               test.AppName,
 		AppVersion:            test.AppVersion,
-		IdentityFile:          test.IdentityFileValue,
-		LastRead:              test.LastReadValue,
 		ManagementClusterName: test.ManagementClusterName,
 		ProxyAddr:             test.ProxyAddr,
 		TeleportVersion:       test.TeleportVersion,
+	}
+}
+
+func newIdentity(lastRead time.Time) *config.IdentityConfig {
+	return &config.IdentityConfig{
+		IdentityFile: test.IdentityFileValue,
+		LastRead:     lastRead,
 	}
 }

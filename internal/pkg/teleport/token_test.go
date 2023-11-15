@@ -2,6 +2,7 @@ package teleport
 
 import (
 	"context"
+	"github.com/giantswarm/teleport-operator/internal/pkg/config"
 	"testing"
 
 	"github.com/gravitational/teleport/api/types"
@@ -47,7 +48,7 @@ func Test_GenerateToken(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			teleport := New(test.NamespaceName, &SecretConfig{}, test.NewMockTokenGenerator(test.TokenName))
+			teleport := New(test.NamespaceName, &config.Config{}, test.NewMockTokenGenerator(test.TokenName))
 			teleport.TeleportClient = test.NewTeleportClient(test.FakeTeleportClientConfig{
 				FailsList:   tc.failsList,
 				FailsDelete: tc.failsDelete,
@@ -118,7 +119,7 @@ func Test_IsTokenValid(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			teleport := New(test.NamespaceName, &SecretConfig{}, token.NewGenerator())
+			teleport := New(test.NamespaceName, &config.Config{}, token.NewGenerator())
 			teleport.TeleportClient = test.NewTeleportClient(test.FakeTeleportClientConfig{
 				Tokens:    tc.tokens,
 				FailsList: tc.failsList,
@@ -182,7 +183,7 @@ func Test_DeleteToken(t *testing.T) {
 			ctx := context.TODO()
 			log := ctrl.Log.WithName("test")
 
-			teleport := New(test.NamespaceName, &SecretConfig{}, token.NewGenerator())
+			teleport := New(test.NamespaceName, &config.Config{}, token.NewGenerator())
 			teleport.TeleportClient = test.NewTeleportClient(test.FakeTeleportClientConfig{
 				FailsDelete: tc.failsDelete,
 				Tokens:      tc.tokens,

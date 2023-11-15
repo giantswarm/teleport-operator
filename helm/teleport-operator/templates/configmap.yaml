@@ -1,27 +1,15 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: tbot-config
-  namespace: {{ include "resource.default.namespace"  . }}
+  name: {{ include "resource.default.name" . }}
+  namespace: {{ include "resource.default.namespace" . }}
   labels:
-  {{- include "labels.common" . | nindent 4 }}
+    {{- include "labels.common" . | nindent 4 }}
+type: Opaque
 data:
-  tbot.yaml: |
-    version: v2
-    onboarding:
-      join_method: kubernetes
-      # ensure token is set to the name of the join token you created earlier
-      token: {{ .Values.teleport.managementClusterName }}
-    storage:
-      # a memory destination is used for the bots own state since the kubernetes
-      # join method does not require persistence.
-      type: memory
-    # ensure this is configured to the address of your Teleport Proxy or
-    # Auth Server. Prefer the address of the Teleport Proxy.
-    auth_server: {{ .Values.teleport.proxyAddr }}
-    # outputs will be filled in during the completion of an access guide.
-    outputs:
-      - type: identity
-        destination:
-          type: kubernetes_secret
-          name: identity-output
+  appCatalog: {{ .Values.teleport.appCatalog | b64enc | quote }}
+  appName: {{ .Values.teleport.appName | b64enc | quote }}
+  appVersion: {{ .Values.teleport.appVersion | b64enc | quote }}
+  managementClusterName: {{ .Values.teleport.managementClusterName | b64enc | quote }}
+  proxyAddr: {{ .Values.teleport.proxyAddr | b64enc | quote }}
+  teleportVersion: {{ .Values.teleport.teleportVersion | b64enc | quote }}
