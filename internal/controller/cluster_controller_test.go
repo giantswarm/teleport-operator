@@ -210,13 +210,7 @@ func Test_ClusterController(t *testing.T) {
 				if len(secretList.Items) < expectedSecretListLength {
 					t.Fatalf("unexpected result: secret list is empty\n%v", secretList)
 				}
-				var actualSecret *corev1.Secret
-				for _, secret := range secretList.Items {
-					if secret.Name == tc.expectedSecret.Name {
-						actualSecret = &secret
-						break
-					}
-				}
+				actualSecret := findSecretInList(secretList, tc.expectedSecret.Name)
 				test.CheckSecret(t, tc.expectedSecret, actualSecret)
 			} else if len(secretList.Items) > expectedSecretListLength-1 {
 				t.Fatalf("unexpected result: secret list is not empty\n%v", secretList)
@@ -261,4 +255,13 @@ func newIdentity(lastRead time.Time) *config.IdentityConfig {
 		IdentityFile: test.IdentityFileValue,
 		LastRead:     lastRead,
 	}
+}
+
+func findSecretInList(secretList *corev1.SecretList, name string) *corev1.Secret {
+	for _, secret := range secretList.Items {
+		if secret.Name == name {
+			return &secret
+		}
+	}
+	return nil
 }
