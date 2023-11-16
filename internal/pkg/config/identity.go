@@ -20,10 +20,10 @@ type IdentityConfig struct {
 	LastRead     time.Time
 }
 
-func (c *IdentityConfig) Age() float64 {
+func (c *IdentityConfig) Age() time.Duration {
 	now := time.Now()
 	diff := now.Sub(c.LastRead)
-	return diff.Seconds()
+	return diff
 }
 
 func (c *IdentityConfig) Hash() string {

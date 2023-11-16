@@ -76,7 +76,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	log.Info("Reconciling cluster", "cluster", cluster)
 
 	if r.Teleport.Identity != nil {
-		log.Info("Teleport identity", "last-read-minutes-ago", r.Teleport.Identity.Age()/60, "hash", r.Teleport.Identity.Hash())
+		log.Info("Teleport identity", "last-read-minutes-ago", r.Teleport.Identity.Age(), "hash", r.Teleport.Identity.Hash())
 	}
 
 	if r.Teleport.Identity == nil || time.Since(r.Teleport.Identity.LastRead) > identityExpirationPeriod {
