@@ -35,6 +35,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
+const (
+	identityExpirationPeriod = 20 * time.Minute
+	identityRenewRetryDelay  = 30 * time.Second
+)
+
 // ClusterReconciler reconciles a Cluster object
 type ClusterReconciler struct {
 	Client    client.Client
@@ -74,16 +79,16 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		log.Info("Teleport identity", "last-read-minutes-ago", r.Teleport.Identity.Age()/60, "hash", r.Teleport.Identity.Hash())
 	}
 
-	if r.Teleport.Identity == nil || time.Since(r.Teleport.Identity.LastRead) > 20*time.Minute {
+	if r.Teleport.Identity == nil || time.Since(r.Teleport.Identity.LastRead) > identityExpirationPeriod {
 		log.Info("Retrieving new identity", "secretName", key.TeleportBotSecretName)
 
 		newIdentityConfig, err := config.GetIdentityConfigFromSecret(ctx, r.Client, r.Namespace)
 		if err != nil {
-			return ctrl.Result{RequeueAfter: 10 * time.Second}, microerror.Mask(err)
+			return ctrl.Result{RequeueAfter: identityRenewRetryDelay}, microerror.Mask(err)
 		}
 
 		if r.Teleport.TeleportClient, err = teleport.NewClient(ctx, r.Teleport.Config.ProxyAddr, newIdentityConfig.IdentityFile); err != nil {
-			return ctrl.Result{RequeueAfter: 10 * time.Second}, microerror.Mask(err)
+			return ctrl.Result{RequeueAfter: identityRenewRetryDelay}, microerror.Mask(err)
 		}
 		if r.Teleport.Identity == nil {
 			log.Info("Connected to teleport cluster", "proxyAddr", r.Teleport.Config.ProxyAddr)
