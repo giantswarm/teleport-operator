@@ -109,7 +109,7 @@ func Test_ClusterController(t *testing.T) {
 			namespace: test.NamespaceName,
 			token:     test.TokenName,
 			config:    newConfig(),
-			identity:  newIdentity(time.Now()),
+			identity:  newIdentity(time.Now().Add(-identityExpirationPeriod - time.Second)),
 			cluster:   test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
 			secret:    test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
 			configMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
