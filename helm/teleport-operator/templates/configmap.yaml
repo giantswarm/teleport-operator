@@ -7,9 +7,9 @@ metadata:
     {{- include "labels.common" . | nindent 4 }}
 type: Opaque
 data:
-  appCatalog: {{ .Values.teleport.appCatalog | b64enc | quote }}
-  appName: {{ .Values.teleport.appName | b64enc | quote }}
-  appVersion: {{ .Values.teleport.appVersion | b64enc | quote }}
-  managementClusterName: {{ .Values.teleport.managementClusterName | b64enc | quote }}
-  proxyAddr: {{ .Values.teleport.proxyAddr | b64enc | quote }}
-  teleportVersion: {{ .Values.teleport.teleportVersion | b64enc | quote }}
+  appCatalog: {{ .Values.teleport.appCatalog | quote }}
+  appName: {{ .Values.teleport.appName | quote }}
+  appVersion: {{ .Values.teleport.appVersion | quote }}
+  managementClusterName: {{ .Values.teleport.managementClusterName | quote }}
+  proxyAddr: {{ .Values.teleport.proxyAddr | quote }}
+  teleportVersion: {{ .Values.teleport.teleportVersion | quote }}
