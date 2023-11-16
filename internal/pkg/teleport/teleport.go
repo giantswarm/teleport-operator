@@ -1,19 +1,21 @@
 package teleport
 
 import (
+	"github.com/giantswarm/teleport-operator/internal/pkg/config"
 	"github.com/giantswarm/teleport-operator/internal/pkg/token"
 )
 
 type Teleport struct {
-	SecretConfig   *SecretConfig
+	Config         *config.Config
+	Identity       *config.IdentityConfig
 	TeleportClient Client
 	Namespace      string
 	TokenGenerator token.Generator
 }
 
-func New(namespace string, secretConfig *SecretConfig, tokenGenerator token.Generator) *Teleport {
+func New(namespace string, cfg *config.Config, tokenGenerator token.Generator) *Teleport {
 	return &Teleport{
-		SecretConfig:   secretConfig,
+		Config:         cfg,
 		Namespace:      namespace,
 		TokenGenerator: tokenGenerator,
 	}

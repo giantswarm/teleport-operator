@@ -18,7 +18,7 @@ import (
 
 func (t *Teleport) GetConfigMap(ctx context.Context, log logr.Logger, ctrlClient client.Client, clusterName string, clusterNamespace string) (*corev1.ConfigMap, error) {
 	var (
-		configMapName = key.GetConfigmapName(clusterName, t.SecretConfig.AppName)
+		configMapName = key.GetConfigmapName(clusterName, t.Config.AppName)
 		configMap     = &corev1.ConfigMap{}
 	)
 
@@ -52,7 +52,7 @@ func (t *Teleport) GetTokenFromConfigMap(ctx context.Context, configMap *corev1.
 }
 
 func (t *Teleport) CreateConfigMap(ctx context.Context, log logr.Logger, ctrlClient client.Client, clusterName string, clusterNamespace string, registerName string, token string) error {
-	configMapName := key.GetConfigmapName(clusterName, t.SecretConfig.AppName)
+	configMapName := key.GetConfigmapName(clusterName, t.Config.AppName)
 
 	configMapData := map[string]string{
 		"values": t.getConfigMapData(registerName, token),
@@ -112,7 +112,7 @@ func (t *Teleport) UpdateConfigMap(ctx context.Context, log logr.Logger, ctrlCli
 }
 
 func (t *Teleport) DeleteConfigMap(ctx context.Context, log logr.Logger, ctrlClient client.Client, clusterName string, clusterNamespace string) error {
-	configMapName := key.GetConfigmapName(clusterName, t.SecretConfig.AppName)
+	configMapName := key.GetConfigmapName(clusterName, t.Config.AppName)
 	cm := corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      configMapName,
@@ -134,9 +134,9 @@ func (t *Teleport) DeleteConfigMap(ctx context.Context, log logr.Logger, ctrlCli
 func (t *Teleport) getConfigMapData(registerName string, token string) string {
 	var (
 		authToken               = token
-		proxyAddr               = t.SecretConfig.ProxyAddr
+		proxyAddr               = t.Config.ProxyAddr
 		kubeClusterName         = registerName
-		teleportVersionOverride = t.SecretConfig.TeleportVersion
+		teleportVersionOverride = t.Config.TeleportVersion
 	)
 
 	return key.GetConfigmapDataFromTemplate(authToken, proxyAddr, kubeClusterName, teleportVersionOverride)

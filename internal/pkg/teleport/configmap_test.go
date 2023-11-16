@@ -11,6 +11,7 @@ import (
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
+	"github.com/giantswarm/teleport-operator/internal/pkg/config"
 	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 	"github.com/giantswarm/teleport-operator/internal/pkg/test"
 	"github.com/giantswarm/teleport-operator/internal/pkg/token"
@@ -30,7 +31,7 @@ func Test_ConfigMapCRUD(t *testing.T) {
 		configMapToDelete *corev1.ConfigMap
 		expectError       bool
 		expectEmpty       bool
-		secretConfig      *SecretConfig
+		config            *config.Config
 	}{
 		{
 			name:              "case 0: Create a configmap if it does not exist",
@@ -38,7 +39,7 @@ func Test_ConfigMapCRUD(t *testing.T) {
 			clusterName:       test.ClusterName,
 			registerName:      key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
 			configMapToCreate: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
-			secretConfig: &SecretConfig{
+			config: &config.Config{
 				AppName:         test.AppName,
 				ProxyAddr:       test.ProxyAddr,
 				TeleportVersion: test.TeleportVersion,
@@ -52,7 +53,7 @@ func Test_ConfigMapCRUD(t *testing.T) {
 			configMap:         test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
 			configMapToCreate: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
 			expectError:       false,
-			secretConfig: &SecretConfig{
+			config: &config.Config{
 				AppName:         test.AppName,
 				ProxyAddr:       test.ProxyAddr,
 				TeleportVersion: test.TeleportVersion,
@@ -65,7 +66,7 @@ func Test_ConfigMapCRUD(t *testing.T) {
 			registerName:    key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
 			configMap:       test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
 			configMapToRead: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
-			secretConfig: &SecretConfig{
+			config: &config.Config{
 				AppName:         test.AppName,
 				ProxyAddr:       test.ProxyAddr,
 				TeleportVersion: test.TeleportVersion,
@@ -78,7 +79,7 @@ func Test_ConfigMapCRUD(t *testing.T) {
 			registerName:    key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
 			configMapToRead: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
 			expectEmpty:     true,
-			secretConfig: &SecretConfig{
+			config: &config.Config{
 				AppName:         test.AppName,
 				ProxyAddr:       test.ProxyAddr,
 				TeleportVersion: test.TeleportVersion,
@@ -92,7 +93,7 @@ func Test_ConfigMapCRUD(t *testing.T) {
 			token:           test.TokenName,
 			configMap:       test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
 			configMapToRead: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
-			secretConfig: &SecretConfig{
+			config: &config.Config{
 				AppName:         test.AppName,
 				ProxyAddr:       test.ProxyAddr,
 				TeleportVersion: test.TeleportVersion,
@@ -112,7 +113,7 @@ func Test_ConfigMapCRUD(t *testing.T) {
 			},
 			configMapToRead: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
 			expectError:     true,
-			secretConfig: &SecretConfig{
+			config: &config.Config{
 				AppName:         test.AppName,
 				ProxyAddr:       test.ProxyAddr,
 				TeleportVersion: test.TeleportVersion,
@@ -126,7 +127,7 @@ func Test_ConfigMapCRUD(t *testing.T) {
 			token:             test.NewTokenName,
 			configMap:         test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
 			configMapToUpdate: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.NewTokenName),
-			secretConfig: &SecretConfig{
+			config: &config.Config{
 				AppName:         test.AppName,
 				ProxyAddr:       test.ProxyAddr,
 				TeleportVersion: test.TeleportVersion,
@@ -140,7 +141,7 @@ func Test_ConfigMapCRUD(t *testing.T) {
 			configMap:         test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
 			configMapToDelete: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
 			expectError:       false,
-			secretConfig: &SecretConfig{
+			config: &config.Config{
 				AppName:         test.AppName,
 				ProxyAddr:       test.ProxyAddr,
 				TeleportVersion: test.TeleportVersion,
@@ -153,7 +154,7 @@ func Test_ConfigMapCRUD(t *testing.T) {
 			registerName:      key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
 			configMapToDelete: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
 			expectError:       false,
-			secretConfig: &SecretConfig{
+			config: &config.Config{
 				AppName:         test.AppName,
 				ProxyAddr:       test.ProxyAddr,
 				TeleportVersion: test.TeleportVersion,
@@ -175,7 +176,7 @@ func Test_ConfigMapCRUD(t *testing.T) {
 				t.Fatalf("unexpected error %v", err)
 			}
 
-			teleport := New(tc.name, tc.secretConfig, token.NewGenerator())
+			teleport := New(tc.name, tc.config, token.NewGenerator())
 
 			ctx := context.TODO()
 			log := ctrl.Log.WithName("test")

@@ -70,6 +70,16 @@ func NewSecret(clusterName, namespaceName, tokenName string) *corev1.Secret {
 	}
 }
 
+func NewIdentitySecret(namespaceName, identityFile string) *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      key.TeleportBotSecretName,
+			Namespace: namespaceName,
+		},
+		Data: map[string][]byte{key.Identity: []byte(identityFile)},
+	}
+}
+
 func NewConfigMap(clusterName, appName, namespaceName, tokenName string) *corev1.ConfigMap {
 	registerName := key.GetRegisterName(ManagementClusterName, clusterName)
 	return &corev1.ConfigMap{
