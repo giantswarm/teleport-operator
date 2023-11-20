@@ -1,7 +1,7 @@
 apiVersion: apps/v1
 kind: Deployment
 metadata:
-  name: tbot
+  name: {{ include "resource.default.name" . }}-tbot
   namespace: {{ include "resource.default.namespace"  . }}
   labels:
   {{- include "labels.common" . | nindent 4 }}
@@ -60,7 +60,7 @@ spec:
       volumes:
         - name: config
           configMap:
-            name: tbot-config
+            name: {{ include "resource.default.name" . }}-tbot-config
         - name: join-sa-token
           projected:
             sources:

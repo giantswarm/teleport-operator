@@ -1,7 +1,7 @@
 apiVersion: v1
 kind: ConfigMap
 metadata:
-  name: tbot-config
+  name: {{ include "resource.default.name" . }}-tbot-config
   namespace: {{ include "resource.default.namespace"  . }}
   labels:
   {{- include "labels.common" . | nindent 4 }}
