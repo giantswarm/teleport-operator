@@ -9,6 +9,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Update architecture diagram with Machine ID (tbot)
+
 ## [0.6.0] - 2023-11-21
 
 ### Added
