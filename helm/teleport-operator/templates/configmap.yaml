@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "resource.default.name" . }}
+  namespace: {{ include "resource.default.namespace" . }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+type: Opaque
+data:
+  appCatalog: {{ .Values.teleport.appCatalog | quote }}
+  appName: {{ .Values.teleport.appName | quote }}
+  appVersion: {{ .Values.teleport.appVersion | quote }}
+  managementClusterName: {{ .Values.teleport.managementClusterName | quote }}
+  proxyAddr: {{ .Values.teleport.proxyAddr | quote }}
+  teleportVersion: {{ .Values.teleport.teleportVersion | quote }}

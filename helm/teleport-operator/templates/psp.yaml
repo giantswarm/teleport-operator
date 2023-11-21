@@ -32,4 +32,5 @@ spec:
   volumes:
     - 'projected'
     - 'secret'
+    - 'configMap'
 {{- end }}

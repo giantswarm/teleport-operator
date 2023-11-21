@@ -27,6 +27,7 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 
+	"github.com/giantswarm/teleport-operator/internal/pkg/config"
 	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 	"github.com/giantswarm/teleport-operator/internal/pkg/teleport"
 
@@ -34,12 +35,15 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
+const identityExpirationPeriod = 20 * time.Minute
+
 // ClusterReconciler reconciles a Cluster object
 type ClusterReconciler struct {
-	Client   client.Client
-	Log      logr.Logger
-	Scheme   *runtime.Scheme
-	Teleport *teleport.Teleport
+	Client    client.Client
+	Log       logr.Logger
+	Scheme    *runtime.Scheme
+	Teleport  *teleport.Teleport
+	Namespace string
 }
 
 //+kubebuilder:rbac:groups=cluster.x-k8s.io.giantswarm.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
@@ -68,9 +72,32 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 	log.Info("Reconciling cluster", "cluster", cluster)
 
+	if r.Teleport.Identity != nil {
+		log.Info("Teleport identity", "last-read-minutes-ago", r.Teleport.Identity.Age(), "hash", r.Teleport.Identity.Hash())
+	}
+
+	if r.Teleport.Identity == nil || time.Since(r.Teleport.Identity.LastRead) > identityExpirationPeriod {
+		log.Info("Retrieving new identity", "secretName", key.TeleportBotSecretName)
+
+		newIdentityConfig, err := config.GetIdentityConfigFromSecret(ctx, r.Client, r.Namespace)
+		if err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
+		}
+
+		if r.Teleport.TeleportClient, err = teleport.NewClient(ctx, r.Teleport.Config.ProxyAddr, newIdentityConfig.IdentityFile); err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
+		}
+		if r.Teleport.Identity == nil {
+			log.Info("Connected to teleport cluster", "proxyAddr", r.Teleport.Config.ProxyAddr)
+		} else {
+			log.Info("Re-connected to teleport cluster with new identity", "proxyAddr", r.Teleport.Config.ProxyAddr)
+		}
+		r.Teleport.Identity = newIdentityConfig
+	}
+
 	registerName := cluster.Name
-	if cluster.Name != r.Teleport.SecretConfig.ManagementClusterName {
-		registerName = key.GetRegisterName(r.Teleport.SecretConfig.ManagementClusterName, cluster.Name)
+	if cluster.Name != r.Teleport.Config.ManagementClusterName {
+		registerName = key.GetRegisterName(r.Teleport.Config.ManagementClusterName, cluster.Name)
 	}
 
 	// Check if the cluster instance is marked to be deleted, which is indicated by the deletion timestamp being set.

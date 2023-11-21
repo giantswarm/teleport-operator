@@ -19,7 +19,7 @@ type Client interface {
 	DeleteToken(ctx context.Context, name string) error
 }
 
-func NewClient(ctx context.Context, proxyAddr, identityFile string) (Client, error) {
+var NewClient = func(ctx context.Context, proxyAddr, identityFile string) (Client, error) {
 	teleportClient, err := tc.New(ctx, tc.Config{
 		Addrs: []string{
 			proxyAddr,

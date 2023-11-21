@@ -41,6 +41,8 @@ const (
 	ConfigMapValuesFormat = "authToken: %s\nproxyAddr: %s\nroles: kube\nkubeClusterName: %s\nteleportVersionOverride: %s"
 )
 
+var LastReadValue = time.Now()
+
 type MockTokenGenerator struct {
 	token string
 }
@@ -65,6 +67,16 @@ func NewSecret(clusterName, namespaceName, tokenName string) *corev1.Secret {
 		},
 		Data:       map[string][]byte{JoinTokenKey: []byte(tokenName)},
 		StringData: map[string]string{JoinTokenKey: tokenName},
+	}
+}
+
+func NewIdentitySecret(namespaceName, identityFile string) *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      key.TeleportBotSecretName,
+			Namespace: namespaceName,
+		},
+		Data: map[string][]byte{key.Identity: []byte(identityFile)},
 	}
 }
 

@@ -47,6 +47,9 @@
                 "proxyAddr": {
                     "type": "string"
                 },
+                "teleportClusterName": {
+                    "type": "string"
+                },
                 "teleportVersion": {
                     "type": "string"
                 }

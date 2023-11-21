@@ -1,0 +1,74 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "resource.default.name" . }}-tbot
+  namespace: {{ include "resource.default.namespace"  . }}
+  labels:
+  {{- include "labels.common" . | nindent 4 }}
+spec:
+  replicas: 1
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: tbot
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: tbot
+    spec:
+      securityContext:
+        runAsUser: {{ .Values.pod.user.id }}
+        runAsGroup: {{ .Values.pod.group.id }}
+        {{- with .Values.podSecurityContext }}
+          {{- . | toYaml | nindent 8 }}
+        {{- end }}
+      containers:
+      - name: tbot
+        image: public.ecr.aws/gravitational/teleport:{{ .Values.teleport.teleportVersion }}
+        command:
+          - tbot
+        args:
+          - start
+          - -c
+          - /config/tbot.yaml
+        env:
+          # POD_NAMESPACE is required for the kubernetes_secret` destination
+          # type to work correctly.
+          - name: POD_NAMESPACE
+            valueFrom:
+              fieldRef:
+                fieldPath: metadata.namespace
+          # KUBERNETES_TOKEN_PATH specifies the path to the service account
+          # JWT to use for joining.
+          # This path is based on the configuration of the volume and
+          # volumeMount.
+          - name: KUBERNETES_TOKEN_PATH
+            value: /var/run/secrets/tokens/join-sa-token
+        volumeMounts:
+          - mountPath: /config
+            name: config
+          - mountPath: /var/run/secrets/tokens
+            name: join-sa-token
+        securityContext:
+          {{- with .Values.containerSecurityContext }}
+            {{- . | toYaml | nindent 10 }}
+          {{- end }}
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+      serviceAccountName: {{ include "resource.default.name"  . }}
+      volumes:
+        - name: config
+          configMap:
+            name: {{ include "resource.default.name" . }}-tbot-config
+        - name: join-sa-token
+          projected:
+            sources:
+              - serviceAccountToken:
+                  path: join-sa-token
+                  # 600 seconds is the minimum that Kubernetes supports. We
+                  # recommend this value is used.
+                  expirationSeconds: 600
+                  # `example.teleport.sh` must be replaced with the name of
+                  # your Teleport cluster.
+                  audience: {{ .Values.teleport.teleportClusterName }}

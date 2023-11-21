@@ -15,72 +15,6 @@ import (
 	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 )
 
-type SecretConfig struct {
-	ProxyAddr             string
-	IdentityFile          string
-	TeleportVersion       string
-	ManagementClusterName string
-	AppName               string
-	AppVersion            string
-	AppCatalog            string
-}
-
-func GetConfigFromSecret(ctx context.Context, ctrlClient client.Client, namespace string) (*SecretConfig, error) {
-	secret := &corev1.Secret{}
-
-	if err := ctrlClient.Get(ctx, types.NamespacedName{
-		Name:      key.TeleportOperatorSecretName,
-		Namespace: namespace,
-	}, secret); err != nil {
-		return nil, microerror.Mask(err)
-	}
-
-	proxyAddr, err := getSecretString(secret, key.ProxyAddr)
-	if err != nil {
-		return nil, microerror.Mask(err)
-	}
-
-	identityFile, err := getSecretString(secret, key.IdentityFile)
-	if err != nil {
-		return nil, microerror.Mask(err)
-	}
-
-	managementClusterName, err := getSecretString(secret, key.ManagementClusterName)
-	if err != nil {
-		return nil, microerror.Mask(err)
-	}
-
-	teleportVersion, err := getSecretString(secret, key.TeleportVersion)
-	if err != nil {
-		return nil, microerror.Mask(err)
-	}
-
-	appName, err := getSecretString(secret, key.AppName)
-	if err != nil {
-		return nil, microerror.Mask(err)
-	}
-
-	appVersion, err := getSecretString(secret, key.AppVersion)
-	if err != nil {
-		return nil, microerror.Mask(err)
-	}
-
-	appCatalog, err := getSecretString(secret, key.AppCatalog)
-	if err != nil {
-		return nil, microerror.Mask(err)
-	}
-
-	return &SecretConfig{
-		IdentityFile:          identityFile,
-		ProxyAddr:             proxyAddr,
-		ManagementClusterName: managementClusterName,
-		TeleportVersion:       teleportVersion,
-		AppName:               appName,
-		AppVersion:            appVersion,
-		AppCatalog:            appCatalog,
-	}, nil
-}
-
 func (t *Teleport) GetSecret(ctx context.Context, log logr.Logger, ctrlClient client.Client, clusterName string, clusterNamespace string) (*corev1.Secret, error) {
 	var (
 		secretName           = key.GetSecretName(clusterName) //#nosec G101
@@ -164,12 +98,4 @@ func (t *Teleport) DeleteSecret(ctx context.Context, log logr.Logger, ctrlClient
 	}
 	log.Info("Deleted secret", "secretName", secretName)
 	return nil
-}
-
-func getSecretString(secret *corev1.Secret, key string) (string, error) {
-	b, ok := secret.Data[key]
-	if !ok {
-		return "", fmt.Errorf("malformed Secret: required key %q not found", key)
-	}
-	return string(b), nil
 }
