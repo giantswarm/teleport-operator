@@ -12,8 +12,8 @@ teleport:
   appName: teleport-kube-agent
   appVersion: 0.3.0
   managementClusterName: ""
-  proxyAddr: test.teleport.giantswarm.io:443
-  teleportClusterName: test.teleport.giantswarm.io
+  proxyAddr: teleport.giantswarm.io:443
+  teleportClusterName: teleport.giantswarm.io
   teleportVersion: 14.1.1
 
 pod:
