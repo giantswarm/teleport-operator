@@ -72,29 +72,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 	log.Info("Reconciling cluster", "cluster", cluster)
 
-	if r.Teleport.Identity != nil {
-		log.Info("Teleport identity", "last-read-minutes-ago", r.Teleport.Identity.Age(), "hash", r.Teleport.Identity.Hash())
-	}
-
-	if r.Teleport.Identity == nil || time.Since(r.Teleport.Identity.LastRead) > identityExpirationPeriod {
-		log.Info("Retrieving new identity", "secretName", key.TeleportBotSecretName)
-
-		newIdentityConfig, err := config.GetIdentityConfigFromSecret(ctx, r.Client, r.Namespace)
-		if err != nil {
-			return ctrl.Result{}, microerror.Mask(err)
-		}
-
-		if r.Teleport.TeleportClient, err = teleport.NewClient(ctx, r.Teleport.Config.ProxyAddr, newIdentityConfig.IdentityFile); err != nil {
-			return ctrl.Result{}, microerror.Mask(err)
-		}
-		if r.Teleport.Identity == nil {
-			log.Info("Connected to teleport cluster", "proxyAddr", r.Teleport.Config.ProxyAddr)
-		} else {
-			log.Info("Re-connected to teleport cluster with new identity", "proxyAddr", r.Teleport.Config.ProxyAddr)
-		}
-		r.Teleport.Identity = newIdentityConfig
-	}
-
 	registerName := cluster.Name
 	if cluster.Name != r.Teleport.Config.ManagementClusterName {
 		registerName = key.GetRegisterName(r.Teleport.Config.ManagementClusterName, cluster.Name)
@@ -126,6 +103,29 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 
 		return ctrl.Result{}, nil
+	}
+
+	if r.Teleport.Identity != nil {
+		log.Info("Teleport identity", "last-read-minutes-ago", r.Teleport.Identity.Age(), "hash", r.Teleport.Identity.Hash())
+	}
+
+	if r.Teleport.Identity == nil || time.Since(r.Teleport.Identity.LastRead) > identityExpirationPeriod {
+		log.Info("Retrieving new identity", "secretName", key.TeleportBotSecretName)
+
+		newIdentityConfig, err := config.GetIdentityConfigFromSecret(ctx, r.Client, r.Namespace)
+		if err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
+		}
+
+		if r.Teleport.TeleportClient, err = teleport.NewClient(ctx, r.Teleport.Config.ProxyAddr, newIdentityConfig.IdentityFile); err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
+		}
+		if r.Teleport.Identity == nil {
+			log.Info("Connected to teleport cluster", "proxyAddr", r.Teleport.Config.ProxyAddr)
+		} else {
+			log.Info("Re-connected to teleport cluster with new identity", "proxyAddr", r.Teleport.Config.ProxyAddr)
+		}
+		r.Teleport.Identity = newIdentityConfig
 	}
 
 	// Add finalizer to cluster CR if it's not there
