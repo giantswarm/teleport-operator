@@ -13,7 +13,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Remove `-bot` suffix from tbot token name.
+- Replace `-bot` suffix with `bot-` rpefix in tbot token name.
 
 ## [0.6.0] - 2023-11-21
 
