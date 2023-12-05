@@ -14,31 +14,14 @@ workflows:
             tags:
               only: /^v.*/
 
-      - architect/push-to-docker:
-          context: "architect"
-          name: push-teleport-operator-to-quay
-          image: "quay.io/giantswarm/teleport-operator"
-          username_envar: "QUAY_USERNAME"
-          password_envar: "QUAY_PASSWORD"
+      - architect/push-to-registries:
+          context: architect
+          name: push-to-registries
           requires:
             - go-build
-          # Needed to trigger job also on git tag.
           filters:
             tags:
               only: /^v.*/
-      - architect/push-to-docker:
-          context: "architect"
-          name: push-teleport-operator-to-docker
-          image: "docker.io/giantswarm/teleport-operator"
-          username_envar: "DOCKER_USERNAME"
-          password_envar: "DOCKER_PASSWORD"
-          requires:
-            - go-build
-          # Needed to trigger job also on git tag.
-          filters:
-            tags:
-              only: /^v.*/
-
       - architect/push-to-app-catalog:
           context: "architect"
           executor: "app-build-suite" # uncomment this if you want automatic metadata generation and helm chart linting
@@ -47,9 +30,7 @@ workflows:
           app_catalog_test: "control-plane-test-catalog"
           chart: "teleport-operator"
           requires:
-            - push-teleport-operator-to-quay
-            - push-teleport-operator-to-docker
-          # Needed to trigger job also on git tag.
+            - push-to-registries
           filters:
             tags:
               only: /^v.*/
@@ -61,9 +42,8 @@ workflows:
           app_namespace: "giantswarm"
           app_collection_repo: "aws-app-collection"
           requires:
-            - push-teleport-operator-to-quay
-            - push-teleport-operator-to-docker
             - push-teleport-operator-to-app-catalog
+            - push-to-registries
           filters:
             branches:
               ignore: /.*/
@@ -76,9 +56,8 @@ workflows:
           app_name: "teleport-operator"
           app_collection_repo: "capa-app-collection"
           requires:
-            - push-teleport-operator-to-quay
-            - push-teleport-operator-to-docker
             - push-teleport-operator-to-app-catalog
+            - push-to-registries
           filters:
             branches:
               ignore: /.*/
@@ -91,9 +70,8 @@ workflows:
           app_name: "teleport-operator"
           app_collection_repo: "cloud-director-app-collection"
           requires:
-            - push-teleport-operator-to-quay
-            - push-teleport-operator-to-docker
             - push-teleport-operator-to-app-catalog
+            - push-to-registries
           filters:
             branches:
               ignore: /.*/
@@ -106,9 +84,8 @@ workflows:
           app_name: "teleport-operator"
           app_collection_repo: "capz-app-collection"
           requires:
-            - push-teleport-operator-to-quay
-            - push-teleport-operator-to-docker
             - push-teleport-operator-to-app-catalog
+            - push-to-registries
           filters:
             branches:
               ignore: /.*/
@@ -121,9 +98,8 @@ workflows:
           app_name: "teleport-operator"
           app_collection_repo: "gcp-app-collection"
           requires:
-            - push-teleport-operator-to-quay
-            - push-teleport-operator-to-docker
             - push-teleport-operator-to-app-catalog
+            - push-to-registries
           filters:
             branches:
               ignore: /.*/
@@ -136,9 +112,8 @@ workflows:
           app_name: "teleport-operator"
           app_collection_repo: "vsphere-app-collection"
           requires:
-            - push-teleport-operator-to-quay
-            - push-teleport-operator-to-docker
             - push-teleport-operator-to-app-catalog
+            - push-to-registries
           filters:
             branches:
               ignore: /.*/
