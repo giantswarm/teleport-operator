@@ -5,7 +5,7 @@ global:
 image:
   name: "giantswarm/teleport-operator"
 registry:
-  domain: docker.io
+  domain: gsoci.azurecr.io
 
 teleport:
   appCatalog: giantswarm
