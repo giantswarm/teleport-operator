@@ -1,7 +1,7 @@
 version: 2.1
 
 orbs:
-  architect: giantswarm/architect@4.35.5
+  architect: giantswarm/architect@4.35.6
 
 workflows:
   build:
@@ -32,21 +32,6 @@ workflows:
           requires:
             - push-to-registries
           filters:
-            tags:
-              only: /^v.*/
-
-      - architect/push-to-app-collection:
-          name: aws-app-collection
-          context: "architect"
-          app_name: "teleport-operator"
-          app_namespace: "giantswarm"
-          app_collection_repo: "aws-app-collection"
-          requires:
-            - push-teleport-operator-to-app-catalog
-            - push-to-registries
-          filters:
-            branches:
-              ignore: /.*/
             tags:
               only: /^v.*/
 
