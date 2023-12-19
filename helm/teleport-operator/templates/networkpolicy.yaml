@@ -1,3 +1,22 @@
+{{- if .Values.ciliumNetworkPolicy.enabled }}
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: {{ include "resource.networkPolicy.name"  . }}
+  namespace: {{ include "resource.default.namespace"  . }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  egress:
+  - toEntities:
+    - kube-apiserver
+  ingress:
+  - toPorts:
+    - 8080/tcp
+  endpointSelector:
+    matchLabels:
+      {{- include "labels.selector" . | nindent 6 }}
+{{- else }}
 kind: NetworkPolicy
 apiVersion: networking.k8s.io/v1
 metadata:
@@ -18,3 +37,4 @@ spec:
   policyTypes:
   - Egress
   - Ingress
+{{- end }}

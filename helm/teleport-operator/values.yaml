@@ -2,6 +2,9 @@ global:
   podSecurityStandards:
     enforced: false
 
+ciliumNetworkPolicy:
+  enabled: false
+
 image:
   name: "giantswarm/teleport-operator"
 registry:
