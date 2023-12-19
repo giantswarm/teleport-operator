@@ -1,5 +1,5 @@
 name: teleport-operator
-version: 0.7.0
+version: 0.8.0
 description: "Teleport operator"
 home: "https://github.com/giantswarm/teleport-operator"
 apiVersion: v1
