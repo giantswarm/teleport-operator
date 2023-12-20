@@ -12,7 +12,8 @@ spec:
     - kube-apiserver
   ingress:
   - toPorts:
-    - 8080/tcp
+    - port: "8080"
+      protocol: "tcp"
   endpointSelector:
     matchLabels:
       {{- include "labels.selector" . | nindent 6 }}
