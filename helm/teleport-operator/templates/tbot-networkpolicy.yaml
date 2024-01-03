@@ -1,0 +1,41 @@
+{{- if .Values.ciliumNetworkPolicy.enabled }}
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: {{ include "resource.networkPolicy.name"  . }}-tbot
+  namespace: {{ include "resource.default.namespace"  . }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  egress:
+  - toEntities:
+    - kube-apiserver
+  ingress:
+  - toPorts:
+    - port: "8080"
+      protocol: "tcp"
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: tbot
+{{- else }}
+kind: NetworkPolicy
+apiVersion: networking.k8s.io/v1
+metadata:
+  name: {{ include "resource.networkPolicy.name" . }}-tbot
+  namespace: {{ include "resource.default.namespace" . }}
+  labels:
+    {{- include "labels.common" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: tbot
+  egress:
+  - {}
+  ingress:
+  - ports:
+    - port: 8080
+      protocol: TCP
+  policyTypes:
+  - Egress
+  - Ingress
+{{- end }}
