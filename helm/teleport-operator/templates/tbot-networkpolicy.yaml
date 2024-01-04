@@ -10,6 +10,7 @@ spec:
   egress:
   - toEntities:
     - kube-apiserver
+    - world
   ingress:
   - toPorts:
     - port: "8080"
