@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add network policy for tbot
+- Fixes CVE-2023-48795 in crypto package
+
 ## [0.8.1] - 2023-12-20
 
 ### Fixed
