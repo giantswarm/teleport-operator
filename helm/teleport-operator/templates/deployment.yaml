@@ -30,6 +30,9 @@ spec:
         {{- end }}
       containers:
       - name: {{ .Chart.Name }}
+        env:
+        - name: TELEPORT_TLS_ROUTING_CONN_UPGRADE
+          value: "{{ .Values.teleport.proxyAddr }}=yes"
         image: "{{ .Values.registry.domain }}/{{ .Values.image.name }}:{{ .Chart.Version }}"
         args:
         - "--namespace={{ include "resource.default.namespace"  . }}"
