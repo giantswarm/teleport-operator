@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Updated cilium network policy for tbot and teleport-operator
+
 ## [0.8.3] - 2024-01-04
 
 ### Added
