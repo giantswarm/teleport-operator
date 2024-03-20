@@ -65,6 +65,9 @@ func (t *Teleport) CreateConfigMap(ctx context.Context, log logr.Logger, ctrlCli
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      configMapName,
 					Namespace: clusterNamespace,
+					Labels: map[string]string{
+						"app-operator.giantswarm.io/watching": "false",
+					},
 				},
 				Data: configMapData,
 			}
