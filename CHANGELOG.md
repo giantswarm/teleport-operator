@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Updated `tbot` deployment to use standalone `tbot` image (smaller image size)
+
 ## [0.8.4] - 2024-01-04
 
 ### Changed
