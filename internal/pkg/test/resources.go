@@ -86,6 +86,9 @@ func NewConfigMap(clusterName, appName, namespaceName, tokenName string) *corev1
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      key.GetConfigmapName(clusterName, appName),
 			Namespace: namespaceName,
+			Labels: map[string]string{
+				"app-operator.giantswarm.io/watching": "false",
+			},
 		},
 		Data: map[string]string{
 			"values": fmt.Sprintf(ConfigMapValuesFormat, tokenName, ProxyAddr, registerName, TeleportVersion),

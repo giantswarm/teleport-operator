@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Added the label `app-operator.giantswarm.io/watching` to `"false"` on `configmap` created by the operator to avoid the unstopable reconciliation of the resource.
+
 ## [0.8.4] - 2024-01-04
 
 ### Changed

@@ -52,6 +52,9 @@ func (t *Teleport) CreateSecret(ctx context.Context, log logr.Logger, ctrlClient
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
 			Namespace: clusterNamespace,
+			Labels: map[string]string{
+				"app-operator.giantswarm.io/watching": "false",
+			},
 		},
 		StringData: map[string]string{
 			"joinToken": token,
@@ -70,6 +73,9 @@ func (t *Teleport) UpdateSecret(ctx context.Context, log logr.Logger, ctrlClient
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      secretName,
 			Namespace: clusterNamespace,
+			Labels: map[string]string{
+				"app-operator.giantswarm.io/watching": "false",
+			},
 		},
 		StringData: map[string]string{
 			"joinToken": token,

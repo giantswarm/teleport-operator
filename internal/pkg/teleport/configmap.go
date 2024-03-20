@@ -65,6 +65,9 @@ func (t *Teleport) CreateConfigMap(ctx context.Context, log logr.Logger, ctrlCli
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      configMapName,
 					Namespace: clusterNamespace,
+					Labels: map[string]string{
+						"app-operator.giantswarm.io/watching": "false",
+					},
 				},
 				Data: configMapData,
 			}
@@ -104,6 +107,15 @@ func (t *Teleport) UpdateConfigMap(ctx context.Context, log logr.Logger, ctrlCli
 
 	// Update the ConfigMap's data with the modified value
 	configMap.Data["values"] = string(updatedValuesYaml)
+
+	// Ensure the Labels map is initialized
+	if configMap.Labels == nil {
+		configMap.Labels = make(map[string]string)
+	}
+
+	// Add the specific label
+	configMap.Labels["app-operator.giantswarm.io/watching"] = "false"
+
 	if err := ctrlClient.Update(ctx, configMap); err != nil {
 		return microerror.Mask(fmt.Errorf("failed to update ConfigMap: %w", err))
 	}
