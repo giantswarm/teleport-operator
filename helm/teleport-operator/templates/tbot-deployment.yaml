@@ -25,7 +25,7 @@ spec:
         {{- end }}
       containers:
       - name: tbot
-        image: gsoci.azurecr.io/giantswarm/teleport-tbot:{{ .Values.teleport.teleportVersion }}
+        image: gsoci.azurecr.io/giantswarm/tbot-distroless:{{ .Values.teleport.teleportVersion }}
         command:
           - tbot
         args:
