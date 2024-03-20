@@ -10,6 +10,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Changed
 
 - Updated `tbot` deployment to use standalone `tbot` image (smaller image size)
+- Bump teleport version to `15.1.7`
 
 ## [0.8.4] - 2024-01-04
 
