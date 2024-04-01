@@ -7,11 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Use PodMonitor for monitoring instead of legacy system.
+
 ## [0.9.0] - 2024-03-21
 
 ### Changed
 
-- Use PodMonitor for monitoring instead of legacy system.
 - Updated `tbot` deployment to use standalone `tbot` image (smaller image size)
 - Bump teleport version to `15.1.7`
 
