@@ -46,3 +46,19 @@ containerSecurityContext:
   capabilities:
     drop:
       - ALL
+
+tolerations:
+  - effect: "NoSchedule"
+    key: "node-role.kubernetes.io/control-plane"
+  - effect: "NoSchedule"
+    key: "node.cluster.x-k8s.io/uninitialized"
+    operator: "Exists"
+
+affinity:
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 10
+      preference:
+        matchExpressions:
+        - key: "node-role.kubernetes.io/control-plane"
+          operator: "Exists"
