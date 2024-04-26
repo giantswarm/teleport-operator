@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+- Added affinity and tolerations for operators' deployments to run on control-plane
+
 ## [0.9.1] - 2024-04-01
 
 ### Fixed
