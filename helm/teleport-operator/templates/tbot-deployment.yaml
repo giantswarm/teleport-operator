@@ -72,3 +72,7 @@ spec:
                   # `example.teleport.sh` must be replaced with the name of
                   # your Teleport cluster.
                   audience: {{ .Values.teleport.teleportClusterName }}
+      affinity:
+        {{- toYaml .Values.affinity | nindent 8 }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}

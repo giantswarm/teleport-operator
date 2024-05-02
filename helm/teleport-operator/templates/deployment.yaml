@@ -47,3 +47,7 @@ spec:
         resources:
           {{- toYaml .Values.resources | nindent 10 }}
       terminationGracePeriodSeconds: 10
+      affinity:
+        {{- toYaml .Values.affinity | nindent 8 }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}
