@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Increase token validity for node and kube agents
+
 ## [0.9.2] - 2024-05-07
 
 ### Added

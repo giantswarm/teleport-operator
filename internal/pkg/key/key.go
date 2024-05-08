@@ -13,8 +13,8 @@ const (
 	TeleportOperatorLabelValue      = "teleport-operator"
 	TeleportOperatorConfigName      = "teleport-operator"
 	TeleportBotSecretName           = "identity-output"
-	TeleportKubeTokenValidity       = 1 * time.Hour
-	TeleportNodeTokenValidity       = 24 * time.Hour
+	TeleportKubeTokenValidity       = 720 * time.Hour
+	TeleportNodeTokenValidity       = 720 * time.Hour
 
 	AppCatalog            = "appCatalog"
 	AppName               = "appName"
