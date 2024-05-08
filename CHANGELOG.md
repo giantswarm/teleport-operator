@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.9.3] - 2024-05-08
+
 ### Changed
 
 - Increase token validity for node and kube agents
@@ -123,7 +125,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2023-08-09
 
-[Unreleased]: https://github.com/giantswarm/teleport-operator/compare/v0.9.2...HEAD
+[Unreleased]: https://github.com/giantswarm/teleport-operator/compare/v0.9.3...HEAD
+[0.9.3]: https://github.com/giantswarm/teleport-operator/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/giantswarm/teleport-operator/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/giantswarm/teleport-operator/compare/v0.9.0...v0.9.1
 [0.9.0]: https://github.com/giantswarm/teleport-operator/compare/v0.8.4...v0.9.0
