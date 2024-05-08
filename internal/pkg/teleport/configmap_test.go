@@ -221,6 +221,9 @@ func Test_ConfigMapCRUD(t *testing.T) {
 					if err != nil {
 						test.CheckConfigMap(t, tc.configMapToUpdate, actualConfigMap)
 					}
+					if actualConfigMap.Labels["app-operator.giantswarm.io/watching"] != "false" {
+						t.Errorf("Expected label app-operator.giantswarm.io/watching=false, found %s", actualConfigMap.Labels["app-operator.giantswarm.io/watching"])
+					}
 				}
 			}
 
