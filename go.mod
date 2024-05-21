@@ -7,7 +7,7 @@ toolchain go1.22.3
 require (
 	github.com/giantswarm/apiextensions-application v0.6.0
 	github.com/giantswarm/microerror v0.4.1
-	github.com/go-logr/logr v1.4.1
+	github.com/go-logr/logr v1.4.2
 	github.com/google/uuid v1.6.0
 	github.com/gravitational/teleport/api v0.0.0-20240520223711-c5858508b870
 	github.com/onsi/ginkgo/v2 v2.17.3
