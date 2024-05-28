@@ -905,8 +905,8 @@ github.com/googleapis/gax-go/v2 v2.7.0/go.mod h1:TEop28CZZQ2y+c0VxMUmu1lV+fQx57Q
 github.com/googleapis/gax-go/v2 v2.7.1/go.mod h1:4orTrqY6hXxxaUL4LHIPl6lGo8vAE38/qKbhSAKP6QI=
 github.com/googleapis/go-type-adapters v1.0.0/go.mod h1:zHW75FOG2aur7gAO2B+MLby+cLsWGBF62rFAi7WjWO4=
 github.com/googleapis/google-cloud-go-testing v0.0.0-20200911160855-bcd43fbb19e8/go.mod h1:dvDLG8qkwmyD9a/MJJN3XJcT3xFxOKAvTZGvuZmac9g=
-github.com/gravitational/teleport/api v0.0.0-20240523003845-27fd7c7236d2 h1:895F9UI2gjHBCIcS8QgaZr6V37GsIvOMQVNw2uJ/9C8=
-github.com/gravitational/teleport/api v0.0.0-20240523003845-27fd7c7236d2/go.mod h1:TmsVgOruwXszj9DFNX87YEwlIOzqVbaKCAJx/H976Xc=
+github.com/gravitational/teleport/api v0.0.0-20240528170928-4d85eeadafaf h1:Uy/aubkx7lnqY7dEub9IY/jZXTEnx7Rzkye6zrO11lo=
+github.com/gravitational/teleport/api v0.0.0-20240528170928-4d85eeadafaf/go.mod h1:TmsVgOruwXszj9DFNX87YEwlIOzqVbaKCAJx/H976Xc=
 github.com/gravitational/trace v1.4.0 h1:TtTeMElVwMX21Udb1nmK2tpWYAAMJoyjevzKOaxIFZQ=
 github.com/gravitational/trace v1.4.0/go.mod h1:g79NZzwCjWS/VVubYowaFAQsTjVTohGi0hFbIWSyGoY=
 github.com/grpc-ecosystem/grpc-gateway v1.16.0/go.mod h1:BDjrQk3hbvj6Nolgz8mAMFbcEtjT1g+wF4CSlocrBnw=
