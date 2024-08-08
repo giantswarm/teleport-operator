@@ -13,6 +13,8 @@ const (
 	TeleportOperatorLabelValue      = "teleport-operator"
 	TeleportOperatorConfigName      = "teleport-operator"
 	TeleportBotSecretName           = "identity-output"
+	TeleportBotNamespace            = "giantswarm"
+	TeleportBotAppName              = "teleport-tbot"
 	TeleportKubeTokenValidity       = 720 * time.Hour
 	TeleportNodeTokenValidity       = 720 * time.Hour
 
@@ -30,8 +32,16 @@ func GetConfigmapName(clusterName string, appName string) string {
 	return fmt.Sprintf("%s-%s-config", clusterName, appName)
 }
 
+func GetTbotConfigmapName(clusterName string) string {
+	return fmt.Sprintf("teleport-tbot-%s-config", clusterName)
+}
+
 func GetSecretName(clusterName string) string {
 	return fmt.Sprintf("%s-teleport-join-token", clusterName)
+}
+
+func GetKubeconfigSecretName(clusterName string) string {
+	return fmt.Sprintf("teleport-%s-kubeconfig", clusterName)
 }
 
 func GetRegisterName(managementClusterName, clusterName string) string {
@@ -58,4 +68,12 @@ kubeClusterName: "%s"
 	}
 
 	return fmt.Sprintf(dataTpl, authToken, proxyAddr, kubeClusterName)
+}
+
+func GetTbotConfigmapDataFromTemplate(kubeClusterName string, clusterName string) string {
+	dataTpl := `outputs:
+  %s: "%s"
+`
+
+	return fmt.Sprintf(dataTpl, kubeClusterName, clusterName)
 }
