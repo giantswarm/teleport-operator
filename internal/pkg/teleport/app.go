@@ -6,10 +6,11 @@ import (
 
 	"github.com/giantswarm/apiextensions-application/api/v1alpha1"
 	"github.com/giantswarm/microerror"
-	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/api/errors"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 )
 
 func (t *Teleport) getBotExtraConfig(clusterName string) v1alpha1.AppExtraConfig {
