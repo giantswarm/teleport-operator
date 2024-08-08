@@ -36,6 +36,9 @@ spec:
         image: "{{ .Values.registry.domain }}/{{ .Values.image.name }}:{{ .Chart.Version }}"
         args:
         - "--namespace={{ include "resource.default.namespace"  . }}"
+        {{- if .Values.tbot.enabled }}
+        - "--tbot"
+        {{- end }}
         ports:
         - name: metrics
           protocol: TCP
