@@ -62,6 +62,7 @@ func init() {
 func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
+	var enableTeleportBot bool
 	var probeAddr string
 	var namespace string
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
@@ -69,6 +70,9 @@ func main() {
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
 		"Enable leader election for controller manager. "+
 			"Enabling this will ensure there is only one active controller manager.")
+	flag.BoolVar(&enableTeleportBot, "tbot", false,
+		"Enable teleport bot for teleport-operator. "+
+			"Enabling this will ensure teleport bot configmap is created and app.spec.extraConfig is updated.")
 	flag.StringVar(&namespace, "namespace", "", "Namespace where operator is deployed")
 	opts := zap.Options{
 		Development: true,
@@ -119,11 +123,12 @@ func main() {
 
 	tele := teleport.New(namespace, config, token.NewGenerator())
 	if err = (&controller.ClusterReconciler{
-		Client:    mgr.GetClient(),
-		Log:       ctrl.Log.WithName("controllers").WithName("Cluster"),
-		Scheme:    mgr.GetScheme(),
-		Teleport:  tele,
-		Namespace: namespace,
+		Client:       mgr.GetClient(),
+		Log:          ctrl.Log.WithName("controllers").WithName("Cluster"),
+		Scheme:       mgr.GetScheme(),
+		Teleport:     tele,
+		IsBotEnabled: enableTeleportBot,
+		Namespace:    namespace,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 		os.Exit(1)
@@ -138,6 +143,8 @@ func main() {
 		setupLog.Error(err, "unable to set up ready check")
 		os.Exit(1)
 	}
+
+	setupLog.Info("is teleport bot enabled?", "enabled", enableTeleportBot)
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

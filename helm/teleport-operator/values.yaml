@@ -62,3 +62,6 @@ affinity:
         matchExpressions:
         - key: "node-role.kubernetes.io/control-plane"
           operator: "Exists"
+
+tbot:
+  enabled: false

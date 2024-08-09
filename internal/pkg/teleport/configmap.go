@@ -32,6 +32,23 @@ func (t *Teleport) GetConfigMap(ctx context.Context, log logr.Logger, ctrlClient
 	return configMap, nil
 }
 
+func (t *Teleport) GetTbotConfigMap(ctx context.Context, ctrlClient client.Client, clusterName string) (*corev1.ConfigMap, error) {
+	var (
+		configMapName = key.GetTbotConfigmapName(clusterName)
+		configMap     = &corev1.ConfigMap{}
+	)
+
+	key := client.ObjectKey{Name: configMapName, Namespace: key.TeleportBotNamespace}
+	if err := ctrlClient.Get(ctx, key, configMap); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, microerror.Mask(fmt.Errorf("bot: Failed to get configmap: %w", err))
+	}
+
+	return configMap, nil
+}
+
 func (t *Teleport) GetTokenFromConfigMap(ctx context.Context, configMap *corev1.ConfigMap) (string, error) {
 	valuesBytes, ok := configMap.Data["values"]
 	if !ok {
@@ -78,6 +95,43 @@ func (t *Teleport) CreateConfigMap(ctx context.Context, log logr.Logger, ctrlCli
 		}
 
 		return microerror.Mask(err)
+	}
+
+	return nil
+}
+
+func (t *Teleport) CreateTbotConfigMap(ctx context.Context, ctrlClient client.Client, clusterName string, registerName string) (*corev1.ConfigMap, error) {
+	configMapName := key.GetTbotConfigmapName(clusterName)
+	data := map[string]string{
+		"values": t.getTbotConfigMapData(registerName, clusterName),
+	}
+	cm := corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      configMapName,
+			Namespace: key.TeleportBotNamespace,
+		},
+		Data: data,
+	}
+
+	if err := ctrlClient.Create(ctx, &cm); err != nil {
+		return nil, microerror.Mask(err)
+	}
+
+	return &cm, nil
+}
+
+func (t *Teleport) EnsureTbotConfigMap(ctx context.Context, log logr.Logger, ctrlClient client.Client, clusterName string, namespace string, registerName string) error {
+	cm, err := t.GetTbotConfigMap(ctx, ctrlClient, clusterName)
+	if err != nil {
+		return microerror.Mask(err)
+	}
+
+	if cm == nil {
+		cm, err = t.CreateTbotConfigMap(ctx, ctrlClient, clusterName, registerName)
+		if err != nil {
+			return microerror.Mask(err)
+		}
+		log.Info("tbot: Created configmap", "configmap", cm)
 	}
 
 	return nil
@@ -131,6 +185,26 @@ func (t *Teleport) DeleteConfigMap(ctx context.Context, log logr.Logger, ctrlCli
 	return nil
 }
 
+func (t *Teleport) DeleteTbotConfigMap(ctx context.Context, log logr.Logger, ctrlClient client.Client, clusterName string, namespace string) error {
+	configMapName := key.GetTbotConfigmapName(clusterName)
+	cm := corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      configMapName,
+			Namespace: namespace,
+		},
+	}
+
+	if err := ctrlClient.Delete(ctx, &cm); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return microerror.Mask(err)
+	}
+
+	log.Info("tbot: Deleted configmap", "configMap", configMapName)
+	return nil
+}
+
 func (t *Teleport) getConfigMapData(registerName string, token string) string {
 	var (
 		authToken               = token
@@ -140,4 +214,8 @@ func (t *Teleport) getConfigMapData(registerName string, token string) string {
 	)
 
 	return key.GetConfigmapDataFromTemplate(authToken, proxyAddr, kubeClusterName, teleportVersionOverride)
+}
+
+func (t *Teleport) getTbotConfigMapData(registerName string, clusterName string) string {
+	return key.GetTbotConfigmapDataFromTemplate(registerName, clusterName)
 }

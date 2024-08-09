@@ -39,11 +39,12 @@ const identityExpirationPeriod = 20 * time.Minute
 
 // ClusterReconciler reconciles a Cluster object
 type ClusterReconciler struct {
-	Client    client.Client
-	Log       logr.Logger
-	Scheme    *runtime.Scheme
-	Teleport  *teleport.Teleport
-	Namespace string
+	Client       client.Client
+	Log          logr.Logger
+	Scheme       *runtime.Scheme
+	Teleport     *teleport.Teleport
+	IsBotEnabled bool
+	Namespace    string
 }
 
 //+kubebuilder:rbac:groups=cluster.x-k8s.io.giantswarm.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
@@ -116,6 +117,20 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		// Delete ConfigMap for the cluster
 		if err := r.Teleport.DeleteConfigMap(ctx, log, r.Client, cluster.Name, cluster.Namespace); err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
+		}
+
+		if r.IsBotEnabled {
+			if err := r.Teleport.DeleteBotAppExtraConfig(ctx, log, r.Client, cluster.Name); err != nil {
+				return ctrl.Result{}, microerror.Mask(err)
+			}
+
+			if err := r.Teleport.DeleteTbotConfigMap(ctx, log, r.Client, cluster.Name, key.TeleportBotNamespace); err != nil {
+				return ctrl.Result{}, microerror.Mask(err)
+			}
+
+			if err := r.Teleport.DeleteKubeconfigSecret(ctx, log, r.Client, cluster.Name, key.TeleportBotNamespace); err != nil {
+				return ctrl.Result{}, microerror.Mask(err)
+			}
 		}
 
 		// Remove finalizer from the Cluster CR
@@ -205,6 +220,22 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 		if err := r.Teleport.CreateConfigMap(ctx, log, r.Client, cluster.Name, cluster.Namespace, registerName, token); err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
+		}
+	}
+
+	if r.IsBotEnabled {
+		secret, err := r.Teleport.GetKubeconfigSecret(ctx, r.Client, cluster.Name, key.TeleportBotNamespace)
+		if err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
+		}
+		if secret == nil {
+			if err := r.Teleport.EnsureTbotConfigMap(ctx, log, r.Client, cluster.Name, key.TeleportBotNamespace, registerName); err != nil {
+				return ctrl.Result{}, microerror.Mask(err)
+			}
+
+			if err := r.Teleport.EnsureBotAppExtraConfig(ctx, log, r.Client, cluster.Name); err != nil {
+				return ctrl.Result{}, microerror.Mask(err)
+			}
 		}
 	}
 

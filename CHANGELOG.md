@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Added tbot feature flag, enabled with `--tbot` flag
+- If tbot feature flag is set, creates configmap and append to tbot app extra config for generating  kubeconfig.
+
 ## [0.9.3] - 2024-05-08
 
 ### Changed
