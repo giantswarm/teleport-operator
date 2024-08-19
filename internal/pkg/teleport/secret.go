@@ -99,3 +99,44 @@ func (t *Teleport) DeleteSecret(ctx context.Context, log logr.Logger, ctrlClient
 	log.Info("Deleted secret", "secretName", secretName)
 	return nil
 }
+
+func (t *Teleport) DeleteKubeconfigSecret(ctx context.Context, log logr.Logger, ctrlClient client.Client, clusterName string, clusterNamespace string) error {
+	secretName := key.GetKubeconfigSecretName(clusterName) //#nosec G101
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      secretName,
+			Namespace: clusterNamespace,
+		},
+	}
+	if err := ctrlClient.Delete(ctx, secret); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil
+		}
+		return microerror.Mask(fmt.Errorf("failed to delete Secret: %w", err))
+	}
+	log.Info("tbot: Deleted secret", "secretName", secretName)
+	return nil
+}
+
+func (t *Teleport) GetKubeconfigSecret(ctx context.Context, ctrlClient client.Client, clusterName string, clusterNamespace string) (*corev1.Secret, error) {
+	var (
+		secretName           = key.GetKubeconfigSecretName(clusterName) //#nosec G101
+		secretNamespace      = clusterNamespace
+		secretNamespacedName = types.NamespacedName{Name: secretName, Namespace: secretNamespace}
+		secret               = &corev1.Secret{
+			ObjectMeta: metav1.ObjectMeta{
+				Name:      secretName,
+				Namespace: secretNamespace,
+			},
+		}
+	)
+
+	if err := ctrlClient.Get(ctx, secretNamespacedName, secret); err != nil {
+		if apierrors.IsNotFound(err) {
+			return nil, nil
+		}
+		return nil, microerror.Mask(fmt.Errorf("failed to get Secret: %w", err))
+	}
+
+	return secret, nil
+}
