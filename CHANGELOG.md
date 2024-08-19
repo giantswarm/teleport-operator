@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.10.0] - 2024-08-19
+
 ### Added
 
 - Added tbot feature flag, enabled with `--tbot` flag
@@ -130,7 +132,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2023-08-09
 
-[Unreleased]: https://github.com/giantswarm/teleport-operator/compare/v0.9.3...HEAD
+[Unreleased]: https://github.com/giantswarm/teleport-operator/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/giantswarm/teleport-operator/compare/v0.9.3...v0.10.0
 [0.9.3]: https://github.com/giantswarm/teleport-operator/compare/v0.9.2...v0.9.3
 [0.9.2]: https://github.com/giantswarm/teleport-operator/compare/v0.9.1...v0.9.2
 [0.9.1]: https://github.com/giantswarm/teleport-operator/compare/v0.9.0...v0.9.1
