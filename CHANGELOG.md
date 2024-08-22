@@ -11,6 +11,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Chart to use `.Release.Namespace` namespace
 
+## [0.10.0] - 2024-08-19
+
+### Added
+
+- Added tbot feature flag, enabled with `--tbot` flag
+- If tbot feature flag is set, creates configmap and append to tbot app extra config for generating  kubeconfig.
+
+## [0.9.3] - 2024-05-08
+
+### Changed
+
+- Increase token validity for node and kube agents
+
+## [0.9.2] - 2024-05-07
+
+### Added
+
+- Added affinity and tolerations for operators' deployments to run on control-plane
+
+## [0.9.1] - 2024-04-01
+
+### Fixed
+
+- Use PodMonitor for monitoring instead of legacy system.
+
+## [0.9.0] - 2024-03-21
+
+### Changed
+
+- Updated `tbot` deployment to use standalone `tbot` image (smaller image size)
+- Bump teleport version to `15.1.7`
+
 ## [0.8.4] - 2024-01-04
 
 ### Changed
@@ -104,7 +136,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2023-08-09
 
-[Unreleased]: https://github.com/giantswarm/teleport-operator/compare/v0.8.4...HEAD
+[Unreleased]: https://github.com/giantswarm/teleport-operator/compare/v0.10.0...HEAD
+[0.10.0]: https://github.com/giantswarm/teleport-operator/compare/v0.9.3...v0.10.0
+[0.9.3]: https://github.com/giantswarm/teleport-operator/compare/v0.9.2...v0.9.3
+[0.9.2]: https://github.com/giantswarm/teleport-operator/compare/v0.9.1...v0.9.2
+[0.9.1]: https://github.com/giantswarm/teleport-operator/compare/v0.9.0...v0.9.1
+[0.9.0]: https://github.com/giantswarm/teleport-operator/compare/v0.8.4...v0.9.0
 [0.8.4]: https://github.com/giantswarm/teleport-operator/compare/v0.8.3...v0.8.4
 [0.8.3]: https://github.com/giantswarm/teleport-operator/compare/v0.8.2...v0.8.3
 [0.8.2]: https://github.com/giantswarm/teleport-operator/compare/v0.8.1...v0.8.2

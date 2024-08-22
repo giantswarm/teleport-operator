@@ -11,7 +11,7 @@ spec:
   revisionHistoryLimit: 3
   selector:
     matchLabels:
-  {{- include "labels.selector" . | nindent 6 }}
+      {{- include "labels.selector" . | nindent 6 }}
   strategy:
     type: Recreate
   template:
@@ -19,7 +19,7 @@ spec:
       annotations:
         releaseRevision: {{ .Release.Revision | quote }}
       labels:
-    {{- include "labels.selector" . | nindent 8 }}
+        {{- include "labels.selector" . | nindent 8 }}
     spec:
       serviceAccountName: {{ include "resource.default.name"  . }}
       securityContext:
@@ -36,6 +36,13 @@ spec:
         image: "{{ .Values.registry.domain }}/{{ .Values.image.name }}:{{ .Chart.Version }}"
         args:
         - "--namespace={{ include "resource.default.namespace"  . }}"
+        {{- if .Values.tbot.enabled }}
+        - "--tbot"
+        {{- end }}
+        ports:
+        - name: metrics
+          protocol: TCP
+          containerPort: 8080
         securityContext:
           {{- with .Values.containerSecurityContext }}
             {{- . | toYaml | nindent 10 }}
@@ -43,3 +50,7 @@ spec:
         resources:
           {{- toYaml .Values.resources | nindent 10 }}
       terminationGracePeriodSeconds: 10
+      affinity:
+        {{- toYaml .Values.affinity | nindent 8 }}
+      tolerations:
+        {{- toYaml .Values.tolerations | nindent 8 }}

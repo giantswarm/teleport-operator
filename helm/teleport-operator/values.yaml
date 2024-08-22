@@ -17,7 +17,7 @@ teleport:
   managementClusterName: ""
   proxyAddr: test.teleport.giantswarm.io:443
   teleportClusterName: test.teleport.giantswarm.io
-  teleportVersion: 14.1.1
+  teleportVersion: 15.1.7
 
 pod:
   user:
@@ -46,3 +46,22 @@ containerSecurityContext:
   capabilities:
     drop:
       - ALL
+
+tolerations:
+  - effect: "NoSchedule"
+    key: "node-role.kubernetes.io/control-plane"
+  - effect: "NoSchedule"
+    key: "node.cluster.x-k8s.io/uninitialized"
+    operator: "Exists"
+
+affinity:
+  nodeAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+    - weight: 10
+      preference:
+        matchExpressions:
+        - key: "node-role.kubernetes.io/control-plane"
+          operator: "Exists"
+
+tbot:
+  enabled: false
