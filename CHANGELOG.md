@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Change ownership to Team Shield
+
 ### Fixed
 
 - Disable logger development mode to avoid panicking
