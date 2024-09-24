@@ -20,7 +20,7 @@ Common labels
 app: {{ include "name" . | quote }}
 {{ include "labels.selector" . }}
 app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
-application.giantswarm.io/team: {{ index .Chart.Annotations "application.giantswarm.io/team" | default "bigmac" | quote }}
+application.giantswarm.io/team: {{ index .Chart.Annotations "application.giantswarm.io/team" | default "shield" | quote }}
 app.kubernetes.io/version: {{ .Chart.Version | quote }}
 helm.sh/chart: {{ include "chart" . | quote }}
 {{- end -}}

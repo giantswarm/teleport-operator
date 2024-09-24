@@ -4,10 +4,10 @@ description: "Teleport operator"
 home: "https://github.com/giantswarm/teleport-operator"
 apiVersion: v1
 annotations:
-  application.giantswarm.io/team: "bigmac"
+  application.giantswarm.io/team: "shield"
 icon: https://s.giantswarm.io/app-icons/teleport/1/light.png
 maintainers:
-  - name: giantswarm/team-bigmac
-    email: team-bigmac@giantswarm.io
+  - name: giantswarm/team-shield
+    email: team-shield@giantswarm.io
 keywords:
   - Teleport
