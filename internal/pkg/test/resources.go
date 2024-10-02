@@ -28,7 +28,7 @@ const (
 	TokenTypeKey  = "type"
 	JoinTokenKey  = "joinToken"
 
-	TokenTypeKube = "kube"
+	TokenTypeKube = "kube,app"
 	TokenTypeNode = "node"
 
 	AppCatalog            = "app-catalog"
@@ -38,7 +38,7 @@ const (
 	IdentityFileValue     = "identity-file-value"
 	TeleportVersion       = "1.0.0"
 
-	ConfigMapValuesFormat = "authToken: %s\nproxyAddr: %s\nroles: kube\nkubeClusterName: %s\nteleportVersionOverride: %s"
+	ConfigMapValuesFormat = "authToken: %s\nproxyAddr: %s\nroles: kube,app\nkubeClusterName: %s\nteleportVersionOverride: %s"
 )
 
 var LastReadValue = time.Now()
