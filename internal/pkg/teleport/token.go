@@ -42,6 +42,9 @@ func (t *Teleport) GenerateToken(ctx context.Context, registerName string, token
 	case "node":
 		tokenValidity = time.Now().Add(key.TeleportNodeTokenValidity)
 		tokenRole = tt.RoleNode
+	case "app":
+		tokenValidity = time.Now().Add(key.TeleportAppTokenValidity)
+		tokenRole = tt.RoleApp
 	default:
 		return "", microerror.Mask(fmt.Errorf("token type %s is not supported", tokenType))
 	}

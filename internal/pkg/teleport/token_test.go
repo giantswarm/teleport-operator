@@ -39,6 +39,13 @@ func Test_GenerateToken(t *testing.T) {
 			expectedToken: test.NewToken(test.TokenName, test.ClusterName, test.TokenTypeNode),
 		},
 		{
+			name:          "case 2: Generate a new app token",
+			registerName:  key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
+			tokenType:     test.TokenTypeApp,
+			expectError:   false,
+			expectedToken: test.NewToken(test.TokenName, test.ClusterName, test.TokenTypeApp),
+		},
+		{
 			name:         "case 3: Fail in case new token cannot be upserted",
 			registerName: key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
 			failsUpsert:  true,

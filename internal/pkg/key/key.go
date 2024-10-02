@@ -17,6 +17,7 @@ const (
 	TeleportBotAppName              = "teleport-tbot"
 	TeleportKubeTokenValidity       = 720 * time.Hour
 	TeleportNodeTokenValidity       = 720 * time.Hour
+	TeleportAppTokenValidity        = 720 * time.Hour
 
 	AppCatalog            = "appCatalog"
 	AppName               = "appName"
@@ -57,7 +58,7 @@ func GetAppName(clusterName string, appName string) string {
 }
 
 func GetConfigmapDataFromTemplate(authToken string, proxyAddr string, kubeClusterName string, teleportVersion string) string {
-	dataTpl := `roles: "kube,app"
+	dataTpl := `roles: "kube"
 authToken: "%s"
 proxyAddr: "%s"
 kubeClusterName: "%s"

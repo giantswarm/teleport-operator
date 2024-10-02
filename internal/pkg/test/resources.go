@@ -28,8 +28,9 @@ const (
 	TokenTypeKey  = "type"
 	JoinTokenKey  = "joinToken"
 
-	TokenTypeKube = "kube,app"
+	TokenTypeKube = "kube"
 	TokenTypeNode = "node"
+	TokenTypeApp  = "app"
 
 	AppCatalog            = "app-catalog"
 	AppVersion            = "appVersion"
@@ -38,7 +39,7 @@ const (
 	IdentityFileValue     = "identity-file-value"
 	TeleportVersion       = "1.0.0"
 
-	ConfigMapValuesFormat = "authToken: %s\nproxyAddr: %s\nroles: kube,app\nkubeClusterName: %s\nteleportVersionOverride: %s"
+	ConfigMapValuesFormat = "authToken: %s\nproxyAddr: %s\nroles: kube\nkubeClusterName: %s\nteleportVersionOverride: %s"
 )
 
 var LastReadValue = time.Now()
@@ -110,6 +111,8 @@ func NewToken(tokenName, clusterName, tokenType string) teleportTypes.ProvisionT
 		newToken.Spec.Roles = append(newToken.Spec.Roles, teleportTypes.RoleKube)
 	} else if tokenType == TokenTypeNode {
 		newToken.Spec.Roles = append(newToken.Spec.Roles, teleportTypes.RoleNode)
+	} else if tokenType == TokenTypeApp {
+		newToken.Spec.Roles = append(newToken.Spec.Roles, teleportTypes.RoleApp)
 	}
 	return newToken
 }

@@ -98,6 +98,20 @@ func Test_FakeTeleportClient(t *testing.T) {
 			expectClientErrors: false,
 			expectTokensError:  false,
 		},
+		{
+			name: "case 8: Return expected list of tokens",
+			config: FakeTeleportClientConfig{
+				Tokens: []types.ProvisionToken{
+					NewToken(TokenName, ClusterName, TokenTypeApp),
+					NewToken(NewTokenName, ClusterName, TokenTypeApp),
+				},
+			},
+			expectedTokens: []types.ProvisionToken{
+				NewToken(TokenName, ClusterName, TokenTypeApp),
+				NewToken(NewTokenName, ClusterName, TokenTypeApp),
+			},
+			expectClientErrors: false,
+		},
 	}
 
 	for _, tc := range testCases {
