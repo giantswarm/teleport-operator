@@ -57,7 +57,7 @@ func GetAppName(clusterName string, appName string) string {
 }
 
 func GetConfigmapDataFromTemplate(authToken string, proxyAddr string, kubeClusterName string, teleportVersion string) string {
-	dataTpl := `roles: "kube"
+	dataTpl := `roles: "kube,app"
 authToken: "%s"
 proxyAddr: "%s"
 kubeClusterName: "%s"
