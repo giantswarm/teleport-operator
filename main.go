@@ -20,6 +20,7 @@ import (
 	"context"
 	"flag"
 	"os"
+	"strconv"
 
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
@@ -121,14 +122,19 @@ func main() {
 		os.Exit(1)
 	}
 
+	useCombinedTokens, err := strconv.ParseBool(os.Getenv("USE_COMBINED_TOKENS"))
+	if err != nil {
+		useCombinedTokens = false
+	}
 	tele := teleport.New(namespace, config, token.NewGenerator())
 	if err = (&controller.ClusterReconciler{
-		Client:       mgr.GetClient(),
-		Log:          ctrl.Log.WithName("controllers").WithName("Cluster"),
-		Scheme:       mgr.GetScheme(),
-		Teleport:     tele,
-		IsBotEnabled: enableTeleportBot,
-		Namespace:    namespace,
+		Client:            mgr.GetClient(),
+		Log:               ctrl.Log.WithName("controllers").WithName("Cluster"),
+		Scheme:            mgr.GetScheme(),
+		Teleport:          tele,
+		IsBotEnabled:      enableTeleportBot,
+		Namespace:         namespace,
+		UseCombinedTokens: useCombinedTokens,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 		os.Exit(1)

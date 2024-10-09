@@ -17,7 +17,10 @@ teleport:
   managementClusterName: ""
   proxyAddr: test.teleport.giantswarm.io:443
   teleportClusterName: test.teleport.giantswarm.io
-  teleportVersion: 15.1.7
+  teleportVersion: 16.1.7
+
+teleportOperator:
+  useCombinedTokens: true  # Set true if we want `kube, app` role tokens to be generated instead of just `kube` ones.
 
 pod:
   user:

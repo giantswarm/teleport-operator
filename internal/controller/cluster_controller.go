@@ -39,12 +39,13 @@ const identityExpirationPeriod = 20 * time.Minute
 
 // ClusterReconciler reconciles a Cluster object
 type ClusterReconciler struct {
-	Client       client.Client
-	Log          logr.Logger
-	Scheme       *runtime.Scheme
-	Teleport     *teleport.Teleport
-	IsBotEnabled bool
-	Namespace    string
+	Client            client.Client
+	Log               logr.Logger
+	Scheme            *runtime.Scheme
+	Teleport          *teleport.Teleport
+	IsBotEnabled      bool
+	Namespace         string
+	UseCombinedTokens bool
 }
 
 //+kubebuilder:rbac:groups=cluster.x-k8s.io.giantswarm.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
@@ -193,17 +194,32 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 
-	if configMap != nil {
+	var tokenType string
+	if r.UseCombinedTokens {
+		tokenType = "kubeapp"
+	} else {
+		tokenType = "kube"
+	}
+
+	if configMap == nil {
+		token, err := r.Teleport.GenerateToken(ctx, registerName, tokenType)
+		if err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
+		}
+		if err := r.Teleport.CreateConfigMap(ctx, log, r.Client, cluster.Name, cluster.Namespace, registerName, token); err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
+		}
+	} else {
 		token, err := r.Teleport.GetTokenFromConfigMap(ctx, configMap)
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
-		tokenValid, err := r.Teleport.IsTokenValid(ctx, registerName, token, "kube")
+		tokenValid, err := r.Teleport.IsTokenValid(ctx, registerName, token, tokenType)
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
 		if !tokenValid {
-			token, err := r.Teleport.GenerateToken(ctx, registerName, "kube")
+			token, err := r.Teleport.GenerateToken(ctx, registerName, tokenType)
 			if err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
@@ -212,14 +228,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			}
 		} else {
 			log.Info("ConfigMap has valid teleport kube join token", "configMapName", configMap.GetName())
-		}
-	} else {
-		token, err := r.Teleport.GenerateToken(ctx, registerName, "kube")
-		if err != nil {
-			return ctrl.Result{}, microerror.Mask(err)
-		}
-		if err := r.Teleport.CreateConfigMap(ctx, log, r.Client, cluster.Name, cluster.Namespace, registerName, token); err != nil {
-			return ctrl.Result{}, microerror.Mask(err)
 		}
 	}
 

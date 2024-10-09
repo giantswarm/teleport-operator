@@ -63,6 +63,14 @@
                 }
             }
         },
+        "teleportOperator": {
+            "type": "object",
+            "properties": {
+                "useCombinedTokens": {
+                    "type": "boolean"
+                }
+            }
+        },
         "pod": {
             "type": "object",
             "properties": {
