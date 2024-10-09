@@ -39,6 +39,13 @@ func Test_GenerateToken(t *testing.T) {
 			expectedToken: test.NewToken(test.TokenName, test.ClusterName, test.TokenTypeNode),
 		},
 		{
+			name:          "case 2: Generate a new kube and app token",
+			registerName:  key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
+			tokenType:     test.TokenTypeKubeApp,
+			expectError:   false,
+			expectedToken: test.NewToken(test.TokenName, test.ClusterName, test.TokenTypeKubeApp),
+		},
+		{
 			name:         "case 3: Fail in case new token cannot be upserted",
 			registerName: key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
 			failsUpsert:  true,
