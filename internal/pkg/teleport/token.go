@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/go-logr/logr"
-	tt "github.com/gravitational/teleport/api/types"
+	"github.com/gravitational/teleport/api/types"
 
 	"github.com/giantswarm/microerror"
 
@@ -32,21 +32,21 @@ func (t *Teleport) IsTokenValid(ctx context.Context, registerName string, oldTok
 func (t *Teleport) GenerateToken(ctx context.Context, registerName string, tokenType string) (string, error) {
 	var (
 		tokenValidity time.Time
-		tokenRole     tt.SystemRole
+		tokenRoles    []types.SystemRole
 	)
 
 	switch tokenType {
 	case "kube":
 		tokenValidity = time.Now().Add(key.TeleportKubeTokenValidity)
-		tokenRole = tt.RoleKube
+		tokenRoles = []types.SystemRole{types.RoleKube, types.RoleApp}
 	case "node":
 		tokenValidity = time.Now().Add(key.TeleportNodeTokenValidity)
-		tokenRole = tt.RoleNode
+		tokenRoles = []types.SystemRole{types.RoleNode}
 	default:
 		return "", microerror.Mask(fmt.Errorf("token type %s is not supported", tokenType))
 	}
 
-	token, err := tt.NewProvisionToken(t.TokenGenerator.Generate(), []tt.SystemRole{tokenRole}, tokenValidity)
+	token, err := types.NewProvisionToken(t.TokenGenerator.Generate(), tokenRoles, tokenValidity)
 	if err != nil {
 		return "", microerror.Mask(err)
 	}
