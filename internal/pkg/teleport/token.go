@@ -38,6 +38,9 @@ func (t *Teleport) GenerateToken(ctx context.Context, registerName string, token
 	switch tokenType {
 	case "kube":
 		tokenValidity = time.Now().Add(key.TeleportKubeTokenValidity)
+		tokenRoles = []types.SystemRole{types.RoleKube}
+	case "kubeapp":
+		tokenValidity = time.Now().Add(key.TeleportKubeTokenValidity)
 		tokenRoles = []types.SystemRole{types.RoleKube, types.RoleApp}
 	case "node":
 		tokenValidity = time.Now().Add(key.TeleportNodeTokenValidity)
