@@ -38,7 +38,7 @@ spec:
         image: "{{ .Values.registry.domain }}/{{ .Values.image.name }}:{{ .Chart.Version }}"
         args:
         - "--namespace={{ include "resource.default.namespace" . }}"
-        - "--roles={{ .Values.teleportOperator.roles | join "," }}"
+        - "--token-roles={{ .Values.teleportOperator.roles | join "," }}"
         {{- if .Values.tbot.enabled }}
         - "--tbot"
         {{- end }}

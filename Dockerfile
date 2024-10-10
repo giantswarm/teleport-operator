@@ -28,6 +28,5 @@ FROM gcr.io/distroless/static:nonroot
 WORKDIR /
 COPY --from=builder /workspace/manager .
 USER 65532:65532
-ENV USE_COMBINED_TOKENS="false"
 
 ENTRYPOINT ["/manager"]
