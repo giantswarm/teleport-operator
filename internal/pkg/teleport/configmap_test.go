@@ -38,7 +38,7 @@ func Test_ConfigMapCRUD(t *testing.T) {
 			namespace:         test.NamespaceName,
 			clusterName:       test.ClusterName,
 			registerName:      key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
-			configMapToCreate: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
+			configMapToCreate: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{"kube", "app"}),
 			config: &config.Config{
 				AppName:         test.AppName,
 				ProxyAddr:       test.ProxyAddr,
@@ -50,8 +50,8 @@ func Test_ConfigMapCRUD(t *testing.T) {
 			namespace:         test.NamespaceName,
 			clusterName:       test.ClusterName,
 			registerName:      key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
-			configMap:         test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
-			configMapToCreate: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
+			configMap:         test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{"kube", "app"}),
+			configMapToCreate: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{"kube", "app"}),
 			expectError:       false,
 			config: &config.Config{
 				AppName:         test.AppName,
@@ -64,8 +64,8 @@ func Test_ConfigMapCRUD(t *testing.T) {
 			namespace:       test.NamespaceName,
 			clusterName:     test.ClusterName,
 			registerName:    key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
-			configMap:       test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
-			configMapToRead: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
+			configMap:       test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{"kube", "app"}),
+			configMapToRead: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{"kube", "app"}),
 			config: &config.Config{
 				AppName:         test.AppName,
 				ProxyAddr:       test.ProxyAddr,
@@ -77,7 +77,7 @@ func Test_ConfigMapCRUD(t *testing.T) {
 			namespace:       test.NamespaceName,
 			clusterName:     test.ClusterName,
 			registerName:    key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
-			configMapToRead: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
+			configMapToRead: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{"kube", "app"}),
 			expectEmpty:     true,
 			config: &config.Config{
 				AppName:         test.AppName,
@@ -91,8 +91,8 @@ func Test_ConfigMapCRUD(t *testing.T) {
 			clusterName:     test.ClusterName,
 			registerName:    key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
 			token:           test.TokenName,
-			configMap:       test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
-			configMapToRead: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
+			configMap:       test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{"kube", "app"}),
+			configMapToRead: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{"kube", "app"}),
 			config: &config.Config{
 				AppName:         test.AppName,
 				ProxyAddr:       test.ProxyAddr,
@@ -111,7 +111,7 @@ func Test_ConfigMapCRUD(t *testing.T) {
 					Namespace: test.NamespaceName,
 				},
 			},
-			configMapToRead: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
+			configMapToRead: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{"kube", "app"}),
 			expectError:     true,
 			config: &config.Config{
 				AppName:         test.AppName,
@@ -125,8 +125,8 @@ func Test_ConfigMapCRUD(t *testing.T) {
 			clusterName:       test.ClusterName,
 			registerName:      key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
 			token:             test.NewTokenName,
-			configMap:         test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
-			configMapToUpdate: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.NewTokenName),
+			configMap:         test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{"kube", "app"}),
+			configMapToUpdate: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.NewTokenName, []string{"kube", "app"}),
 			config: &config.Config{
 				AppName:         test.AppName,
 				ProxyAddr:       test.ProxyAddr,
@@ -138,8 +138,8 @@ func Test_ConfigMapCRUD(t *testing.T) {
 			namespace:         test.NamespaceName,
 			clusterName:       test.ClusterName,
 			registerName:      key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
-			configMap:         test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
-			configMapToDelete: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
+			configMap:         test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{"kube", "app"}),
+			configMapToDelete: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{"kube", "app"}),
 			expectError:       false,
 			config: &config.Config{
 				AppName:         test.AppName,
@@ -152,7 +152,7 @@ func Test_ConfigMapCRUD(t *testing.T) {
 			namespace:         test.NamespaceName,
 			clusterName:       test.ClusterName,
 			registerName:      key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
-			configMapToDelete: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
+			configMapToDelete: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{"kube", "app"}),
 			expectError:       false,
 			config: &config.Config{
 				AppName:         test.AppName,
@@ -201,7 +201,7 @@ func Test_ConfigMapCRUD(t *testing.T) {
 			}
 
 			if tc.configMapToCreate != nil {
-				err = teleport.CreateConfigMap(ctx, log, ctrlClient, tc.clusterName, tc.namespace, tc.registerName, tc.token)
+				err = teleport.CreateConfigMap(ctx, log, ctrlClient, tc.clusterName, tc.namespace, tc.registerName, tc.token, []string{"kube", "app"})
 				test.CheckError(t, tc.expectError, err)
 				if err != nil {
 					actualConfigMap, err = loadConfigMap(ctx, ctrlClient, tc.configMapToCreate)
@@ -213,7 +213,7 @@ func Test_ConfigMapCRUD(t *testing.T) {
 			}
 
 			if tc.configMapToUpdate != nil {
-				err = teleport.UpdateConfigMap(ctx, log, ctrlClient, tc.configMap, tc.token)
+				err = teleport.UpdateConfigMap(ctx, log, ctrlClient, tc.configMap, tc.token, []string{"kube", "app"})
 				test.CheckError(t, tc.expectError, err)
 				if err != nil {
 					actualConfigMap, err = loadConfigMap(ctx, ctrlClient, tc.configMapToUpdate)

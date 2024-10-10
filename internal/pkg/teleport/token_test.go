@@ -2,7 +2,9 @@ package teleport
 
 import (
 	"context"
+	"strings"
 	"testing"
+	"time"
 
 	"github.com/gravitational/teleport/api/types"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -15,28 +17,39 @@ import (
 
 func Test_GenerateToken(t *testing.T) {
 	testCases := []struct {
-		name          string
-		registerName  string
-		tokenType     string
-		failsList     bool
-		failsDelete   bool
-		failsUpsert   bool
-		expectError   bool
-		expectedToken types.ProvisionToken
+		name           string
+		registerName   string
+		tokenType      []string
+		failsList      bool
+		failsDelete    bool
+		failsUpsert    bool
+		expectError    bool
+		expectedRoles  []string
+		expectedExpiry time.Duration
 	}{
 		{
-			name:          "case 0: Generate a new kube token",
-			registerName:  key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
-			tokenType:     test.TokenTypeKube,
-			expectError:   false,
-			expectedToken: test.NewToken(test.TokenName, test.ClusterName, test.TokenTypeKube),
+			name:           "case 0: Generate a new kube token",
+			registerName:   key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
+			tokenType:      []string{"kube"},
+			expectError:    false,
+			expectedRoles:  []string{"kube"},
+			expectedExpiry: 720 * time.Hour,
 		},
 		{
-			name:          "case 1: Generate a new node token",
-			registerName:  key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
-			tokenType:     test.TokenTypeNode,
-			expectError:   false,
-			expectedToken: test.NewToken(test.TokenName, test.ClusterName, test.TokenTypeNode),
+			name:           "case 1: Generate a new node token",
+			registerName:   key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
+			tokenType:      []string{"node"},
+			expectError:    false,
+			expectedRoles:  []string{"node"},
+			expectedExpiry: 720 * time.Hour,
+		},
+		{
+			name:           "case 2: Generate a new kube and app token",
+			registerName:   key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
+			tokenType:      []string{"kube", "app"},
+			expectError:    false,
+			expectedRoles:  []string{"kube", "app"},
+			expectedExpiry: 720 * time.Hour,
 		},
 		{
 			name:         "case 3: Fail in case new token cannot be upserted",
@@ -66,7 +79,28 @@ func Test_GenerateToken(t *testing.T) {
 			generatedToken, err := teleport.TeleportClient.GetToken(ctx, tokenName)
 			test.CheckError(t, false, err)
 			if err == nil {
-				test.CheckToken(t, tc.expectedToken, generatedToken)
+				expectedExpiryTime := time.Now().Add(tc.expectedExpiry)
+
+				actualToken := generatedToken.(*types.ProvisionTokenV2)
+				if !actualToken.GetMetadata().Expires.After(expectedExpiryTime.Add(-time.Minute)) ||
+					!actualToken.GetMetadata().Expires.Before(expectedExpiryTime.Add(time.Minute)) {
+					t.Fatalf("Expected token expiry to be close to %v, but got %v", expectedExpiryTime, actualToken.GetMetadata().Expires)
+				}
+
+				actualRoles := actualToken.GetRoles()
+				actualRoleStrings := make([]string, len(actualRoles))
+				for i, role := range actualRoles {
+					actualRoleStrings[i] = strings.ToLower(role.String())
+				}
+
+				if len(tc.expectedRoles) != len(actualRoleStrings) {
+					t.Fatalf("Expected roles %v, but got %v", tc.expectedRoles, actualRoleStrings)
+				}
+				for i := range tc.expectedRoles {
+					if tc.expectedRoles[i] != actualRoleStrings[i] {
+						t.Fatalf("Expected roles %v, but got %v", tc.expectedRoles, actualRoleStrings)
+					}
+				}
 			}
 		})
 	}
@@ -88,7 +122,7 @@ func Test_IsTokenValid(t *testing.T) {
 			registerName:   key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
 			tokenName:      test.TokenName,
 			tokenType:      test.TokenTypeKube,
-			tokens:         []types.ProvisionToken{test.NewToken(test.TokenName, test.ClusterName, test.TokenTypeKube)},
+			tokens:         []types.ProvisionToken{test.NewToken(test.TokenName, test.ClusterName, []string{"kube"})},
 			expectedResult: true,
 		},
 		{
@@ -104,7 +138,7 @@ func Test_IsTokenValid(t *testing.T) {
 			registerName:   key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
 			tokenName:      test.TokenName,
 			tokenType:      test.TokenTypeNode,
-			tokens:         []types.ProvisionToken{test.NewToken(test.TokenName, test.ClusterName, test.TokenTypeKube)},
+			tokens:         []types.ProvisionToken{test.NewToken(test.TokenName, test.ClusterName, []string{"kube"})},
 			expectedResult: false,
 		},
 		{
@@ -149,28 +183,28 @@ func Test_DeleteToken(t *testing.T) {
 		{
 			name:          "case 0: Delete token from Teleport",
 			registerName:  key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
-			token:         test.NewToken(test.TokenName, test.ClusterName, test.TokenTypeKube),
-			tokens:        []types.ProvisionToken{test.NewToken(test.TokenName, test.ClusterName, test.TokenTypeKube)},
+			token:         test.NewToken(test.TokenName, test.ClusterName, []string{"kube"}),
+			tokens:        []types.ProvisionToken{test.NewToken(test.TokenName, test.ClusterName, []string{"kube"})},
 			expectDeleted: true,
 		},
 		{
 			name:          "case 1: Do not delete token in case cluster label does not match",
 			registerName:  test.ManagementClusterName,
-			token:         test.NewToken(test.TokenName, test.ClusterName, test.TokenTypeKube),
-			tokens:        []types.ProvisionToken{test.NewToken(test.TokenName, test.ClusterName, test.TokenTypeKube)},
+			token:         test.NewToken(test.TokenName, test.ClusterName, []string{"kube"}),
+			tokens:        []types.ProvisionToken{test.NewToken(test.TokenName, test.ClusterName, []string{"kube"})},
 			expectDeleted: false,
 		},
 		{
 			name:          "case 2: Succeed in case token does not exist",
 			registerName:  key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
-			token:         test.NewToken(test.TokenName, test.ManagementClusterName, test.TokenTypeKube),
+			token:         test.NewToken(test.TokenName, test.ManagementClusterName, []string{"kube"}),
 			expectDeleted: true,
 		},
 		{
 			name:         "case 3: Fail in case teleport client is unable to delete the token",
 			registerName: key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
-			token:        test.NewToken(test.TokenName, test.ManagementClusterName, test.TokenTypeKube),
-			tokens:       []types.ProvisionToken{test.NewToken(test.TokenName, test.ClusterName, test.TokenTypeKube)},
+			token:        test.NewToken(test.TokenName, test.ManagementClusterName, []string{"kube"}),
+			tokens:       []types.ProvisionToken{test.NewToken(test.TokenName, test.ClusterName, []string{"kube"})},
 			failsDelete:  true,
 			expectError:  true,
 		},

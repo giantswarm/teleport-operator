@@ -41,13 +41,13 @@ func Test_FakeTeleportClient(t *testing.T) {
 			name: "case 2: Return expected list of tokens",
 			config: FakeTeleportClientConfig{
 				Tokens: []types.ProvisionToken{
-					NewToken(TokenName, ClusterName, TokenTypeKube),
-					NewToken(NewTokenName, ClusterName, TokenTypeKube),
+					NewToken(TokenName, ClusterName, []string{"kube"}),
+					NewToken(NewTokenName, ClusterName, []string{"kube"}),
 				},
 			},
 			expectedTokens: []types.ProvisionToken{
-				NewToken(TokenName, ClusterName, TokenTypeKube),
-				NewToken(NewTokenName, ClusterName, TokenTypeKube),
+				NewToken(TokenName, ClusterName, []string{"kube"}),
+				NewToken(NewTokenName, ClusterName, []string{"kube"}),
 			},
 			expectClientErrors: false,
 		},
@@ -55,8 +55,8 @@ func Test_FakeTeleportClient(t *testing.T) {
 			name: "case 3, Fail to return list of tokens",
 			config: FakeTeleportClientConfig{
 				Tokens: []types.ProvisionToken{
-					NewToken(TokenName, ClusterName, TokenTypeKube),
-					NewToken(NewTokenName, ClusterName, TokenTypeKube),
+					NewToken(TokenName, ClusterName, []string{"kube"}),
+					NewToken(NewTokenName, ClusterName, []string{"kube"}),
 				},
 			},
 			expectClientErrors: false,
@@ -66,18 +66,18 @@ func Test_FakeTeleportClient(t *testing.T) {
 			name: "case 4: Return expected token",
 			config: FakeTeleportClientConfig{
 				Tokens: []types.ProvisionToken{
-					NewToken(TokenName, ClusterName, TokenTypeKube),
+					NewToken(TokenName, ClusterName, []string{"kube"}),
 				},
 			},
 			tokenName:          TokenName,
-			expectedToken:      NewToken(TokenName, ClusterName, TokenTypeKube),
+			expectedToken:      NewToken(TokenName, ClusterName, []string{"kube"}),
 			expectClientErrors: false,
 		},
 		{
 			name: "case 5: Fail to return expected token",
 			config: FakeTeleportClientConfig{
 				Tokens: []types.ProvisionToken{
-					NewToken(TokenName, ClusterName, TokenTypeKube),
+					NewToken(TokenName, ClusterName, []string{"kube"}),
 				},
 			},
 			tokenName:          NewTokenName,
@@ -87,14 +87,14 @@ func Test_FakeTeleportClient(t *testing.T) {
 		{
 			name:               "case 6: Store token",
 			config:             FakeTeleportClientConfig{},
-			storedToken:        NewToken(TokenName, ClusterName, TokenTypeKube),
+			storedToken:        NewToken(TokenName, ClusterName, []string{"kube"}),
 			expectClientErrors: false,
 			expectTokensError:  false,
 		},
 		{
 			name:               "case 7: Upsert token",
 			config:             FakeTeleportClientConfig{},
-			upsertedToken:      NewToken(TokenName, ClusterName, TokenTypeNode),
+			upsertedToken:      NewToken(TokenName, ClusterName, []string{"node"}),
 			expectClientErrors: false,
 			expectTokensError:  false,
 		},
@@ -128,7 +128,7 @@ func Test_FakeTeleportClient(t *testing.T) {
 				}
 			}
 
-			token = NewToken(uuid.NewString(), ClusterName, TokenTypeKube)
+			token = NewToken(uuid.NewString(), ClusterName, []string{"kube"})
 			err = fakeClient.CreateToken(ctx, token)
 			CheckError(t, tc.expectClientErrors, err)
 

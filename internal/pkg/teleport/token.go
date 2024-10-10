@@ -2,11 +2,10 @@ package teleport
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/go-logr/logr"
-	tt "github.com/gravitational/teleport/api/types"
+	"github.com/gravitational/teleport/api/types"
 
 	"github.com/giantswarm/microerror"
 
@@ -29,24 +28,11 @@ func (t *Teleport) IsTokenValid(ctx context.Context, registerName string, oldTok
 	return false, nil
 }
 
-func (t *Teleport) GenerateToken(ctx context.Context, registerName string, tokenType string) (string, error) {
-	var (
-		tokenValidity time.Time
-		tokenRole     tt.SystemRole
-	)
+func (t *Teleport) GenerateToken(ctx context.Context, registerName string, roles []string) (string, error) {
+	tokenValidity := time.Now().Add(key.TeleportKubeTokenValidity)
+	tokenRoles := key.RolesToSystemRoles(roles)
 
-	switch tokenType {
-	case "kube":
-		tokenValidity = time.Now().Add(key.TeleportKubeTokenValidity)
-		tokenRole = tt.RoleKube
-	case "node":
-		tokenValidity = time.Now().Add(key.TeleportNodeTokenValidity)
-		tokenRole = tt.RoleNode
-	default:
-		return "", microerror.Mask(fmt.Errorf("token type %s is not supported", tokenType))
-	}
-
-	token, err := tt.NewProvisionToken(t.TokenGenerator.Generate(), []tt.SystemRole{tokenRole}, tokenValidity)
+	token, err := types.NewProvisionToken(t.TokenGenerator.Generate(), tokenRoles, tokenValidity)
 	if err != nil {
 		return "", microerror.Mask(err)
 	}
@@ -55,7 +41,7 @@ func (t *Teleport) GenerateToken(ctx context.Context, registerName string, token
 		m := token.GetMetadata()
 		m.Labels = map[string]string{
 			"cluster": registerName,
-			"type":    tokenType,
+			"roles":   key.RolesToString(roles),
 		}
 		token.SetMetadata(m)
 		if err := t.TeleportClient.UpsertToken(ctx, token); err != nil {
