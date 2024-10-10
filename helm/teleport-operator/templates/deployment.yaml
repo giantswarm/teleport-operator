@@ -21,7 +21,7 @@ spec:
       labels:
         {{- include "labels.selector" . | nindent 8 }}
     spec:
-      serviceAccountName: {{ include "resource.default.name"  . }}
+      serviceAccountName: {{ include "resource.default.name" . }}
       securityContext:
         runAsUser: {{ .Values.pod.user.id }}
         runAsGroup: {{ .Values.pod.group.id }}
@@ -37,7 +37,8 @@ spec:
           value: {{ .Values.teleportOperator.useCombinedTokens | quote }}
         image: "{{ .Values.registry.domain }}/{{ .Values.image.name }}:{{ .Chart.Version }}"
         args:
-        - "--namespace={{ include "resource.default.namespace"  . }}"
+        - "--namespace={{ include "resource.default.namespace" . }}"
+        - "--roles={{ .Values.teleportOperator.roles | join "," }}"
         {{- if .Values.tbot.enabled }}
         - "--tbot"
         {{- end }}

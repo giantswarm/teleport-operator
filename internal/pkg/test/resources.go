@@ -2,6 +2,7 @@ package test
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	appv1alpha1 "github.com/giantswarm/apiextensions-application/api/v1alpha1"
@@ -81,7 +82,7 @@ func NewIdentitySecret(namespaceName, identityFile string) *corev1.Secret {
 	}
 }
 
-func NewConfigMap(clusterName, appName, namespaceName, tokenName, roles string) *corev1.ConfigMap {
+func NewConfigMap(clusterName, appName, namespaceName, tokenName string, roles []string) *corev1.ConfigMap {
 	registerName := key.GetRegisterName(ManagementClusterName, clusterName)
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -89,31 +90,33 @@ func NewConfigMap(clusterName, appName, namespaceName, tokenName, roles string) 
 			Namespace: namespaceName,
 		},
 		Data: map[string]string{
-			"values": fmt.Sprintf(ConfigMapValuesFormat, tokenName, ProxyAddr, roles, registerName, TeleportVersion),
+			"values": fmt.Sprintf(ConfigMapValuesFormat, tokenName, ProxyAddr, strings.Join(roles, ","), registerName, TeleportVersion),
 		},
 	}
 }
 
-func NewToken(tokenName, clusterName, tokenType string) teleportTypes.ProvisionToken {
+func NewToken(tokenName, clusterName string, roles []string) teleportTypes.ProvisionToken {
 	newToken := &teleportTypes.ProvisionTokenV2{
 		Metadata: teleportTypes.Metadata{
 			Name: tokenName,
 			Labels: map[string]string{
 				ClusterKey:   key.GetRegisterName(ManagementClusterName, clusterName),
-				TokenTypeKey: tokenType,
+				TokenTypeKey: strings.Join(roles, ","),
 			},
 		},
 		Spec: teleportTypes.ProvisionTokenSpecV2{
 			Roles: []teleportTypes.SystemRole{},
 		},
 	}
-	switch tokenType {
-	case TokenTypeKube:
-		newToken.Spec.Roles = append(newToken.Spec.Roles, teleportTypes.RoleKube)
-	case TokenTypeNode:
-		newToken.Spec.Roles = append(newToken.Spec.Roles, teleportTypes.RoleNode)
-	case TokenTypeKubeApp:
-		newToken.Spec.Roles = append(newToken.Spec.Roles, teleportTypes.RoleKube, teleportTypes.RoleApp)
+	for _, role := range roles {
+		switch role {
+		case key.RoleKube:
+			newToken.Spec.Roles = append(newToken.Spec.Roles, teleportTypes.RoleKube)
+		case key.RoleApp:
+			newToken.Spec.Roles = append(newToken.Spec.Roles, teleportTypes.RoleApp)
+		case key.RoleNode:
+			newToken.Spec.Roles = append(newToken.Spec.Roles, teleportTypes.RoleNode)
+		}
 	}
 	return newToken
 }

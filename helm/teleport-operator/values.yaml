@@ -20,7 +20,9 @@ teleport:
   teleportVersion: 16.1.7
 
 teleportOperator:
-  useCombinedTokens: true  # Set true if we want `kube, app` role tokens to be generated instead of just `kube` ones.
+  roles:
+    - kube
+    - app
 
 pod:
   user:
