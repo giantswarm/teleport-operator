@@ -57,8 +57,8 @@ func GetAppName(clusterName string, appName string) string {
 	return fmt.Sprintf("%s-%s", clusterName, appName)
 }
 
-func GetConfigmapDataFromTemplate(authToken string, proxyAddr string, kubeClusterName string, teleportVersion string) string {
-	dataTpl := `roles: "kube,app"
+func GetConfigmapDataFromTemplate(authToken string, proxyAddr string, kubeClusterName string, teleportVersion string, roles string) string {
+	dataTpl := `roles: "%s"
 authToken: "%s"
 proxyAddr: "%s"
 kubeClusterName: "%s"
@@ -68,7 +68,7 @@ kubeClusterName: "%s"
 		dataTpl = fmt.Sprintf("%steleportVersionOverride: %q", dataTpl, teleportVersion)
 	}
 
-	return fmt.Sprintf(dataTpl, authToken, proxyAddr, kubeClusterName)
+	return fmt.Sprintf(dataTpl, roles, authToken, proxyAddr, kubeClusterName)
 }
 
 func GetTbotConfigmapDataFromTemplate(kubeClusterName string, clusterName string) string {

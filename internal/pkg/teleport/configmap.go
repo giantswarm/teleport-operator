@@ -68,11 +68,11 @@ func (t *Teleport) GetTokenFromConfigMap(ctx context.Context, configMap *corev1.
 	return token, nil
 }
 
-func (t *Teleport) CreateConfigMap(ctx context.Context, log logr.Logger, ctrlClient client.Client, clusterName string, clusterNamespace string, registerName string, token string) error {
+func (t *Teleport) CreateConfigMap(ctx context.Context, log logr.Logger, ctrlClient client.Client, clusterName string, clusterNamespace string, registerName string, token string, tokenType string) error {
 	configMapName := key.GetConfigmapName(clusterName, t.Config.AppName)
 
 	configMapData := map[string]string{
-		"values": t.getConfigMapData(registerName, token),
+		"values": t.getConfigMapData(registerName, token, tokenType),
 	}
 
 	cm := corev1.ConfigMap{}
@@ -137,7 +137,7 @@ func (t *Teleport) EnsureTbotConfigMap(ctx context.Context, log logr.Logger, ctr
 	return nil
 }
 
-func (t *Teleport) UpdateConfigMap(ctx context.Context, log logr.Logger, ctrlClient client.Client, configMap *corev1.ConfigMap, token string) error {
+func (t *Teleport) UpdateConfigMap(ctx context.Context, log logr.Logger, ctrlClient client.Client, configMap *corev1.ConfigMap, token string, tokenType string) error {
 	valuesBytes, ok := configMap.Data["values"]
 	if !ok {
 		return microerror.Mask(fmt.Errorf("malformed ConfigMap: key `values` not found"))
@@ -150,6 +150,11 @@ func (t *Teleport) UpdateConfigMap(ctx context.Context, log logr.Logger, ctrlCli
 
 	// Modify the authToken value
 	valuesYaml["authToken"] = token
+	if tokenType == "kubeapp" {
+		valuesYaml["roles"] = "kube,app"
+	} else {
+		valuesYaml["roles"] = "kube"
+	}
 
 	updatedValuesYaml, err := yaml.Marshal(valuesYaml)
 	if err != nil {
@@ -205,15 +210,20 @@ func (t *Teleport) DeleteTbotConfigMap(ctx context.Context, log logr.Logger, ctr
 	return nil
 }
 
-func (t *Teleport) getConfigMapData(registerName string, token string) string {
+func (t *Teleport) getConfigMapData(registerName string, token string, tokenType string) string {
 	var (
 		authToken               = token
 		proxyAddr               = t.Config.ProxyAddr
 		kubeClusterName         = registerName
 		teleportVersionOverride = t.Config.TeleportVersion
+		roles                   = "kube"
 	)
 
-	return key.GetConfigmapDataFromTemplate(authToken, proxyAddr, kubeClusterName, teleportVersionOverride)
+	if tokenType == "kubeapp" {
+		roles = "kube,app"
+	}
+
+	return key.GetConfigmapDataFromTemplate(authToken, proxyAddr, kubeClusterName, teleportVersionOverride, roles)
 }
 
 func (t *Teleport) getTbotConfigMapData(registerName string, clusterName string) string {

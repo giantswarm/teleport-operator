@@ -206,7 +206,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
-		if err := r.Teleport.CreateConfigMap(ctx, log, r.Client, cluster.Name, cluster.Namespace, registerName, token); err != nil {
+		if err := r.Teleport.CreateConfigMap(ctx, log, r.Client, cluster.Name, cluster.Namespace, registerName, token, tokenType); err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
 	} else {
@@ -223,7 +223,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			if err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
-			if err := r.Teleport.UpdateConfigMap(ctx, log, r.Client, configMap, token); err != nil {
+			if err := r.Teleport.UpdateConfigMap(ctx, log, r.Client, configMap, token, tokenType); err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
 		} else {

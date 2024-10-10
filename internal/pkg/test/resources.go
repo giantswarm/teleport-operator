@@ -39,7 +39,7 @@ const (
 	IdentityFileValue     = "identity-file-value"
 	TeleportVersion       = "1.0.0"
 
-	ConfigMapValuesFormat = "authToken: %s\nproxyAddr: %s\nroles: kube,app\nkubeClusterName: %s\nteleportVersionOverride: %s"
+	ConfigMapValuesFormat = "authToken: %s\nproxyAddr: %s\nroles: %s\nkubeClusterName: %s\nteleportVersionOverride: %s"
 )
 
 var LastReadValue = time.Now()
@@ -81,7 +81,7 @@ func NewIdentitySecret(namespaceName, identityFile string) *corev1.Secret {
 	}
 }
 
-func NewConfigMap(clusterName, appName, namespaceName, tokenName string) *corev1.ConfigMap {
+func NewConfigMap(clusterName, appName, namespaceName, tokenName, roles string) *corev1.ConfigMap {
 	registerName := key.GetRegisterName(ManagementClusterName, clusterName)
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -89,7 +89,7 @@ func NewConfigMap(clusterName, appName, namespaceName, tokenName string) *corev1
 			Namespace: namespaceName,
 		},
 		Data: map[string]string{
-			"values": fmt.Sprintf(ConfigMapValuesFormat, tokenName, ProxyAddr, registerName, TeleportVersion),
+			"values": fmt.Sprintf(ConfigMapValuesFormat, tokenName, ProxyAddr, roles, registerName, TeleportVersion),
 		},
 	}
 }
