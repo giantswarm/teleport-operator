@@ -29,9 +29,9 @@ const (
 	TokenTypeKey  = "type"
 	JoinTokenKey  = "joinToken"
 
-	TokenTypeKube    = "kube"
-	TokenTypeNode    = "node"
-	TokenTypeKubeApp = "kubeapp"
+	TokenTypeKube = "kube"
+	TokenTypeNode = "node"
+	TokenTypeApp  = "app"
 
 	AppCatalog            = "app-catalog"
 	AppVersion            = "appVersion"
