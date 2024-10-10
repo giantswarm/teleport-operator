@@ -66,11 +66,16 @@
         "teleportOperator": {
             "type": "object",
             "properties": {
-                "useCombinedTokens": {
-                    "type": "boolean"
-                }
-            }
-        },
+              "roles": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "List of roles for the Teleport operator. Example: ['kube', 'app']"
+              }
+            },
+            "required": ["roles"]
+          },
         "pod": {
             "type": "object",
             "properties": {
