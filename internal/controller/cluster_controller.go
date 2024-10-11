@@ -199,12 +199,21 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 
-	if configMap != nil {
-		existingToken, err := r.Teleport.GetTokenFromConfigMap(ctx, configMap)
+	if configMap == nil {
+		token, err := r.Teleport.GenerateToken(ctx, registerName, roles)
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
-		tokenValid, err := r.Teleport.IsTokenValid(ctx, registerName, existingToken, key.RolesToString(roles))
+		if err := r.Teleport.CreateConfigMap(ctx, log, r.Client, cluster.Name, cluster.Namespace, registerName, token, roles); err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
+		}
+		log.Info("Created new config map with teleport kube join token", "configMapName", key.GetConfigmapName(cluster.Name, r.Teleport.Config.AppName))
+	} else {
+		token, err := r.Teleport.GetTokenFromConfigMap(ctx, configMap)
+		if err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
+		}
+		tokenValid, err := r.Teleport.IsTokenValid(ctx, registerName, token, key.RolesToString(roles))
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
@@ -218,15 +227,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			}
 			log.Info("Updated config map with new teleport kube join token", "configMapName", configMap.GetName())
 		} else {
-			log.Info("ConfigMap has valid teleport join token", "configMapName", configMap.GetName())
-		}
-	} else {
-		token, err := r.Teleport.GenerateToken(ctx, registerName, roles)
-		if err != nil {
-			return ctrl.Result{}, microerror.Mask(err)
-		}
-		if err := r.Teleport.CreateConfigMap(ctx, log, r.Client, cluster.Name, cluster.Namespace, registerName, token, roles); err != nil {
-			return ctrl.Result{}, microerror.Mask(err)
+			log.Info("ConfigMap has valid teleport kube join token", "configMapName", configMap.GetName())
 		}
 	}
 
