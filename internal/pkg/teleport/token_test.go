@@ -118,15 +118,15 @@ func Test_IsTokenValid(t *testing.T) {
 		expectedResult bool
 	}{
 		{
-			name:           "case 0: Service should return true in case the token exists",
+			name:           "case 0: Service should return true for a valid, non-expired token",
 			registerName:   key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
 			tokenName:      test.TokenName,
 			tokenType:      test.TokenTypeKube,
-			tokens:         []types.ProvisionToken{test.NewToken(test.TokenName, test.ClusterName, []string{"kube"})},
+			tokens:         []types.ProvisionToken{test.NewToken(test.TokenName, test.ClusterName, []string{"kube"}, time.Now().Add(1*time.Hour))},
 			expectedResult: true,
 		},
 		{
-			name:           "case 1: Service should return false in case the token does not exist",
+			name:           "case 1: Service should return false for a non-existent token",
 			registerName:   key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
 			tokenName:      test.TokenName,
 			tokenType:      test.TokenTypeKube,
@@ -134,7 +134,7 @@ func Test_IsTokenValid(t *testing.T) {
 			expectedResult: false,
 		},
 		{
-			name:           "case 2: Service should return false in case the token types do not match",
+			name:           "case 2: Service should return false for a token with mismatched type",
 			registerName:   key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
 			tokenName:      test.TokenName,
 			tokenType:      test.TokenTypeNode,
@@ -142,12 +142,28 @@ func Test_IsTokenValid(t *testing.T) {
 			expectedResult: false,
 		},
 		{
-			name:         "case 3: Service should fail in case the token cannot be retrieved",
+			name:         "case 3: Service should fail when token list cannot be retrieved",
 			registerName: key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
 			tokenName:    test.TokenName,
 			tokenType:    test.TokenTypeKube,
 			failsList:    true,
 			expectError:  true,
+		},
+		{
+			name:           "case 4: Service should return false for an expired token",
+			registerName:   key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
+			tokenName:      test.TokenName,
+			tokenType:      test.TokenTypeKube,
+			tokens:         []types.ProvisionToken{test.NewToken(test.TokenName, test.ClusterName, []string{"kube"}, time.Now().Add(-1*time.Hour))},
+			expectedResult: false,
+		},
+		{
+			name:           "case 5: Service should return false for a token with mismatched cluster name",
+			registerName:   key.GetRegisterName(test.ManagementClusterName, "wrong-cluster"),
+			tokenName:      test.TokenName,
+			tokenType:      test.TokenTypeKube,
+			tokens:         []types.ProvisionToken{test.NewToken(test.TokenName, test.ClusterName, []string{"kube"}, time.Now().Add(1*time.Hour))},
+			expectedResult: false,
 		},
 	}
 
