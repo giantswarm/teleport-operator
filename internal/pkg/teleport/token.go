@@ -2,6 +2,7 @@ package teleport
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
@@ -18,17 +19,43 @@ func (t *Teleport) IsTokenValid(ctx context.Context, registerName string, token 
 		return false, microerror.Mask(err)
 	}
 
+	expectedRoles, err := key.ParseRoles(tokenType)
+	if err != nil {
+		return false, microerror.Mask(err)
+	}
+
 	for _, t := range tokens {
 		if t.GetName() == token &&
-			t.GetMetadata().Labels["cluster"] == registerName &&
-			t.GetMetadata().Labels["type"] == tokenType {
-			if t.Expiry().After(time.Now()) {
+			t.GetMetadata().Labels["cluster"] == registerName {
+			// Check if the token has expired
+			if !t.Expiry().IsZero() && t.Expiry().After(time.Now()) {
+				// Check if the token has all the expected roles
+				tokenRoles := t.GetRoles()
+				if len(tokenRoles) != len(expectedRoles) {
+					return false, nil
+				}
+				for _, role := range expectedRoles {
+					if !containsRole(tokenRoles, role) {
+						return false, nil
+					}
+				}
 				return true, nil
 			}
 			return false, nil
 		}
 	}
+
+	// If we didn't find a matching token, it's not valid
 	return false, nil
+}
+
+func containsRole(roles []types.SystemRole, role string) bool {
+	for _, r := range roles {
+		if strings.ToLower(r.String()) == role {
+			return true
+		}
+	}
+	return false
 }
 
 func (t *Teleport) GenerateToken(ctx context.Context, registerName string, roles []string) (string, error) {
