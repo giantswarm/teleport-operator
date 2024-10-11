@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- Implemented option to generate combined `kube` & `app` tokens
+- Implemented option to generate combined tokens with multiple roles
 - Change ownership to Team Shield
 
 ### Fixed
