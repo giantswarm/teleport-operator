@@ -45,8 +45,8 @@ type ClusterReconciler struct {
 	Teleport     *teleport.Teleport
 	IsBotEnabled bool
 	Namespace    string
-	TokenRoles   []string
 	MCNamespace  string
+	TokenRoles   []string
 }
 
 //+kubebuilder:rbac:groups=cluster.x-k8s.io.giantswarm.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
@@ -200,15 +200,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 
-	if configMap == nil {
-		token, err := r.Teleport.GenerateToken(ctx, registerName, roles)
-		if err != nil {
-			return ctrl.Result{}, microerror.Mask(err)
-		}
-		if err := r.Teleport.CreateConfigMap(ctx, log, r.Client, cluster.Name, cluster.Namespace, registerName, token, roles); err != nil {
-			return ctrl.Result{}, microerror.Mask(err)
-		}
-	} else {
+	if configMap != nil {
 		token, err := r.Teleport.GetTokenFromConfigMap(ctx, configMap)
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
@@ -218,15 +210,23 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			return ctrl.Result{}, microerror.Mask(err)
 		}
 		if !tokenValid {
-			token, err := r.Teleport.GenerateToken(ctx, registerName, roles)
+			newToken, err := r.Teleport.GenerateToken(ctx, registerName, roles)
 			if err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
-			if err := r.Teleport.UpdateConfigMap(ctx, log, r.Client, configMap, token, roles); err != nil {
+			if err := r.Teleport.UpdateConfigMap(ctx, log, r.Client, configMap, newToken, roles); err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
 		} else {
-			log.Info("ConfigMap has valid teleport kube join token", "configMapName", configMap.GetName())
+			log.Info("ConfigMap has valid teleport join token", "configMapName", configMap.GetName())
+		}
+	} else {
+		token, err := r.Teleport.GenerateToken(ctx, registerName, roles)
+		if err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
+		}
+		if err := r.Teleport.CreateConfigMap(ctx, log, r.Client, cluster.Name, cluster.Namespace, registerName, token, roles); err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
 		}
 	}
 
