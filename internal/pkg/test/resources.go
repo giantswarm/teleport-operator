@@ -101,7 +101,7 @@ func NewToken(tokenName, clusterName string, roles []string, expiry ...time.Time
 	if len(expiry) > 0 {
 		expiryTime = expiry[0]
 	} else {
-		expiryTime = time.Now().Add(24 * time.Hour) // Default to 24 hours from now
+		expiryTime = time.Now().Add(720 * time.Hour)
 	}
 
 	newToken := &types.ProvisionTokenV2{
