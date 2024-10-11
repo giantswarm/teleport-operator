@@ -65,6 +65,7 @@ func main() {
 	var probeAddr string
 	var namespace string
 	var tokenRolesStr string
+	var mcNamespace string
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -76,12 +77,17 @@ func main() {
 			"Enabling this will ensure teleport bot configmap is created and app.spec.extraConfig is updated.")
 	flag.StringVar(&namespace, "namespace", "", "Namespace where operator is deployed")
 	flag.StringVar(&tokenRolesStr, "token-roles", "kube", "Comma-separated list of roles for the token (kube, app, node)")
+	flag.StringVar(&mcNamespace, "mc-namespace", "", "Namespace for management cluster with additional roles")
 
 	opts := zap.Options{
 		Development: true,
 	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
+
+	if mcNamespace == "" {
+		mcNamespace = os.Getenv("MC_NAMESPACE")
+	}
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
@@ -140,6 +146,7 @@ func main() {
 		IsBotEnabled: enableTeleportBot,
 		Namespace:    namespace,
 		TokenRoles:   tokenRoles,
+		MCNamespace:  mcNamespace,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 		os.Exit(1)
@@ -156,6 +163,7 @@ func main() {
 	}
 
 	setupLog.Info("is teleport bot enabled?", "enabled", enableTeleportBot)
+	setupLog.Info("management cluster namespace", "namespace", mcNamespace)
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

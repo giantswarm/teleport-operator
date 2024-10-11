@@ -46,6 +46,7 @@ type ClusterReconciler struct {
 	IsBotEnabled bool
 	Namespace    string
 	TokenRoles   []string
+	MCNamespace  string
 }
 
 //+kubebuilder:rbac:groups=cluster.x-k8s.io.giantswarm.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
@@ -69,9 +70,14 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if apierrors.IsNotFound(err) {
 			return ctrl.Result{}, nil
 		}
-
 		return ctrl.Result{}, microerror.Mask(err)
 	}
+
+	roles := []string{key.RoleKube}
+	if r.MCNamespace != "" && cluster.Namespace == r.MCNamespace {
+		roles = r.TokenRoles
+	}
+
 	log.Info("Reconciling cluster", "cluster", cluster)
 
 	if r.Teleport.Identity != nil {
@@ -195,11 +201,11 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	if configMap == nil {
-		token, err := r.Teleport.GenerateToken(ctx, registerName, r.TokenRoles)
+		token, err := r.Teleport.GenerateToken(ctx, registerName, roles)
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
-		if err := r.Teleport.CreateConfigMap(ctx, log, r.Client, cluster.Name, cluster.Namespace, registerName, token, r.TokenRoles); err != nil {
+		if err := r.Teleport.CreateConfigMap(ctx, log, r.Client, cluster.Name, cluster.Namespace, registerName, token, roles); err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
 	} else {
@@ -207,16 +213,16 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
-		tokenValid, err := r.Teleport.IsTokenValid(ctx, registerName, token, key.RolesToString(r.TokenRoles))
+		tokenValid, err := r.Teleport.IsTokenValid(ctx, registerName, token, key.RolesToString(roles))
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
 		if !tokenValid {
-			token, err := r.Teleport.GenerateToken(ctx, registerName, r.TokenRoles)
+			token, err := r.Teleport.GenerateToken(ctx, registerName, roles)
 			if err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
-			if err := r.Teleport.UpdateConfigMap(ctx, log, r.Client, configMap, token, r.TokenRoles); err != nil {
+			if err := r.Teleport.UpdateConfigMap(ctx, log, r.Client, configMap, token, roles); err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
 		} else {
