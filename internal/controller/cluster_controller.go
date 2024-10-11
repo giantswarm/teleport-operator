@@ -157,8 +157,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
-	// Check if the secret exists in the cluster, if not, generate teleport token and create the secret
-	// if it is, check teleport token validity, and update the secret if teleport token has expired
+	// Check and update Secret if necessary
 	secret, err := r.Teleport.GetSecret(ctx, log, r.Client, cluster.Name, cluster.Namespace)
 	if err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
@@ -201,11 +200,11 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	if configMap != nil {
-		token, err := r.Teleport.GetTokenFromConfigMap(ctx, configMap)
+		existingToken, err := r.Teleport.GetTokenFromConfigMap(ctx, configMap)
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
-		tokenValid, err := r.Teleport.IsTokenValid(ctx, registerName, token, key.RolesToString(roles))
+		tokenValid, err := r.Teleport.IsTokenValid(ctx, registerName, existingToken, key.RolesToString(roles))
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
@@ -217,6 +216,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			if err := r.Teleport.UpdateConfigMap(ctx, log, r.Client, configMap, newToken, roles); err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
+			log.Info("Updated config map with new teleport kube join token", "configMapName", configMap.GetName())
 		} else {
 			log.Info("ConfigMap has valid teleport join token", "configMapName", configMap.GetName())
 		}
