@@ -22,7 +22,6 @@ teleport:
 teleportOperator:
   roles:
     - kube
-    - app
 
 pod:
   user:

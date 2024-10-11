@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Set only `kube` by default to aviod issues when no apps are set.
+
 ## [0.11.0] - 2024-10-11
 
 ### Changed
