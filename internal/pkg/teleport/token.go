@@ -12,14 +12,17 @@ import (
 	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 )
 
-func (t *Teleport) IsTokenValid(ctx context.Context, registerName string, oldToken string, tokenType string) (bool, error) {
+func (t *Teleport) IsTokenValid(ctx context.Context, registerName string, token string, tokenType string) (bool, error) {
 	tokens, err := t.TeleportClient.GetTokens(ctx)
 	if err != nil {
 		return false, microerror.Mask(err)
 	}
-	for _, token := range tokens {
-		if token.GetMetadata().Labels["cluster"] == registerName && token.GetMetadata().Labels["type"] == tokenType {
-			if token.GetName() == oldToken {
+
+	for _, t := range tokens {
+		if t.GetName() == token &&
+			t.GetMetadata().Labels["cluster"] == registerName &&
+			t.GetMetadata().Labels["type"] == tokenType {
+			if t.Expiry().After(time.Now()) {
 				return true, nil
 			}
 			return false, nil
