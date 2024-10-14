@@ -39,6 +39,8 @@ func Test_ClusterController(t *testing.T) {
 		expectedSecret    *corev1.Secret
 		expectedConfigMap *corev1.ConfigMap
 		expectedError     error
+		mcNamespace       string
+		tokenRoles        []string
 	}{
 		{
 			name:              "case 0: Register cluster and create Secret, ConfigMap and App resources in case they do not exist",
@@ -49,20 +51,21 @@ func Test_ClusterController(t *testing.T) {
 			cluster:           test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
 			expectedCluster:   test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
 			expectedSecret:    test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
-			expectedConfigMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
+			expectedConfigMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{key.RoleKube}),
+			tokenRoles:        []string{key.RoleKube, key.RoleApp},
 		},
 		{
-			name:              "case 1: Register cluster and update Secret, ConfigMap and App resources in case they exist",
+			name:              "case 1: Register cluster in MC namespace and create Secret, ConfigMap with TokenRoles",
 			namespace:         test.NamespaceName,
 			token:             test.TokenName,
 			config:            newConfig(),
 			identity:          newIdentity(test.LastReadValue),
 			cluster:           test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
-			secret:            test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
-			configMap:         test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
 			expectedCluster:   test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
 			expectedSecret:    test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
-			expectedConfigMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
+			expectedConfigMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{key.RoleKube, key.RoleApp}),
+			mcNamespace:       test.NamespaceName,
+			tokenRoles:        []string{key.RoleKube, key.RoleApp},
 		},
 		{
 			name:              "case 2: Update Secret and ConfigMap resources in case join token changes",
@@ -72,20 +75,22 @@ func Test_ClusterController(t *testing.T) {
 			identity:          newIdentity(test.LastReadValue),
 			cluster:           test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
 			secret:            test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
-			configMap:         test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
+			configMap:         test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{key.RoleKube}),
 			expectedCluster:   test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
 			expectedSecret:    test.NewSecret(test.ClusterName, test.NamespaceName, test.NewTokenName),
-			expectedConfigMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.NewTokenName),
+			expectedConfigMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.NewTokenName, []string{key.RoleKube}),
+			tokenRoles:        []string{key.RoleKube, key.RoleApp},
 		},
 		{
-			name:      "case 3: Deregister cluster and delete resources in case the cluster is deleted",
-			namespace: test.NamespaceName,
-			token:     test.TokenName,
-			config:    newConfig(),
-			identity:  newIdentity(test.LastReadValue),
-			cluster:   test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Now()),
-			secret:    test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
-			configMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
+			name:       "case 3: Deregister cluster and delete resources in case the cluster is deleted",
+			namespace:  test.NamespaceName,
+			token:      test.TokenName,
+			config:     newConfig(),
+			identity:   newIdentity(test.LastReadValue),
+			cluster:    test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Now()),
+			secret:     test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
+			configMap:  test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{key.RoleKube}),
+			tokenRoles: []string{key.RoleKube, key.RoleApp},
 		},
 		{
 			name:           "case 4: Reconnect to Teleport when credentials are rotated",
@@ -96,13 +101,14 @@ func Test_ClusterController(t *testing.T) {
 			cluster:        test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
 			secret:         test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
 			identitySecret: test.NewIdentitySecret(test.NamespaceName, test.IdentityFileValue),
-			configMap:      test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
+			configMap:      test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{key.RoleKube}),
 			newTeleportClient: func(ctx context.Context, proxyAddr, identityFile string) (teleport.Client, error) {
 				return test.NewTeleportClient(test.FakeTeleportClientConfig{Tokens: nil}), nil
 			},
 			expectedCluster:   test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
 			expectedSecret:    test.NewSecret(test.ClusterName, test.NamespaceName, test.NewTokenName),
-			expectedConfigMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.NewTokenName),
+			expectedConfigMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.NewTokenName, []string{key.RoleKube}),
+			tokenRoles:        []string{key.RoleKube, key.RoleApp},
 		},
 		{
 			name:      "case 5: Return an error in case reconnection to Teleport fails after the credentials are rotated",
@@ -112,11 +118,12 @@ func Test_ClusterController(t *testing.T) {
 			identity:  newIdentity(time.Now().Add(-identityExpirationPeriod - time.Second)),
 			cluster:   test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
 			secret:    test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
-			configMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName),
+			configMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{key.RoleKube}),
 			newTeleportClient: func(ctx context.Context, proxyAddr, identityFile string) (teleport.Client, error) {
 				return nil, errors.New("simulated error")
 			},
 			expectedError: errors.New("secrets \"identity-output\" not found"),
+			tokenRoles:    []string{key.RoleKube, key.RoleApp},
 		},
 	}
 
@@ -153,11 +160,14 @@ func Test_ClusterController(t *testing.T) {
 			log := ctrl.Log.WithName("test")
 
 			controller := &ClusterReconciler{
-				Client:    ctrlClient,
-				Log:       log,
-				Scheme:    scheme.Scheme,
-				Namespace: tc.namespace,
-				Teleport:  teleport.New(tc.namespace, tc.config, test.NewMockTokenGenerator(tc.token)),
+				Client:       ctrlClient,
+				Log:          log,
+				Scheme:       scheme.Scheme,
+				Namespace:    tc.namespace,
+				Teleport:     teleport.New(tc.namespace, tc.config, test.NewMockTokenGenerator(tc.token)),
+				IsBotEnabled: false,
+				TokenRoles:   tc.tokenRoles,
+				MCNamespace:  tc.mcNamespace,
 			}
 			controller.Teleport.TeleportClient = test.NewTeleportClient(test.FakeTeleportClientConfig{
 				Tokens: tc.tokens,
