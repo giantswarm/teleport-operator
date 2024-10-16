@@ -25,7 +25,6 @@ import (
 	// to ensure that exec-entrypoint and run can make use of them.
 
 	appv1alpha1 "github.com/giantswarm/apiextensions-application/api/v1alpha1"
-	"go.uber.org/zap/zapcore"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
@@ -58,13 +57,13 @@ func init() {
 
 	//+kubebuilder:scaffold:scheme
 }
-
 func main() {
 	var metricsAddr string
 	var enableLeaderElection bool
 	var enableTeleportBot bool
 	var probeAddr string
 	var namespace string
+
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
 	flag.BoolVar(&enableLeaderElection, "leader-elect", false,
@@ -74,12 +73,14 @@ func main() {
 		"Enable teleport bot for teleport-operator. "+
 			"Enabling this will ensure teleport bot configmap is created and app.spec.extraConfig is updated.")
 	flag.StringVar(&namespace, "namespace", "", "Namespace where operator is deployed")
+
 	opts := zap.Options{
 		Development: true,
-		TimeEncoder: zapcore.ISO8601TimeEncoder,
 	}
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
+
+	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
@@ -122,6 +123,7 @@ func main() {
 	}
 
 	tele := teleport.New(namespace, config, token.NewGenerator())
+	tele.Client = mgr.GetClient()
 	if err = (&controller.ClusterReconciler{
 		Client:       mgr.GetClient(),
 		Log:          ctrl.Log.WithName("controllers").WithName("Cluster"),

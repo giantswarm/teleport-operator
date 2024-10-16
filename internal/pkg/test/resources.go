@@ -2,9 +2,11 @@ package test
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	appv1alpha1 "github.com/giantswarm/apiextensions-application/api/v1alpha1"
+	"github.com/gravitational/teleport/api/types"
 	teleportTypes "github.com/gravitational/teleport/api/types"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -30,6 +32,7 @@ const (
 
 	TokenTypeKube = "kube"
 	TokenTypeNode = "node"
+	TokenTypeApp  = "app"
 
 	AppCatalog            = "app-catalog"
 	AppVersion            = "appVersion"
@@ -38,7 +41,7 @@ const (
 	IdentityFileValue     = "identity-file-value"
 	TeleportVersion       = "1.0.0"
 
-	ConfigMapValuesFormat = "authToken: %s\nproxyAddr: %s\nroles: kube\nkubeClusterName: %s\nteleportVersionOverride: %s"
+	ConfigMapValuesFormat = "authToken: %s\nproxyAddr: %s\nroles: %s\nkubeClusterName: %s\nteleportVersionOverride: %s"
 )
 
 var LastReadValue = time.Now()
@@ -80,7 +83,7 @@ func NewIdentitySecret(namespaceName, identityFile string) *corev1.Secret {
 	}
 }
 
-func NewConfigMap(clusterName, appName, namespaceName, tokenName string) *corev1.ConfigMap {
+func NewConfigMap(clusterName, appName, namespaceName, tokenName string, roles []string) *corev1.ConfigMap {
 	registerName := key.GetRegisterName(ManagementClusterName, clusterName)
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -88,28 +91,41 @@ func NewConfigMap(clusterName, appName, namespaceName, tokenName string) *corev1
 			Namespace: namespaceName,
 		},
 		Data: map[string]string{
-			"values": fmt.Sprintf(ConfigMapValuesFormat, tokenName, ProxyAddr, registerName, TeleportVersion),
+			"values": fmt.Sprintf(ConfigMapValuesFormat, tokenName, ProxyAddr, strings.Join(roles, ","), registerName, TeleportVersion),
 		},
 	}
 }
 
-func NewToken(tokenName, clusterName, tokenType string) teleportTypes.ProvisionToken {
-	newToken := &teleportTypes.ProvisionTokenV2{
-		Metadata: teleportTypes.Metadata{
+func NewToken(tokenName, clusterName string, roles []string, expiry ...time.Time) types.ProvisionToken {
+	var expiryTime time.Time
+	if len(expiry) > 0 {
+		expiryTime = expiry[0]
+	} else {
+		expiryTime = time.Now().Add(720 * time.Hour)
+	}
+
+	newToken := &types.ProvisionTokenV2{
+		Metadata: types.Metadata{
 			Name: tokenName,
 			Labels: map[string]string{
 				ClusterKey:   key.GetRegisterName(ManagementClusterName, clusterName),
-				TokenTypeKey: tokenType,
+				TokenTypeKey: strings.Join(roles, ","),
 			},
+			Expires: &expiryTime,
 		},
-		Spec: teleportTypes.ProvisionTokenSpecV2{
-			Roles: []teleportTypes.SystemRole{},
+		Spec: types.ProvisionTokenSpecV2{
+			Roles: []types.SystemRole{},
 		},
 	}
-	if tokenType == TokenTypeKube {
-		newToken.Spec.Roles = append(newToken.Spec.Roles, teleportTypes.RoleKube)
-	} else if tokenType == TokenTypeNode {
-		newToken.Spec.Roles = append(newToken.Spec.Roles, teleportTypes.RoleNode)
+	for _, role := range roles {
+		switch role {
+		case key.RoleKube:
+			newToken.Spec.Roles = append(newToken.Spec.Roles, types.RoleKube)
+		case key.RoleApp:
+			newToken.Spec.Roles = append(newToken.Spec.Roles, types.RoleApp)
+		case key.RoleNode:
+			newToken.Spec.Roles = append(newToken.Spec.Roles, types.RoleNode)
+		}
 	}
 	return newToken
 }

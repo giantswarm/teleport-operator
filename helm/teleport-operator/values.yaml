@@ -17,7 +17,8 @@ teleport:
   managementClusterName: ""
   proxyAddr: test.teleport.giantswarm.io:443
   teleportClusterName: test.teleport.giantswarm.io
-  teleportVersion: 15.1.7
+  teleportVersion: 16.1.7
+
 
 pod:
   user:

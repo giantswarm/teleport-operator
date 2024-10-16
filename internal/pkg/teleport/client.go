@@ -6,6 +6,7 @@ import (
 	tc "github.com/gravitational/teleport/api/client"
 	"github.com/gravitational/teleport/api/client/proto"
 	"github.com/gravitational/teleport/api/types"
+	"google.golang.org/grpc"
 
 	"github.com/giantswarm/microerror"
 )
@@ -26,6 +27,9 @@ var NewClient = func(ctx context.Context, proxyAddr, identityFile string) (Clien
 		},
 		Credentials: []tc.Credentials{
 			tc.LoadIdentityFileFromString(identityFile),
+		},
+		DialOpts: []grpc.DialOption{
+			grpc.WithDefaultCallOptions(grpc.MaxCallRecvMsgSize(10 * 1024 * 1024)),
 		},
 	})
 	if err != nil {
