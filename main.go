@@ -39,7 +39,6 @@ import (
 
 	"github.com/giantswarm/teleport-operator/internal/controller"
 	"github.com/giantswarm/teleport-operator/internal/pkg/config"
-	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 	"github.com/giantswarm/teleport-operator/internal/pkg/teleport"
 	"github.com/giantswarm/teleport-operator/internal/pkg/token"
 	//+kubebuilder:scaffold:imports
@@ -64,8 +63,6 @@ func main() {
 	var enableTeleportBot bool
 	var probeAddr string
 	var namespace string
-	var tokenRolesStr string
-	var mcNamespace string
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -76,8 +73,6 @@ func main() {
 		"Enable teleport bot for teleport-operator. "+
 			"Enabling this will ensure teleport bot configmap is created and app.spec.extraConfig is updated.")
 	flag.StringVar(&namespace, "namespace", "", "Namespace where operator is deployed")
-	flag.StringVar(&tokenRolesStr, "token-roles", "kube", "Comma-separated list of roles for the token (kube, app, node)")
-	flag.StringVar(&mcNamespace, "mc-namespace", "", "Namespace for management cluster with additional roles")
 
 	opts := zap.Options{
 		Development: true,
@@ -85,17 +80,7 @@ func main() {
 	opts.BindFlags(flag.CommandLine)
 	flag.Parse()
 
-	if mcNamespace == "" {
-		mcNamespace = os.Getenv("MC_NAMESPACE")
-	}
-
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
-
-	tokenRoles, err := key.ParseRoles(tokenRolesStr)
-	if err != nil {
-		setupLog.Error(err, "Failed to parse token roles")
-		os.Exit(1)
-	}
 
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
@@ -138,6 +123,7 @@ func main() {
 	}
 
 	tele := teleport.New(namespace, config, token.NewGenerator())
+	tele.Client = mgr.GetClient()
 	if err = (&controller.ClusterReconciler{
 		Client:       mgr.GetClient(),
 		Log:          ctrl.Log.WithName("controllers").WithName("Cluster"),
@@ -145,8 +131,6 @@ func main() {
 		Teleport:     tele,
 		IsBotEnabled: enableTeleportBot,
 		Namespace:    namespace,
-		TokenRoles:   tokenRoles,
-		MCNamespace:  mcNamespace,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 		os.Exit(1)
@@ -163,7 +147,6 @@ func main() {
 	}
 
 	setupLog.Info("is teleport bot enabled?", "enabled", enableTeleportBot)
-	setupLog.Info("management cluster namespace", "namespace", mcNamespace)
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

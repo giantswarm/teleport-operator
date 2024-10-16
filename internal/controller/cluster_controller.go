@@ -39,14 +39,13 @@ const identityExpirationPeriod = 20 * time.Minute
 
 // ClusterReconciler reconciles a Cluster object
 type ClusterReconciler struct {
-	Client       client.Client
-	Log          logr.Logger
-	Scheme       *runtime.Scheme
-	Teleport     *teleport.Teleport
-	IsBotEnabled bool
-	Namespace    string
-	MCNamespace  string
-	TokenRoles   []string
+	Client            client.Client
+	Log               logr.Logger
+	Scheme            *runtime.Scheme
+	Teleport          *teleport.Teleport
+	IsBotEnabled      bool
+	Namespace         string
+	lastAssignedRoles []string
 }
 
 //+kubebuilder:rbac:groups=cluster.x-k8s.io.giantswarm.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
@@ -73,13 +72,19 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 
-	roles := []string{key.RoleKube}
-	if r.MCNamespace != "" && cluster.Namespace == r.MCNamespace {
-		roles = r.TokenRoles
-	}
-
 	log.Info("Reconciling cluster", "cluster", cluster)
 
+	appsEnabled, err := r.Teleport.AreTeleportAppsEnabled(ctx, cluster.Name, cluster.Namespace)
+	if err != nil {
+		log.Error(err, "Failed to check if Teleport apps are enabled")
+		return ctrl.Result{}, microerror.Mask(err)
+	}
+
+	roles := []string{key.RoleKube}
+	if appsEnabled {
+		roles = append(roles, key.RoleApp)
+	}
+	r.lastAssignedRoles = roles
 	if r.Teleport.Identity != nil {
 		log.Info("Teleport identity", "last-read-minutes-ago", r.Teleport.Identity.Age(), "hash", r.Teleport.Identity.Hash())
 	}

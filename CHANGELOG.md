@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Changed the logic of setting roles by parsing `"%s-teleport-kube-agent-user-values"` configmaps to check if apps are enabled.
+- Deprecated `MC-Namespace` and `tokenRoles`
+
 ## [0.11.2] - 2024-10-11
 
 ### Fixed
