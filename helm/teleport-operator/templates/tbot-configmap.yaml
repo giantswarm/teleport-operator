@@ -1,3 +1,4 @@
+{{- if .Values.tbot.deployment }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -25,3 +26,4 @@ data:
         destination:
           type: kubernetes_secret
           name: identity-output
+{{- end }}

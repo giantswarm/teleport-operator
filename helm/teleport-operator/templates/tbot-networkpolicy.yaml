@@ -1,3 +1,4 @@
+{{- if .Values.tbot.deployment }}
 {{- if .Values.ciliumNetworkPolicy.enabled }}
 apiVersion: cilium.io/v2
 kind: CiliumNetworkPolicy
@@ -39,4 +40,5 @@ spec:
   policyTypes:
   - Egress
   - Ingress
+{{- end }}
 {{- end }}
