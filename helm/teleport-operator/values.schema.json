@@ -161,9 +161,6 @@
             "properties": {
                 "enabled": {
                     "type": "boolean"
-                },
-                "deployment": {
-                    "type": "boolean"
                 }
             }
         }

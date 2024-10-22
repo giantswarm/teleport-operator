@@ -65,5 +65,4 @@ affinity:
           operator: "Exists"
 
 tbot:
-  enabled: false
-  deployment: true
+  enabled: true
