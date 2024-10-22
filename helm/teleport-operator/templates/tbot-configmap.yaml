@@ -1,4 +1,4 @@
-{{- if .Values.tbot.enabled }}
+{{- if .Values.tbot.deployment }}
 apiVersion: v1
 kind: ConfigMap
 metadata:
