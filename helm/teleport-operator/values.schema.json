@@ -163,6 +163,14 @@
                     "type": "boolean"
                 }
             }
+        },
+        "tbot-deployment": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                }
+            }
         }
     }
 }
