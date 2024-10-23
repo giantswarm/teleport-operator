@@ -7,7 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
 ## [0.12.1] - 2024-10-23
+
+### Added
+
+- Added enable/disable switch on `tbot` components
 
 ## [0.12.0] - 2024-10-16
 

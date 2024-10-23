@@ -64,5 +64,10 @@ affinity:
         - key: "node-role.kubernetes.io/control-plane"
           operator: "Exists"
 
+# Enables `--tbot` flag, `teleport-tbot` App has to be installed
 tbot:
   enabled: false
+
+# Enables `teleport-operator-tbot` deployment
+tbot-deployment:
+  enabled: true
