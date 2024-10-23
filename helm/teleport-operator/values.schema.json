@@ -164,7 +164,7 @@
                 }
             }
         },
-        "tbot-deployment": {
+        "tbotDeployment": {
             "type": "object",
             "properties": {
                 "enabled": {

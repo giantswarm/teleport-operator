@@ -1,4 +1,4 @@
-{{- if .Values.tbot-deployment.enabled }}
+{{- if .Values.tbotDeployment.enabled }}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
