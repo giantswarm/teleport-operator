@@ -65,5 +65,7 @@ affinity:
           operator: "Exists"
 
 tbot:
+  # Enables `--tbot` flag, `teleport-tbot` App has to be installed
   enabled: false
+  # Enables `teleport-operator-tbot` deployment
   deployment: true
