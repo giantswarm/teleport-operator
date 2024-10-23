@@ -69,5 +69,5 @@ tbot:
   enabled: false
 
 # Enables `teleport-operator-tbot` deployment
-tbot-deployment:
+tbotDeployment:
   enabled: true
