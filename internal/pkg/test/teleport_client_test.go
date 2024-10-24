@@ -119,7 +119,7 @@ func Test_FakeTeleportClient(t *testing.T) {
 				}
 			}
 
-			if tc.expectedTokens != nil && len(tc.expectedTokens) > 0 {
+			if len(tc.expectedTokens) > 0 {
 				var tokens []types.ProvisionToken
 				tokens, err = fakeClient.GetTokens(ctx)
 				CheckError(t, tc.expectTokensError, err)
