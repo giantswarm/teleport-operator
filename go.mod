@@ -2,7 +2,7 @@ module github.com/giantswarm/teleport-operator
 
 go 1.21
 
-toolchain go1.22.6
+toolchain go1.23.2
 
 require (
 	github.com/giantswarm/apiextensions-application v0.6.0
