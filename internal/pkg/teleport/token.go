@@ -97,3 +97,46 @@ func (t *Teleport) DeleteToken(ctx context.Context, log logr.Logger, registerNam
 	}
 	return nil
 }
+
+func (t *Teleport) GenerateCIBotToken(ctx context.Context, log logr.Logger, registerName string) error {
+	tokens, err := t.TestClient.GetTokens(ctx)
+	if err != nil {
+		return microerror.Mask(err)
+	}
+
+	// Check for existing token
+	for _, token := range tokens {
+		if token.GetMetadata().Labels["type"] == "ci-bot" &&
+			token.GetMetadata().Labels["cluster"] == registerName {
+			if !token.Expiry().IsZero() && token.Expiry().After(time.Now()) {
+				// Token still valid
+				return nil
+			}
+		}
+	}
+
+	// Generate new token
+	tokenValidity := time.Now().Add(key.TeleportKubeTokenValidity)
+	tokenRoles := []types.SystemRole{types.RoleBot}
+
+	token, err := types.NewProvisionToken(t.TokenGenerator.Generate(), tokenRoles, tokenValidity)
+	if err != nil {
+		return microerror.Mask(err)
+	}
+
+	// Set metadata
+	m := token.GetMetadata()
+	m.Labels = map[string]string{
+		"type":    "ci-bot",
+		"cluster": registerName,
+		"roles":   "bot",
+	}
+	token.SetMetadata(m)
+
+	if err := t.TestClient.UpsertToken(ctx, token); err != nil {
+		return microerror.Mask(err)
+	}
+
+	log.Info("Generated CI bot token", "registerName", registerName)
+	return nil
+}

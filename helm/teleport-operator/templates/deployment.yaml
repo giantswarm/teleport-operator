@@ -39,6 +39,9 @@ spec:
         {{- if .Values.tbot.enabled }}
         - "--tbot"
         {{- end }}
+        {{- if .Values.ciBot.enabled }}
+        - "--enable-ci-bot"
+        {{- end }}
         ports:
         - name: metrics
           protocol: TCP

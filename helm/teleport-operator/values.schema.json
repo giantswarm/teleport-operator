@@ -164,6 +164,14 @@
                 }
             }
         },
+        "ciBot": {
+            "type": "object",
+            "properties": {
+                "enabled": {
+                    "type": "boolean"
+                }
+            }
+        },
         "tbotDeployment": {
             "type": "object",
             "properties": {

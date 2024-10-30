@@ -16,6 +16,8 @@ import (
 
 type Teleport struct {
 	Config         *config.Config
+	PrimaryClient  Client
+	TestClient     Client
 	Identity       *config.IdentityConfig
 	TeleportClient Client
 	Namespace      string
@@ -29,6 +31,37 @@ func New(namespace string, cfg *config.Config, tokenGenerator token.Generator) *
 		Namespace:      namespace,
 		TokenGenerator: tokenGenerator,
 	}
+}
+
+func (t *Teleport) InitializeClients(ctx context.Context) error {
+	var err error
+
+	// Get identity config for primary client
+	primaryIdentity, err := config.GetIdentityConfigFromSecret(ctx, t.Client, t.Namespace)
+	if err != nil {
+		return microerror.Mask(err)
+	}
+
+	// Initialize primary client
+	t.PrimaryClient, err = NewClient(ctx, t.Config.ProxyAddr, primaryIdentity.IdentityFile)
+	if err != nil {
+		return microerror.Mask(err)
+	}
+
+	// Initialize test client if configured
+	if t.Config.TestInstance != nil && t.Config.TestInstance.Enabled {
+		testIdentity, err := config.GetIdentityConfigFromSecret(ctx, t.Client, t.Namespace)
+		if err != nil {
+			return microerror.Mask(err)
+		}
+
+		t.TestClient, err = NewClient(ctx, t.Config.TestInstance.ProxyAddr, testIdentity.IdentityFile)
+		if err != nil {
+			return microerror.Mask(err)
+		}
+	}
+
+	return nil
 }
 
 func (t *Teleport) AreTeleportAppsEnabled(ctx context.Context, clusterName, namespace string) (bool, error) {

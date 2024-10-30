@@ -45,6 +45,7 @@ type ClusterReconciler struct {
 	Teleport          *teleport.Teleport
 	IsBotEnabled      bool
 	Namespace         string
+	EnableCIBot       bool
 	lastAssignedRoles []string
 }
 
@@ -106,6 +107,12 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			log.Info("Re-connected to teleport cluster with new identity", "proxyAddr", r.Teleport.Config.ProxyAddr)
 		}
 		r.Teleport.Identity = newIdentityConfig
+	}
+
+	if r.EnableCIBot {
+		if err := r.Teleport.GenerateCIBotToken(ctx, log, cluster.Name); err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
+		}
 	}
 
 	registerName := cluster.Name

@@ -12,6 +12,14 @@ import (
 	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 )
 
+type TeleportInstance struct {
+	ProxyAddr             string
+	TeleportVersion       string
+	ManagementClusterName string
+	IdentityFile          string
+	Enabled               bool
+}
+
 type Config struct {
 	ProxyAddr             string
 	TeleportVersion       string
@@ -19,6 +27,7 @@ type Config struct {
 	AppName               string
 	AppVersion            string
 	AppCatalog            string
+	TestInstance          *TeleportInstance
 }
 
 func GetConfigFromConfigMap(ctx context.Context, ctrlClient client.Client, namespace string) (*Config, error) {
@@ -60,14 +69,40 @@ func GetConfigFromConfigMap(ctx context.Context, ctrlClient client.Client, names
 		return nil, microerror.Mask(err)
 	}
 
-	return &Config{
+	config := &Config{
 		ProxyAddr:             proxyAddr,
 		TeleportVersion:       teleportVersion,
 		ManagementClusterName: managementClusterName,
 		AppName:               appName,
 		AppVersion:            appVersion,
 		AppCatalog:            appCatalog,
-	}, nil
+	}
+
+	testProxyAddr, err := getConfigMapString(configMap, "test.proxyAddr")
+	if err == nil {
+		testClusterName, err := getConfigMapString(configMap, "test.managementClusterName")
+		if err != nil {
+			return nil, microerror.Mask(err)
+		}
+		testIdentityFile, err := getConfigMapString(configMap, "test.identityFile")
+		if err != nil {
+			return nil, microerror.Mask(err)
+		}
+		testVersion, err := getConfigMapString(configMap, "test.teleportVersion")
+		if err != nil {
+			testVersion = config.TeleportVersion
+		}
+
+		config.TestInstance = &TeleportInstance{
+			ProxyAddr:             testProxyAddr,
+			TeleportVersion:       testVersion,
+			ManagementClusterName: testClusterName,
+			IdentityFile:          testIdentityFile,
+			Enabled:               true,
+		}
+	}
+
+	return config, nil
 }
 
 func getConfigMapString(configMap *corev1.ConfigMap, key string) (string, error) {

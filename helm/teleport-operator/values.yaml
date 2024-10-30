@@ -68,6 +68,10 @@ affinity:
 tbot:
   enabled: false
 
+# Enables `--enable-ci-bot` flag, To be used on clusters that Tekton pipelines are running
+ciBot:
+  enabled: true
+
 # Enables `teleport-operator-tbot` deployment
 tbotDeployment:
   enabled: true

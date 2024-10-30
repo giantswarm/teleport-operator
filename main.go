@@ -63,6 +63,7 @@ func main() {
 	var enableTeleportBot bool
 	var probeAddr string
 	var namespace string
+	var enableCIBot bool
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -73,6 +74,7 @@ func main() {
 		"Enable teleport bot for teleport-operator. "+
 			"Enabling this will ensure teleport bot configmap is created and app.spec.extraConfig is updated.")
 	flag.StringVar(&namespace, "namespace", "", "Namespace where operator is deployed")
+	flag.BoolVar(&enableCIBot, "enable-ci-bot", false, "Enable CI bot token generation for test Teleport instance")
 
 	opts := zap.Options{
 		Development: true,
@@ -131,6 +133,7 @@ func main() {
 		Teleport:     tele,
 		IsBotEnabled: enableTeleportBot,
 		Namespace:    namespace,
+		EnableCIBot:  enableCIBot,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 		os.Exit(1)
