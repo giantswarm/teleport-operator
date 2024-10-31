@@ -168,9 +168,25 @@
             "type": "object",
             "properties": {
                 "enabled": {
-                    "type": "boolean"
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Enable CI bot token generation for test teleport instance"
+                },
+                "proxyAddr": {
+                    "type": "string",
+                    "description": "Teleport proxy address for test instance"
+                },
+                "managementClusterName": {
+                    "type": "string",
+                    "description": "Management cluster name for test instance"
+                },
+                "teleportVersion": {
+                    "type": "string",
+                    "description": "Optional: Teleport version for test instance. Defaults to main teleport version if not set"
                 }
-            }
+            },
+            "required": ["enabled"],
+            "additionalProperties": false
         },
         "tbotDeployment": {
             "type": "object",

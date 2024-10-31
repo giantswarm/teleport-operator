@@ -18,9 +18,6 @@ teleport:
   proxyAddr: test.teleport.giantswarm.io:443
   teleportClusterName: test.teleport.giantswarm.io
   teleportVersion: 16.1.7
-  test.proxyAddr: test.teleport.giantswarm.io:443
-  test.teleportClusterName: test.teleport.giantswarm.io
-  test.teleportVersion: 16.1.7
 
 pod:
   user:
@@ -73,6 +70,9 @@ tbot:
 # Enables `--enable-ci-bot` flag, To be used on clusters that Tekton pipelines are running
 ciBot:
   enabled: true
+  proxyAddr: "test.teleport.giantswarm.io:443"
+  managementClusterName: "test.teleport.giantswarm.io"
+  teleportVersion: ""
 
 # Enables `teleport-operator-tbot` deployment
 tbotDeployment:
