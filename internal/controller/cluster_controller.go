@@ -75,47 +75,33 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	log.Info("Reconciling cluster", "cluster", cluster)
 
-	if r.EnableCIBot {
-		// Only process in giantswarm namespace
-		if req.Namespace == "giantswarm" {
-			log.Info("Processing CI Bot token generation",
-				"namespace", req.Namespace,
-				"clusterName", cluster.Name,
-				"testClientInitialized", r.Teleport.TestClient != nil,
-				"testInstanceEnabled", r.Teleport.Config.TestInstance != nil && r.Teleport.Config.TestInstance.Enabled,
-			)
+	// Handle CI Bot token generation first
+	if r.EnableCIBot && req.Namespace == "giantswarm" {
+		log.Info("Processing CI Bot token generation",
+			"namespace", req.Namespace,
+			"clusterName", cluster.Name,
+			"testClientInitialized", r.Teleport.TestClient != nil,
+			"testInstanceEnabled", r.Teleport.Config.TestInstance != nil && r.Teleport.Config.TestInstance.Enabled,
+		)
 
-			if r.Teleport.TestClient == nil {
-				log.Info("Test client not initialized, skipping CI bot token generation")
-				return ctrl.Result{RequeueAfter: time.Minute * 5}, nil
-			}
-
-			if r.Teleport.Config.TestInstance == nil || !r.Teleport.Config.TestInstance.Enabled {
-				log.Info("Test instance not configured or enabled, skipping CI bot token generation")
-				return ctrl.Result{RequeueAfter: time.Minute * 5}, nil
-			}
-
-			if err := r.Teleport.GenerateCIBotToken(ctx, log, "ci-bot"); err != nil {
-				log.Error(err, "Failed to generate CI bot token")
-				// Return and requeue rather than continue, as we want to retry token generation
-				return ctrl.Result{RequeueAfter: time.Minute * 5}, microerror.Mask(err)
-			}
-
-			log.Info("Successfully processed CI bot token")
-			// Return successful result with requeue to periodically check token
-			return ctrl.Result{RequeueAfter: time.Hour}, nil
+		if r.Teleport.TestClient == nil {
+			log.Info("Test client not initialized, skipping CI bot token generation")
+			return ctrl.Result{RequeueAfter: time.Minute * 5}, nil
 		}
-	}
 
-	// Continue with regular cluster reconciliation
-	if err := r.Client.Get(ctx, req.NamespacedName, cluster); err != nil {
-		if apierrors.IsNotFound(err) {
-			return ctrl.Result{}, nil
+		if r.Teleport.Config.TestInstance == nil || !r.Teleport.Config.TestInstance.Enabled {
+			log.Info("Test instance not configured or enabled, skipping CI bot token generation")
+			return ctrl.Result{RequeueAfter: time.Minute * 5}, nil
 		}
-		return ctrl.Result{}, microerror.Mask(err)
-	}
 
-	log.Info("Reconciling cluster", "cluster", cluster)
+		if err := r.Teleport.GenerateCIBotToken(ctx, log, "ci-bot"); err != nil {
+			log.Error(err, "Failed to generate CI bot token")
+			return ctrl.Result{RequeueAfter: time.Minute * 5}, microerror.Mask(err)
+		}
+
+		log.Info("Successfully processed CI bot token")
+		return ctrl.Result{RequeueAfter: time.Hour}, nil
+	}
 
 	appsEnabled, err := r.Teleport.AreTeleportAppsEnabled(ctx, cluster.Name, cluster.Namespace)
 	if err != nil {
