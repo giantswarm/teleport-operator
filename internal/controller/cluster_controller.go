@@ -65,6 +65,20 @@ type ClusterReconciler struct {
 func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("cluster", req.NamespacedName)
 
+	// Handle CI Bot token generation first if enabled and in giantswarm namespace
+	if r.EnableCIBot && req.Namespace == "giantswarm" {
+		log.Info("Processing CI Bot token generation",
+			"namespace", req.Namespace,
+			"testClientInitialized", r.Teleport.TestClient != nil,
+			"testInstanceEnabled", r.Teleport.Config.TestInstance != nil && r.Teleport.Config.TestInstance.Enabled)
+
+		if err := r.Teleport.GenerateCIBotToken(ctx, log, "ci-bot"); err != nil {
+			log.Error(err, "Failed to generate CI bot token")
+			return ctrl.Result{}, microerror.Mask(err)
+		}
+	}
+
+	// Continue with regular cluster reconciliation
 	cluster := &capi.Cluster{}
 	if err := r.Client.Get(ctx, req.NamespacedName, cluster); err != nil {
 		if apierrors.IsNotFound(err) {
@@ -107,24 +121,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			log.Info("Re-connected to teleport cluster with new identity", "proxyAddr", r.Teleport.Config.ProxyAddr)
 		}
 		r.Teleport.Identity = newIdentityConfig
-	}
-
-	if r.EnableCIBot {
-		log.Info("CI Bot reconciliation starting",
-			"testClientInitialized", r.Teleport.TestClient != nil,
-			"testInstanceEnabled", r.Teleport.Config.TestInstance != nil && r.Teleport.Config.TestInstance.Enabled,
-		)
-
-		// Regardless of the cluster, try to ensure CI bot token
-		if err := r.Teleport.GenerateCIBotToken(ctx, log, "ci-bot"); err != nil {
-			log.Error(err, "Failed to generate CI bot token")
-			return ctrl.Result{}, err
-		}
-
-		// Return here only if we're processing giantswarm namespace
-		if req.Namespace == "giantswarm" {
-			return ctrl.Result{RequeueAfter: time.Hour}, nil
-		}
 	}
 
 	registerName := cluster.Name
@@ -273,11 +269,19 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// We need to requeue to check the teleport token validity
 	// and update secret for the cluster, if it expires
-	return ctrl.Result{RequeueAfter: 5 * time.Minute}, nil
+	requeueAfter := 5 * time.Minute
+	if r.EnableCIBot {
+		requeueAfter = 1 * time.Hour
+	}
+
+	return ctrl.Result{RequeueAfter: requeueAfter}, nil
 }
 
 // SetupWithManager sets up the controller with the Manager.
 func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
+	if r.EnableCIBot {
+		r.Log.Info("Setting up controller with CI Bot enabled")
+	}
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&capi.Cluster{}).
 		Complete(r)

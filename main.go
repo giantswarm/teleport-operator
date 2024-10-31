@@ -133,11 +133,10 @@ func main() {
 	}
 
 	if enableCIBot {
-		setupLog.Info("CI Bot initialization status",
+		setupLog.Info("CI Bot status",
 			"testInstanceConfigured", config.TestInstance != nil,
 			"testInstanceEnabled", config.TestInstance != nil && config.TestInstance.Enabled,
 			"testClientInitialized", tele.TestClient != nil,
-			"proxyAddr", config.TestInstance.ProxyAddr,
 		)
 	}
 
