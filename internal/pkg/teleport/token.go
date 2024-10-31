@@ -7,6 +7,12 @@ import (
 
 	"github.com/go-logr/logr"
 	"github.com/gravitational/teleport/api/types"
+	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"sigs.k8s.io/cluster-api/util/patch"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/giantswarm/microerror"
 
@@ -99,9 +105,19 @@ func (t *Teleport) DeleteToken(ctx context.Context, log logr.Logger, registerNam
 }
 
 func (t *Teleport) GenerateCIBotToken(ctx context.Context, log logr.Logger, registerName string) error {
+	// First check if test instance is configured
+	if t.Config.TestInstance == nil || !t.Config.TestInstance.Enabled {
+		return nil
+	}
+
+	// Check if TestClient is initialized
+	if t.TestClient == nil {
+		return nil
+	}
+
 	tokens, err := t.TestClient.GetTokens(ctx)
 	if err != nil {
-		return microerror.Mask(err)
+		return err
 	}
 
 	// Check for existing token
@@ -109,7 +125,7 @@ func (t *Teleport) GenerateCIBotToken(ctx context.Context, log logr.Logger, regi
 		if token.GetMetadata().Labels["type"] == "ci-bot" &&
 			token.GetMetadata().Labels["cluster"] == registerName {
 			if !token.Expiry().IsZero() && token.Expiry().After(time.Now()) {
-				// Token still valid
+				log.Info("Found valid existing CI bot token", "registerName", registerName)
 				return nil
 			}
 		}
@@ -137,6 +153,56 @@ func (t *Teleport) GenerateCIBotToken(ctx context.Context, log logr.Logger, regi
 		return microerror.Mask(err)
 	}
 
-	log.Info("Generated CI bot token", "registerName", registerName)
+	// Create or patch K8s secret
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "teleport-ci-token",
+			Namespace: "mc-bootstrap",
+			Labels: map[string]string{
+				"app.kubernetes.io/name":       "teleport-operator",
+				"app.kubernetes.io/component":  "ci-bot",
+				"app.kubernetes.io/managed-by": "teleport-operator",
+			},
+		},
+		StringData: map[string]string{
+			"token": token.GetName(),
+			"proxy": t.Config.TestInstance.ProxyAddr,
+		},
+	}
+
+	// Get existing secret if it exists
+	existing := &corev1.Secret{}
+	err = t.Client.Get(ctx, client.ObjectKey{
+		Namespace: secret.Namespace,
+		Name:      secret.Name,
+	}, existing)
+
+	if err != nil {
+		if k8serrors.IsNotFound(err) {
+			if err := t.Client.Create(ctx, secret); err != nil {
+				return microerror.Mask(err)
+			}
+			log.Info("Created CI bot token secret", "registerName", registerName)
+			return nil
+		}
+		return microerror.Mask(err)
+	}
+
+	// Create a patch helper
+	patchHelper, err := patch.NewHelper(existing, t.Client)
+	if err != nil {
+		return microerror.Mask(err)
+	}
+
+	// Update the secret data
+	existing.StringData = secret.StringData
+	existing.Labels = secret.Labels
+
+	// Apply the patch
+	if err := patchHelper.Patch(ctx, existing); err != nil {
+		return microerror.Mask(err)
+	}
+
+	log.Info("Updated CI bot token secret", "registerName", registerName)
 	return nil
 }
