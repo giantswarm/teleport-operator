@@ -110,8 +110,20 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	}
 
 	if r.EnableCIBot {
-		if err := r.Teleport.GenerateCIBotToken(ctx, log, cluster.Name); err != nil {
-			return ctrl.Result{}, microerror.Mask(err)
+		log.Info("CI Bot reconciliation starting",
+			"testClientInitialized", r.Teleport.TestClient != nil,
+			"testInstanceEnabled", r.Teleport.Config.TestInstance != nil && r.Teleport.Config.TestInstance.Enabled,
+		)
+
+		// Regardless of the cluster, try to ensure CI bot token
+		if err := r.Teleport.GenerateCIBotToken(ctx, log, "ci-bot"); err != nil {
+			log.Error(err, "Failed to generate CI bot token")
+			return ctrl.Result{}, err
+		}
+
+		// Return here only if we're processing giantswarm namespace
+		if req.Namespace == "giantswarm" {
+			return ctrl.Result{RequeueAfter: time.Hour}, nil
 		}
 	}
 

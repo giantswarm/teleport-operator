@@ -126,6 +126,21 @@ func main() {
 
 	tele := teleport.New(namespace, config, token.NewGenerator())
 	tele.Client = mgr.GetClient()
+
+	if err := tele.InitializeClients(ctx); err != nil {
+		setupLog.Error(err, "failed to initialize teleport clients")
+		os.Exit(1)
+	}
+
+	if enableCIBot {
+		setupLog.Info("CI Bot initialization status",
+			"testInstanceConfigured", config.TestInstance != nil,
+			"testInstanceEnabled", config.TestInstance != nil && config.TestInstance.Enabled,
+			"testClientInitialized", tele.TestClient != nil,
+			"proxyAddr", config.TestInstance.ProxyAddr,
+		)
+	}
+
 	if err = (&controller.ClusterReconciler{
 		Client:       mgr.GetClient(),
 		Log:          ctrl.Log.WithName("controllers").WithName("Cluster"),

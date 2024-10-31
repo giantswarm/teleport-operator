@@ -105,19 +105,32 @@ func (t *Teleport) DeleteToken(ctx context.Context, log logr.Logger, registerNam
 }
 
 func (t *Teleport) GenerateCIBotToken(ctx context.Context, log logr.Logger, name string) error {
-	// Check if test client is ready
-	if t.TestClient == nil {
+	log.Info("Attempting to generate CI bot token",
+		"testClientInitialized", t.TestClient != nil,
+		"testInstanceEnabled", t.Config.TestInstance != nil && t.Config.TestInstance.Enabled,
+	)
+
+	// Check test instance configuration
+	if t.Config.TestInstance == nil || !t.Config.TestInstance.Enabled {
+		log.Info("Test instance not configured or not enabled")
 		return nil
 	}
 
-	// Generate bot token
+	// Check test client
+	if t.TestClient == nil {
+		log.Info("Test client not initialized")
+		return nil
+	}
+
+	// Generate token
 	tokenName := fmt.Sprintf("ci-bot-%s", t.TokenGenerator.Generate())
 	token, err := types.NewProvisionToken(
 		tokenName,
 		[]types.SystemRole{types.RoleBot},
-		time.Now().Add(720*time.Hour), // 30 days
+		time.Now().Add(720*time.Hour),
 	)
 	if err != nil {
+		log.Error(err, "Failed to create provision token")
 		return err
 	}
 
