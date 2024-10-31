@@ -150,6 +150,7 @@ func main() {
 	}
 
 	setupLog.Info("is teleport bot enabled?", "enabled", enableTeleportBot)
+	setupLog.Info("is teleport ciBot enabled?", "enabled", enableCIBot)
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {
