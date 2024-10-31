@@ -65,8 +65,12 @@ type ClusterReconciler struct {
 func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("cluster", req.NamespacedName)
 
-	// Handle CI Bot token generation first if enabled and in giantswarm namespace
-	if r.EnableCIBot && req.Namespace == "giantswarm" {
+	if r.EnableCIBot {
+		if r.Teleport.TestClient == nil {
+			log.Info("CI Bot enabled but test client not initialized - skipping token generation")
+			return ctrl.Result{RequeueAfter: 5 * time.Minute}, nil
+		}
+
 		log.Info("Processing CI Bot token generation",
 			"namespace", req.Namespace,
 			"testClientInitialized", r.Teleport.TestClient != nil,
@@ -74,7 +78,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 		if err := r.Teleport.GenerateCIBotToken(ctx, log, "ci-bot"); err != nil {
 			log.Error(err, "Failed to generate CI bot token")
-			return ctrl.Result{}, microerror.Mask(err)
+			return ctrl.Result{RequeueAfter: 5 * time.Minute}, nil
 		}
 	}
 

@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/giantswarm/microerror"
+	"github.com/go-logr/logr"
 	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -23,6 +24,7 @@ type Teleport struct {
 	Namespace      string
 	TokenGenerator token.Generator
 	Client         client.Client
+	Log            logr.Logger
 }
 
 func New(namespace string, cfg *config.Config, tokenGenerator token.Generator) *Teleport {
@@ -30,35 +32,49 @@ func New(namespace string, cfg *config.Config, tokenGenerator token.Generator) *
 		Config:         cfg,
 		Namespace:      namespace,
 		TokenGenerator: tokenGenerator,
+		Log:            logr.Discard(),
 	}
+}
+
+func (t *Teleport) WithLog(log logr.Logger) *Teleport {
+	t.Log = log
+	return t
 }
 
 func (t *Teleport) InitializeClients(ctx context.Context) error {
 	var err error
 
-	// Get identity config for primary client
+	// Initialize primary client first
 	primaryIdentity, err := config.GetIdentityConfigFromSecret(ctx, t.Client, t.Namespace)
 	if err != nil {
 		return microerror.Mask(err)
 	}
 
-	// Initialize primary client
 	t.PrimaryClient, err = NewClient(ctx, t.Config.ProxyAddr, primaryIdentity.IdentityFile)
 	if err != nil {
 		return microerror.Mask(err)
 	}
 
-	// Initialize test client if configured
+	// Initialize test client if configured - but don't fail if it can't connect
 	if t.Config.TestInstance != nil && t.Config.TestInstance.Enabled {
+		t.Log.Info("Attempting to initialize test client",
+			"proxyAddr", t.Config.TestInstance.ProxyAddr)
+
 		testIdentity, err := config.GetIdentityConfigFromSecret(ctx, t.Client, t.Namespace)
 		if err != nil {
-			return microerror.Mask(err)
+			t.Log.Info("Failed to get test instance identity", "error", err)
+			return nil
 		}
 
 		t.TestClient, err = NewClient(ctx, t.Config.TestInstance.ProxyAddr, testIdentity.IdentityFile)
 		if err != nil {
-			return microerror.Mask(err)
+			t.Log.Info("Failed to initialize test client",
+				"error", err,
+				"proxyAddr", t.Config.TestInstance.ProxyAddr)
+			return nil // Don't fail the operator if test client fails
 		}
+
+		t.Log.Info("Successfully initialized test client")
 	}
 
 	return nil

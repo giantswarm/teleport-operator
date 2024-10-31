@@ -129,13 +129,12 @@ func main() {
 		os.Exit(1)
 	}
 
-	tele := teleport.New(namespace, config, token.NewGenerator())
+	tele := teleport.New(
+		namespace,
+		config,
+		token.NewGenerator(),
+	)
 	tele.Client = unmanagedClient
-
-	if err := tele.InitializeClients(ctx); err != nil {
-		setupLog.Error(err, "failed to initialize teleport clients")
-		os.Exit(1)
-	}
 
 	tele.Client = mgr.GetClient()
 
