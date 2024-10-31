@@ -2,6 +2,7 @@ package teleport
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
@@ -11,7 +12,6 @@ import (
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 
-	"sigs.k8s.io/cluster-api/util/patch"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/giantswarm/microerror"
@@ -104,60 +104,41 @@ func (t *Teleport) DeleteToken(ctx context.Context, log logr.Logger, registerNam
 	return nil
 }
 
-func (t *Teleport) GenerateCIBotToken(ctx context.Context, log logr.Logger, registerName string) error {
-	// First check if test instance is configured
-	if t.Config.TestInstance == nil || !t.Config.TestInstance.Enabled {
-		return nil
-	}
-
-	// Check if TestClient is initialized
+func (t *Teleport) GenerateCIBotToken(ctx context.Context, log logr.Logger, name string) error {
+	// Check if test client is ready
 	if t.TestClient == nil {
 		return nil
 	}
 
-	tokens, err := t.TestClient.GetTokens(ctx)
+	// Generate bot token
+	tokenName := fmt.Sprintf("ci-bot-%s", t.TokenGenerator.Generate())
+	token, err := types.NewProvisionToken(
+		tokenName,
+		[]types.SystemRole{types.RoleBot},
+		time.Now().Add(720*time.Hour), // 30 days
+	)
 	if err != nil {
 		return err
-	}
-
-	// Check for existing token
-	for _, token := range tokens {
-		if token.GetMetadata().Labels["type"] == "ci-bot" &&
-			token.GetMetadata().Labels["cluster"] == registerName {
-			if !token.Expiry().IsZero() && token.Expiry().After(time.Now()) {
-				log.Info("Found valid existing CI bot token", "registerName", registerName)
-				return nil
-			}
-		}
-	}
-
-	// Generate new token
-	tokenValidity := time.Now().Add(key.TeleportKubeTokenValidity)
-	tokenRoles := []types.SystemRole{types.RoleBot}
-
-	token, err := types.NewProvisionToken(t.TokenGenerator.Generate(), tokenRoles, tokenValidity)
-	if err != nil {
-		return microerror.Mask(err)
 	}
 
 	// Set metadata
 	m := token.GetMetadata()
 	m.Labels = map[string]string{
 		"type":    "ci-bot",
-		"cluster": registerName,
-		"roles":   "bot",
+		"created": time.Now().Format(time.RFC3339),
 	}
 	token.SetMetadata(m)
 
+	// Create token in test Teleport instance
 	if err := t.TestClient.UpsertToken(ctx, token); err != nil {
 		return microerror.Mask(err)
 	}
 
-	// Create or patch K8s secret
+	// Store in Kubernetes secret in giantswarm namespace
 	secret := &corev1.Secret{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      "teleport-ci-token",
-			Namespace: "mc-bootstrap",
+			Namespace: "giantswarm",
 			Labels: map[string]string{
 				"app.kubernetes.io/name":       "teleport-operator",
 				"app.kubernetes.io/component":  "ci-bot",
@@ -170,11 +151,11 @@ func (t *Teleport) GenerateCIBotToken(ctx context.Context, log logr.Logger, regi
 		},
 	}
 
-	// Get existing secret if it exists
+	// Create or update secret
 	existing := &corev1.Secret{}
 	err = t.Client.Get(ctx, client.ObjectKey{
-		Namespace: secret.Namespace,
 		Name:      secret.Name,
+		Namespace: secret.Namespace,
 	}, existing)
 
 	if err != nil {
@@ -182,27 +163,15 @@ func (t *Teleport) GenerateCIBotToken(ctx context.Context, log logr.Logger, regi
 			if err := t.Client.Create(ctx, secret); err != nil {
 				return microerror.Mask(err)
 			}
-			log.Info("Created CI bot token secret", "registerName", registerName)
+			log.Info("Created CI bot token secret in giantswarm namespace")
 			return nil
 		}
-		return microerror.Mask(err)
+		return err
 	}
 
-	// Create a patch helper
-	patchHelper, err := patch.NewHelper(existing, t.Client)
-	if err != nil {
+	if err := t.Client.Update(ctx, secret); err != nil {
 		return microerror.Mask(err)
 	}
-
-	// Update the secret data
-	existing.StringData = secret.StringData
-	existing.Labels = secret.Labels
-
-	// Apply the patch
-	if err := patchHelper.Patch(ctx, existing); err != nil {
-		return microerror.Mask(err)
-	}
-
-	log.Info("Updated CI bot token secret", "registerName", registerName)
+	log.Info("Updated CI bot token secret in giantswarm namespace")
 	return nil
 }
