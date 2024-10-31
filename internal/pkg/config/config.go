@@ -16,7 +16,6 @@ type TeleportInstance struct {
 	ProxyAddr             string
 	TeleportVersion       string
 	ManagementClusterName string
-	IdentityFile          string
 	Enabled               bool
 }
 
@@ -84,10 +83,6 @@ func GetConfigFromConfigMap(ctx context.Context, ctrlClient client.Client, names
 		if err != nil {
 			return nil, microerror.Mask(err)
 		}
-		testIdentityFile, err := getConfigMapString(configMap, "test.identityFile")
-		if err != nil {
-			return nil, microerror.Mask(err)
-		}
 		testVersion, err := getConfigMapString(configMap, "test.teleportVersion")
 		if err != nil {
 			testVersion = config.TeleportVersion
@@ -97,7 +92,6 @@ func GetConfigFromConfigMap(ctx context.Context, ctrlClient client.Client, names
 			ProxyAddr:             testProxyAddr,
 			TeleportVersion:       testVersion,
 			ManagementClusterName: testClusterName,
-			IdentityFile:          testIdentityFile,
 			Enabled:               true,
 		}
 	}
