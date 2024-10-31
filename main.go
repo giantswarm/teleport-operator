@@ -87,6 +87,11 @@ func main() {
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	restConfig := ctrl.GetConfigOrDie()
+	unmanagedClient, err := client.New(restConfig, client.Options{})
+	if err != nil {
+		setupLog.Error(err, "unable to create unmanaged client")
+		os.Exit(1)
+	}
 	mgr, err := ctrl.NewManager(restConfig, ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
@@ -125,12 +130,14 @@ func main() {
 	}
 
 	tele := teleport.New(namespace, config, token.NewGenerator())
-	tele.Client = mgr.GetClient()
+	tele.Client = unmanagedClient
 
 	if err := tele.InitializeClients(ctx); err != nil {
 		setupLog.Error(err, "failed to initialize teleport clients")
 		os.Exit(1)
 	}
+
+	tele.Client = mgr.GetClient()
 
 	if enableCIBot {
 		setupLog.Info("CI Bot status",
@@ -140,7 +147,7 @@ func main() {
 		)
 	}
 
-	if err = (&controller.ClusterReconciler{
+	controller := &controller.ClusterReconciler{
 		Client:       mgr.GetClient(),
 		Log:          ctrl.Log.WithName("controllers").WithName("Cluster"),
 		Scheme:       mgr.GetScheme(),
@@ -148,10 +155,13 @@ func main() {
 		IsBotEnabled: enableTeleportBot,
 		Namespace:    namespace,
 		EnableCIBot:  enableCIBot,
-	}).SetupWithManager(mgr); err != nil {
+	}
+
+	if err = controller.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 		os.Exit(1)
 	}
+
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
