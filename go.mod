@@ -11,7 +11,7 @@ require (
 	github.com/google/uuid v1.6.0
 	github.com/gravitational/teleport/api v0.0.0-20241126172415-f708a5885435
 	github.com/onsi/ginkgo/v2 v2.22.0
-	github.com/onsi/gomega v1.35.1
+	github.com/onsi/gomega v1.36.0
 	github.com/pkg/errors v0.9.1
 	google.golang.org/grpc v1.68.0
 	gopkg.in/yaml.v3 v3.0.1
