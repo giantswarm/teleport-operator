@@ -2,11 +2,17 @@ package teleport
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 
 	"github.com/go-logr/logr"
 	"github.com/gravitational/teleport/api/types"
+	corev1 "k8s.io/api/core/v1"
+	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/giantswarm/microerror"
 
@@ -95,5 +101,90 @@ func (t *Teleport) DeleteToken(ctx context.Context, log logr.Logger, registerNam
 			return nil
 		}
 	}
+	return nil
+}
+
+func (t *Teleport) GenerateCIBotToken(ctx context.Context, log logr.Logger, name string) error {
+	log.Info("Attempting to generate CI bot token",
+		"testClientInitialized", t.TestClient != nil,
+		"testInstanceEnabled", t.Config.TestInstance != nil && t.Config.TestInstance.Enabled,
+	)
+
+	// Check test instance configuration
+	if t.Config.TestInstance == nil || !t.Config.TestInstance.Enabled {
+		log.Info("Test instance not configured or not enabled")
+		return nil
+	}
+
+	// Check test client
+	if t.TestClient == nil {
+		log.Info("Test client not initialized")
+		return nil
+	}
+
+	// Generate token
+	tokenName := fmt.Sprintf("ci-bot-%s", t.TokenGenerator.Generate())
+	token, err := types.NewProvisionToken(
+		tokenName,
+		[]types.SystemRole{types.RoleBot},
+		time.Now().Add(720*time.Hour),
+	)
+	if err != nil {
+		log.Error(err, "Failed to create provision token")
+		return err
+	}
+
+	// Set metadata
+	m := token.GetMetadata()
+	m.Labels = map[string]string{
+		"type":    "ci-bot",
+		"created": time.Now().Format(time.RFC3339),
+	}
+	token.SetMetadata(m)
+
+	// Create token in test Teleport instance
+	if err := t.TestClient.UpsertToken(ctx, token); err != nil {
+		return microerror.Mask(err)
+	}
+
+	// Store in Kubernetes secret in giantswarm namespace
+	secret := &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      "teleport-ci-token",
+			Namespace: "giantswarm",
+			Labels: map[string]string{
+				"app.kubernetes.io/name":       "teleport-operator",
+				"app.kubernetes.io/component":  "ci-bot",
+				"app.kubernetes.io/managed-by": "teleport-operator",
+			},
+		},
+		StringData: map[string]string{
+			"token": token.GetName(),
+			"proxy": t.Config.TestInstance.ProxyAddr,
+		},
+	}
+
+	// Create or update secret
+	existing := &corev1.Secret{}
+	err = t.Client.Get(ctx, client.ObjectKey{
+		Name:      secret.Name,
+		Namespace: secret.Namespace,
+	}, existing)
+
+	if err != nil {
+		if k8serrors.IsNotFound(err) {
+			if err := t.Client.Create(ctx, secret); err != nil {
+				return microerror.Mask(err)
+			}
+			log.Info("Created CI bot token secret in giantswarm namespace")
+			return nil
+		}
+		return err
+	}
+
+	if err := t.Client.Update(ctx, secret); err != nil {
+		return microerror.Mask(err)
+	}
+	log.Info("Updated CI bot token secret in giantswarm namespace")
 	return nil
 }

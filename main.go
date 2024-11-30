@@ -63,6 +63,7 @@ func main() {
 	var enableTeleportBot bool
 	var probeAddr string
 	var namespace string
+	var enableCIBot bool
 
 	flag.StringVar(&metricsAddr, "metrics-bind-address", ":8080", "The address the metric endpoint binds to.")
 	flag.StringVar(&probeAddr, "health-probe-bind-address", ":8081", "The address the probe endpoint binds to.")
@@ -73,6 +74,7 @@ func main() {
 		"Enable teleport bot for teleport-operator. "+
 			"Enabling this will ensure teleport bot configmap is created and app.spec.extraConfig is updated.")
 	flag.StringVar(&namespace, "namespace", "", "Namespace where operator is deployed")
+	flag.BoolVar(&enableCIBot, "enable-ci-bot", false, "Enable CI bot token generation for test Teleport instance")
 
 	opts := zap.Options{
 		Development: true,
@@ -85,6 +87,11 @@ func main() {
 	ctrl.SetLogger(zap.New(zap.UseFlagOptions(&opts)))
 
 	restConfig := ctrl.GetConfigOrDie()
+	unmanagedClient, err := client.New(restConfig, client.Options{})
+	if err != nil {
+		setupLog.Error(err, "unable to create unmanaged client")
+		os.Exit(1)
+	}
 	mgr, err := ctrl.NewManager(restConfig, ctrl.Options{
 		Scheme:                 scheme,
 		MetricsBindAddress:     metricsAddr,
@@ -122,19 +129,38 @@ func main() {
 		os.Exit(1)
 	}
 
-	tele := teleport.New(namespace, config, token.NewGenerator())
+	tele := teleport.New(
+		namespace,
+		config,
+		token.NewGenerator(),
+	)
+	tele.Client = unmanagedClient
+
 	tele.Client = mgr.GetClient()
-	if err = (&controller.ClusterReconciler{
+
+	if enableCIBot {
+		setupLog.Info("CI Bot status",
+			"testInstanceConfigured", config.TestInstance != nil,
+			"testInstanceEnabled", config.TestInstance != nil && config.TestInstance.Enabled,
+			"testClientInitialized", tele.TestClient != nil,
+		)
+	}
+
+	controller := &controller.ClusterReconciler{
 		Client:       mgr.GetClient(),
 		Log:          ctrl.Log.WithName("controllers").WithName("Cluster"),
 		Scheme:       mgr.GetScheme(),
 		Teleport:     tele,
 		IsBotEnabled: enableTeleportBot,
 		Namespace:    namespace,
-	}).SetupWithManager(mgr); err != nil {
+		EnableCIBot:  enableCIBot,
+	}
+
+	if err = controller.SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Cluster")
 		os.Exit(1)
 	}
+
 	//+kubebuilder:scaffold:builder
 
 	if err := mgr.AddHealthzCheck("healthz", healthz.Ping); err != nil {
@@ -147,6 +173,7 @@ func main() {
 	}
 
 	setupLog.Info("is teleport bot enabled?", "enabled", enableTeleportBot)
+	setupLog.Info("is teleport ciBot enabled?", "enabled", enableCIBot)
 
 	setupLog.Info("starting manager")
 	if err := mgr.Start(ctrl.SetupSignalHandler()); err != nil {

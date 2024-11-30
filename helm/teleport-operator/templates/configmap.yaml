@@ -13,3 +13,9 @@ data:
   managementClusterName: {{ .Values.teleport.managementClusterName | quote }}
   proxyAddr: {{ .Values.teleport.proxyAddr | quote }}
   teleportVersion: {{ .Values.teleport.teleportVersion | quote }}
+
+  {{- if .Values.ciBot.enabled }}
+  test.proxyAddr: {{ .Values.ciBot.proxyAddr | quote }}
+  test.managementClusterName: {{ .Values.ciBot.managementClusterName | quote }}
+  test.teleportVersion: {{ default .Values.teleport.teleportVersion .Values.ciBot.teleportVersion | quote }}
+  {{- end }}

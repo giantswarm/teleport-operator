@@ -19,7 +19,6 @@ teleport:
   teleportClusterName: test.teleport.giantswarm.io
   teleportVersion: 16.1.7
 
-
 pod:
   user:
     id: 1000
@@ -67,6 +66,13 @@ affinity:
 # Enables `--tbot` flag, `teleport-tbot` App has to be installed
 tbot:
   enabled: false
+
+# Enables `--enable-ci-bot` flag, To be used on clusters that Tekton pipelines are running
+ciBot:
+  enabled: true
+  proxyAddr: "test.teleport.giantswarm.io:443"
+  managementClusterName: "test.teleport.giantswarm.io"
+  teleportVersion: ""
 
 # Enables `teleport-operator-tbot` deployment
 tbotDeployment:
