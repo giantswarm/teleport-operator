@@ -9,7 +9,7 @@ require (
 	github.com/giantswarm/microerror v0.4.1
 	github.com/go-logr/logr v1.4.2
 	github.com/google/uuid v1.6.0
-	github.com/gravitational/teleport/api v0.0.0-20241213102530-9efb73681383
+	github.com/gravitational/teleport/api v0.0.0-20241216224614-6018592ca763
 	github.com/onsi/ginkgo/v2 v2.22.0
 	github.com/onsi/gomega v1.36.1
 	github.com/pkg/errors v0.9.1
@@ -105,7 +105,7 @@ require (
 	gomodules.xyz/jsonpatch/v2 v2.2.0 // indirect
 	google.golang.org/genproto/googleapis/api v0.0.0-20241118233622-e639e219e697 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20241118233622-e639e219e697 // indirect
-	google.golang.org/protobuf v1.35.2 // indirect
+	google.golang.org/protobuf v1.36.0 // indirect
 	gopkg.in/inf.v0 v0.9.1 // indirect
 	gopkg.in/yaml.v2 v2.4.0 // indirect
 	k8s.io/apiextensions-apiserver v0.25.0 // indirect
