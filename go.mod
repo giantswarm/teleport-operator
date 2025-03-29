@@ -9,7 +9,7 @@ require (
 	github.com/giantswarm/microerror v0.4.1
 	github.com/go-logr/logr v1.4.2
 	github.com/google/uuid v1.6.0
-	github.com/gravitational/teleport/api v0.0.0-20250328003111-5060fdc0c44b
+	github.com/gravitational/teleport/api v0.0.0-20250329150308-660c5dad75ef
 	github.com/onsi/ginkgo/v2 v2.23.3
 	github.com/onsi/gomega v1.36.3
 	github.com/pkg/errors v0.9.1
