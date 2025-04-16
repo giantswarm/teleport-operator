@@ -6,7 +6,6 @@ import (
 	"time"
 
 	appv1alpha1 "github.com/giantswarm/apiextensions-application/api/v1alpha1"
-	"github.com/gravitational/teleport/api/types"
 	teleportTypes "github.com/gravitational/teleport/api/types"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -63,40 +62,34 @@ func ObjectKeyFromObjectMeta(objectMeta metav1.ObjectMeta) client.ObjectKey {
 }
 
 func NewSecret(clusterName, namespaceName, tokenName string) *corev1.Secret {
-	return &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      key.GetSecretName(clusterName),
-			Namespace: namespaceName,
-		},
-		Data:       map[string][]byte{JoinTokenKey: []byte(tokenName)},
-		StringData: map[string]string{JoinTokenKey: tokenName},
-	}
+	secret := &corev1.Secret{}
+	secret.Name = key.GetSecretName(clusterName)
+	secret.Namespace = namespaceName
+	secret.Data = map[string][]byte{JoinTokenKey: []byte(tokenName)}
+	secret.StringData = map[string]string{JoinTokenKey: tokenName}
+	return secret
 }
 
 func NewIdentitySecret(namespaceName, identityFile string) *corev1.Secret {
-	return &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      key.TeleportBotSecretName,
-			Namespace: namespaceName,
-		},
-		Data: map[string][]byte{key.Identity: []byte(identityFile)},
-	}
+	secret := &corev1.Secret{}
+	secret.Name = key.TeleportBotSecretName
+	secret.Namespace = namespaceName
+	secret.Data = map[string][]byte{key.Identity: []byte(identityFile)}
+	return secret
 }
 
 func NewConfigMap(clusterName, appName, namespaceName, tokenName string, roles []string) *corev1.ConfigMap {
 	registerName := key.GetRegisterName(ManagementClusterName, clusterName)
-	return &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:      key.GetConfigmapName(clusterName, appName),
-			Namespace: namespaceName,
-		},
-		Data: map[string]string{
-			"values": fmt.Sprintf(ConfigMapValuesFormat, tokenName, ProxyAddr, strings.Join(roles, ","), registerName, TeleportVersion),
-		},
+	configMap := &corev1.ConfigMap{}
+	configMap.Name = key.GetConfigmapName(clusterName, appName)
+	configMap.Namespace = namespaceName
+	configMap.Data = map[string]string{
+		"values": fmt.Sprintf(ConfigMapValuesFormat, tokenName, ProxyAddr, strings.Join(roles, ","), registerName, TeleportVersion),
 	}
+	return configMap
 }
 
-func NewToken(tokenName, clusterName string, roles []string, expiry ...time.Time) types.ProvisionToken {
+func NewToken(tokenName, clusterName string, roles []string, expiry ...time.Time) teleportTypes.ProvisionToken {
 	var expiryTime time.Time
 	if len(expiry) > 0 {
 		expiryTime = expiry[0]
@@ -104,8 +97,8 @@ func NewToken(tokenName, clusterName string, roles []string, expiry ...time.Time
 		expiryTime = time.Now().Add(720 * time.Hour)
 	}
 
-	newToken := &types.ProvisionTokenV2{
-		Metadata: types.Metadata{
+	newToken := &teleportTypes.ProvisionTokenV2{
+		Metadata: teleportTypes.Metadata{
 			Name: tokenName,
 			Labels: map[string]string{
 				ClusterKey:   key.GetRegisterName(ManagementClusterName, clusterName),
@@ -113,34 +106,32 @@ func NewToken(tokenName, clusterName string, roles []string, expiry ...time.Time
 			},
 			Expires: &expiryTime,
 		},
-		Spec: types.ProvisionTokenSpecV2{
-			Roles: []types.SystemRole{},
+		Spec: teleportTypes.ProvisionTokenSpecV2{
+			Roles: []teleportTypes.SystemRole{},
 		},
 	}
 	for _, role := range roles {
 		switch role {
 		case key.RoleKube:
-			newToken.Spec.Roles = append(newToken.Spec.Roles, types.RoleKube)
+			newToken.Spec.Roles = append(newToken.Spec.Roles, teleportTypes.RoleKube)
 		case key.RoleApp:
-			newToken.Spec.Roles = append(newToken.Spec.Roles, types.RoleApp)
+			newToken.Spec.Roles = append(newToken.Spec.Roles, teleportTypes.RoleApp)
 		case key.RoleNode:
-			newToken.Spec.Roles = append(newToken.Spec.Roles, types.RoleNode)
+			newToken.Spec.Roles = append(newToken.Spec.Roles, teleportTypes.RoleNode)
 		}
 	}
 	return newToken
 }
 
 func NewCluster(name, namespace string, finalizers []string, deletionTimestamp time.Time) *capi.Cluster {
-	cluster := &capi.Cluster{
-		ObjectMeta: metav1.ObjectMeta{
-			Name:       name,
-			Namespace:  namespace,
-			Finalizers: finalizers,
-		},
-	}
+	cluster := &capi.Cluster{}
+	cluster.Name = name
+	cluster.Namespace = namespace
+	cluster.Finalizers = finalizers
+
 	if !deletionTimestamp.IsZero() {
 		deletionTime := metav1.NewTime(deletionTimestamp)
-		cluster.ObjectMeta.DeletionTimestamp = &deletionTime
+		cluster.DeletionTimestamp = &deletionTime
 	}
 	return cluster
 }
