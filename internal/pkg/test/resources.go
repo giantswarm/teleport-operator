@@ -63,7 +63,7 @@ func ObjectKeyFromObjectMeta(objectMeta metav1.ObjectMeta) client.ObjectKey {
 
 func NewSecret(clusterName, namespaceName, tokenName string) *corev1.Secret {
 	return &corev1.Secret{
-		ObjectMeta: metav1{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      key.GetSecretName(clusterName),
 			Namespace: namespaceName,
 		},
