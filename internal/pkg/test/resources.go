@@ -63,14 +63,14 @@ func ObjectKeyFromObjectMeta(objectMeta metav1.ObjectMeta) client.ObjectKey {
 
 func NewSecret(clusterName, namespaceName, tokenName string) *corev1.Secret {
 	return &corev1.Secret{
-		ObjectMeta: metav1.ObjectMeta{
+		ObjectMeta: metav1{
 			Name:      key.GetSecretName(clusterName),
 			Namespace: namespaceName,
 		},
 		Data:       map[string][]byte{JoinTokenKey: []byte(tokenName)},
 		StringData: map[string]string{JoinTokenKey: tokenName},
 	}
-}	
+}
 
 func NewIdentitySecret(namespaceName, identityFile string) *corev1.Secret {
 	return &corev1.Secret{
@@ -83,14 +83,16 @@ func NewIdentitySecret(namespaceName, identityFile string) *corev1.Secret {
 }
 
 func NewConfigMap(clusterName, appName, namespaceName, tokenName string, roles []string) *corev1.ConfigMap {
+	registerName := key.GetRegisterName(ManagementClusterName, clusterName)
 	return &corev1.ConfigMap{
-		ObjectMeta: metav1.ObjectMeta{
+		ObjectMeta: metav1{
 			Name:      key.GetConfigmapName(clusterName, appName),
 			Namespace: namespaceName,
 		},
 		Data: map[string]string{
 			"values": fmt.Sprintf(ConfigMapValuesFormat, tokenName, ProxyAddr, strings.Join(roles, ","), registerName, TeleportVersion),
 		},
+	}
 }
 
 func NewToken(tokenName, clusterName string, roles []string, expiry ...time.Time) teleportTypes.ProvisionToken {
@@ -128,10 +130,13 @@ func NewToken(tokenName, clusterName string, roles []string, expiry ...time.Time
 }
 
 func NewCluster(name, namespace string, finalizers []string, deletionTimestamp time.Time) *capi.Cluster {
-	cluster := &capi.Cluster{}
-	cluster.Name = name
-	cluster.Namespace = namespace
-	cluster.Finalizers = finalizers
+	cluster := &capi.Cluster{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:       name,
+			Namespace:  namespace,
+			Finalizers: finalizers,
+		},
+	}
 
 	if !deletionTimestamp.IsZero() {
 		deletionTime := metav1.NewTime(deletionTimestamp)
