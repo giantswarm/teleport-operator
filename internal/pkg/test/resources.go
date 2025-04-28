@@ -85,7 +85,7 @@ func NewIdentitySecret(namespaceName, identityFile string) *corev1.Secret {
 func NewConfigMap(clusterName, appName, namespaceName, tokenName string, roles []string) *corev1.ConfigMap {
 	registerName := key.GetRegisterName(ManagementClusterName, clusterName)
 	return &corev1.ConfigMap{
-		ObjectMeta: metav1{
+		ObjectMeta: metav1.ObjectMeta{
 			Name:      key.GetConfigmapName(clusterName, appName),
 			Namespace: namespaceName,
 		},
