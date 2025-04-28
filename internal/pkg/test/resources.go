@@ -62,31 +62,35 @@ func ObjectKeyFromObjectMeta(objectMeta metav1.ObjectMeta) client.ObjectKey {
 }
 
 func NewSecret(clusterName, namespaceName, tokenName string) *corev1.Secret {
-	secret := &corev1.Secret{}
-	secret.Name = key.GetSecretName(clusterName)
-	secret.Namespace = namespaceName
-	secret.Data = map[string][]byte{JoinTokenKey: []byte(tokenName)}
-	secret.StringData = map[string]string{JoinTokenKey: tokenName}
-	return secret
-}
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      key.GetSecretName(clusterName),
+			Namespace: namespaceName,
+		},
+		Data:       map[string][]byte{JoinTokenKey: []byte(tokenName)},
+		StringData: map[string]string{JoinTokenKey: tokenName},
+	}
+}	
 
 func NewIdentitySecret(namespaceName, identityFile string) *corev1.Secret {
-	secret := &corev1.Secret{}
-	secret.Name = key.TeleportBotSecretName
-	secret.Namespace = namespaceName
-	secret.Data = map[string][]byte{key.Identity: []byte(identityFile)}
-	return secret
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      key.TeleportBotSecretName,
+			Namespace: namespaceName,
+		},
+		Data: map[string][]byte{key.Identity: []byte(identityFile)},
+	}
 }
 
 func NewConfigMap(clusterName, appName, namespaceName, tokenName string, roles []string) *corev1.ConfigMap {
-	registerName := key.GetRegisterName(ManagementClusterName, clusterName)
-	configMap := &corev1.ConfigMap{}
-	configMap.Name = key.GetConfigmapName(clusterName, appName)
-	configMap.Namespace = namespaceName
-	configMap.Data = map[string]string{
-		"values": fmt.Sprintf(ConfigMapValuesFormat, tokenName, ProxyAddr, strings.Join(roles, ","), registerName, TeleportVersion),
-	}
-	return configMap
+	return &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      key.GetConfigmapName(clusterName, appName),
+			Namespace: namespaceName,
+		},
+		Data: map[string]string{
+			"values": fmt.Sprintf(ConfigMapValuesFormat, tokenName, ProxyAddr, strings.Join(roles, ","), registerName, TeleportVersion),
+		},
 }
 
 func NewToken(tokenName, clusterName string, roles []string, expiry ...time.Time) teleportTypes.ProvisionToken {
