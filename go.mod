@@ -1,6 +1,6 @@
 module github.com/giantswarm/teleport-operator
 
-go 1.23.10
+go 1.23.11
 
 toolchain go1.24.5
 
@@ -9,7 +9,7 @@ require (
 	github.com/giantswarm/microerror v0.4.1
 	github.com/go-logr/logr v1.4.3
 	github.com/google/uuid v1.6.0
-	github.com/gravitational/teleport/api v0.0.0-20250709230129-4501ac7bc8c6
+	github.com/gravitational/teleport/api v0.0.0-20250711004541-30b8a81f0ec7
 	github.com/onsi/ginkgo/v2 v2.23.4
 	github.com/onsi/gomega v1.37.0
 	github.com/pkg/errors v0.9.1
