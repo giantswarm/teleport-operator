@@ -17,212 +17,146 @@ limitations under the License.
 package controller
 
 import (
+	"context"
 	"testing"
 
-	"github.com/giantswarm/teleport-operator/internal/pkg/config"
+	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
+	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client/fake"
+
+	"github.com/giantswarm/teleport-operator/internal/pkg/key"
+	"github.com/giantswarm/teleport-operator/internal/pkg/teleport"
 )
 
-func TestDetectConfigChanges(t *testing.T) {
+func TestConfigReconciler_Reconcile(t *testing.T) {
+	scheme := runtime.NewScheme()
+	_ = corev1.AddToScheme(scheme)
+	_ = capi.AddToScheme(scheme)
+
 	testCases := []struct {
-		name                  string
-		oldConfig             *config.Config
-		newConfig             *config.Config
-		expectedChanges       int
-		expectedHighestImpact ChangeImpact
+		name            string
+		configMapName   string
+		configMapData   map[string]string
+		configMapExists bool
+		expectError     bool
+		expectRequeue   bool
 	}{
 		{
-			name: "No changes",
-			oldConfig: &config.Config{
-				ProxyAddr:             "proxy.teleport.example.com:443",
-				TeleportVersion:       "17.7.5",
-				ManagementClusterName: "management",
-				AppName:               "teleport-kube-agent",
-				AppVersion:            "0.12.0",
-				AppCatalog:            "giantswarm",
+			name:          "ConfigMap updated - triggers reconciliation",
+			configMapName: key.TeleportOperatorConfigName,
+			configMapData: map[string]string{
+				"proxyAddr":             "proxy.example.com:443",
+				"teleportVersion":       "17.0.0",
+				"managementClusterName": "management",
 			},
-			newConfig: &config.Config{
-				ProxyAddr:             "proxy.teleport.example.com:443",
-				TeleportVersion:       "17.7.5",
-				ManagementClusterName: "management",
-				AppName:               "teleport-kube-agent",
-				AppVersion:            "0.12.0",
-				AppCatalog:            "giantswarm",
-			},
-			expectedChanges:       0,
-			expectedHighestImpact: ImpactLow,
+			configMapExists: true,
+			expectError:     false,
+			expectRequeue:   false,
 		},
 		{
-			name: "Critical change - ProxyAddr",
-			oldConfig: &config.Config{
-				ProxyAddr:             "proxy.teleport.example.com:443",
-				TeleportVersion:       "17.7.5",
-				ManagementClusterName: "management",
-				AppName:               "teleport-kube-agent",
-				AppVersion:            "0.12.0",
-				AppCatalog:            "giantswarm",
-			},
-			newConfig: &config.Config{
-				ProxyAddr:             "new-proxy.teleport.example.com:443",
-				TeleportVersion:       "17.7.5",
-				ManagementClusterName: "management",
-				AppName:               "teleport-kube-agent",
-				AppVersion:            "0.12.0",
-				AppCatalog:            "giantswarm",
-			},
-			expectedChanges:       1,
-			expectedHighestImpact: ImpactCritical,
+			name:            "ConfigMap deleted - no action needed",
+			configMapName:   key.TeleportOperatorConfigName,
+			configMapExists: false,
+			expectError:     false,
+			expectRequeue:   false,
 		},
 		{
-			name: "High impact change - ManagementClusterName",
-			oldConfig: &config.Config{
-				ProxyAddr:             "proxy.teleport.example.com:443",
-				TeleportVersion:       "17.7.5",
-				ManagementClusterName: "management",
-				AppName:               "teleport-kube-agent",
-				AppVersion:            "0.12.0",
-				AppCatalog:            "giantswarm",
+			name:          "Different ConfigMap - should not be processed",
+			configMapName: "other-configmap",
+			configMapData: map[string]string{
+				"somedata": "value",
 			},
-			newConfig: &config.Config{
-				ProxyAddr:             "proxy.teleport.example.com:443",
-				TeleportVersion:       "17.7.5",
-				ManagementClusterName: "new-management",
-				AppName:               "teleport-kube-agent",
-				AppVersion:            "0.12.0",
-				AppCatalog:            "giantswarm",
-			},
-			expectedChanges:       1,
-			expectedHighestImpact: ImpactHigh,
-		},
-		{
-			name: "Medium impact change - TeleportVersion",
-			oldConfig: &config.Config{
-				ProxyAddr:             "proxy.teleport.example.com:443",
-				TeleportVersion:       "17.7.5",
-				ManagementClusterName: "management",
-				AppName:               "teleport-kube-agent",
-				AppVersion:            "0.12.0",
-				AppCatalog:            "giantswarm",
-			},
-			newConfig: &config.Config{
-				ProxyAddr:             "proxy.teleport.example.com:443",
-				TeleportVersion:       "15.2.0",
-				ManagementClusterName: "management",
-				AppName:               "teleport-kube-agent",
-				AppVersion:            "0.12.0",
-				AppCatalog:            "giantswarm",
-			},
-			expectedChanges:       1,
-			expectedHighestImpact: ImpactMedium,
-		},
-		{
-			name: "Low impact change - AppVersion",
-			oldConfig: &config.Config{
-				ProxyAddr:             "proxy.teleport.example.com:443",
-				TeleportVersion:       "17.7.5",
-				ManagementClusterName: "management",
-				AppName:               "teleport-kube-agent",
-				AppVersion:            "0.12.0",
-				AppCatalog:            "giantswarm",
-			},
-			newConfig: &config.Config{
-				ProxyAddr:             "proxy.teleport.example.com:443",
-				TeleportVersion:       "17.7.5",
-				ManagementClusterName: "management",
-				AppName:               "teleport-kube-agent",
-				AppVersion:            "0.12.1",
-				AppCatalog:            "giantswarm",
-			},
-			expectedChanges:       1,
-			expectedHighestImpact: ImpactLow,
-		},
-		{
-			name: "Multiple changes - mixed impact",
-			oldConfig: &config.Config{
-				ProxyAddr:             "proxy.teleport.example.com:443",
-				TeleportVersion:       "17.7.5",
-				ManagementClusterName: "management",
-				AppName:               "teleport-kube-agent",
-				AppVersion:            "0.12.0",
-				AppCatalog:            "giantswarm",
-			},
-			newConfig: &config.Config{
-				ProxyAddr:             "proxy.teleport.example.com:443",
-				TeleportVersion:       "15.2.0",         // Medium impact
-				ManagementClusterName: "new-management", // High impact
-				AppName:               "teleport-kube-agent",
-				AppVersion:            "0.12.1", // Low impact
-				AppCatalog:            "giantswarm",
-			},
-			expectedChanges:       3,
-			expectedHighestImpact: ImpactHigh, // Highest of the three changes
-		},
-		{
-			name:      "First config load (nil old config)",
-			oldConfig: nil,
-			newConfig: &config.Config{
-				ProxyAddr:             "proxy.teleport.example.com:443",
-				TeleportVersion:       "17.7.5",
-				ManagementClusterName: "management",
-				AppName:               "teleport-kube-agent",
-				AppVersion:            "0.12.0",
-				AppCatalog:            "giantswarm",
-			},
-			expectedChanges:       0, // No changes on first load
-			expectedHighestImpact: ImpactLow,
+			configMapExists: true,
+			expectError:     false,
+			expectRequeue:   false,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			reconciler := &ConfigReconciler{}
+			// Create test objects
+			objects := []runtime.Object{}
 
-			changes := reconciler.detectConfigChanges(tc.oldConfig, tc.newConfig)
+			// Add a test cluster to verify reconciliation triggering
+			testCluster := &capi.Cluster{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      "test-cluster",
+					Namespace: "default",
+				},
+			}
+			objects = append(objects, testCluster)
 
-			if len(changes) != tc.expectedChanges {
-				t.Errorf("Expected %d changes, got %d", tc.expectedChanges, len(changes))
-				for _, change := range changes {
-					t.Logf("Change: %s %s -> %s (impact: %s)",
-						change.Field, change.OldValue, change.NewValue, reconciler.impactString(change.Impact))
+			// Add ConfigMap if it exists
+			if tc.configMapExists {
+				configMap := &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      tc.configMapName,
+						Namespace: "test-namespace",
+					},
+					Data: tc.configMapData,
 				}
+				objects = append(objects, configMap)
 			}
 
-			// Check highest impact
-			if len(changes) > 0 {
-				maxImpact := ImpactLow
-				for _, change := range changes {
-					if change.Impact > maxImpact {
-						maxImpact = change.Impact
-					}
-				}
+			client := fake.NewClientBuilder().
+				WithScheme(scheme).
+				WithRuntimeObjects(objects...).
+				Build()
 
-				if maxImpact != tc.expectedHighestImpact {
-					t.Errorf("Expected highest impact %s, got %s",
-						reconciler.impactString(tc.expectedHighestImpact),
-						reconciler.impactString(maxImpact))
+			reconciler := &ConfigReconciler{
+				Client:    client,
+				Log:       logr.Discard(),
+				Scheme:    scheme,
+				Teleport:  &teleport.Teleport{},
+				Namespace: "test-namespace",
+			}
+
+			req := ctrl.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      tc.configMapName,
+					Namespace: "test-namespace",
+				},
+			}
+
+			// Execute reconcile
+			result, err := reconciler.Reconcile(context.Background(), req)
+
+			// Verify results
+			if tc.expectError && err == nil {
+				t.Error("Expected error but got none")
+			}
+			if !tc.expectError && err != nil {
+				t.Errorf("Unexpected error: %v", err)
+			}
+
+			if tc.expectRequeue && result.Requeue == false {
+				t.Error("Expected requeue but got none")
+			}
+			if !tc.expectRequeue && result.Requeue == true {
+				t.Error("Expected no requeue but got requeue")
+			}
+
+			// For successful ConfigMap updates, verify cluster annotation was added
+			if tc.expectError == false && tc.configMapExists && tc.configMapName == key.TeleportOperatorConfigName {
+				updatedCluster := &capi.Cluster{}
+				err := client.Get(context.Background(), types.NamespacedName{
+					Name:      "test-cluster",
+					Namespace: "default",
+				}, updatedCluster)
+
+				if err != nil {
+					t.Errorf("Failed to get updated cluster: %v", err)
+				} else {
+					if updatedCluster.Annotations == nil || updatedCluster.Annotations[key.ConfigUpdateAnnotation] == "" {
+						t.Error("Expected config update annotation on cluster but found none")
+					}
 				}
 			}
 		})
-	}
-}
-
-func TestImpactString(t *testing.T) {
-	reconciler := &ConfigReconciler{}
-
-	testCases := []struct {
-		impact   ChangeImpact
-		expected string
-	}{
-		{ImpactLow, "low"},
-		{ImpactMedium, "medium"},
-		{ImpactHigh, "high"},
-		{ImpactCritical, "critical"},
-		{ChangeImpact(999), "unknown"},
-	}
-
-	for _, tc := range testCases {
-		result := reconciler.impactString(tc.impact)
-		if result != tc.expected {
-			t.Errorf("Expected impact string %s, got %s", tc.expected, result)
-		}
 	}
 }
