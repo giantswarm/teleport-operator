@@ -176,7 +176,7 @@ func TestConfigReconciler_Reconcile(t *testing.T) {
 					Name:      "test-cluster",
 					Namespace: "default",
 				}, updatedCluster)
-				
+
 				if err != nil {
 					t.Errorf("Failed to get updated cluster: %v", err)
 				} else {
