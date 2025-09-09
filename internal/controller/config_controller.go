@@ -28,7 +28,6 @@ import (
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
-	"sigs.k8s.io/controller-runtime/pkg/controller"
 	"sigs.k8s.io/controller-runtime/pkg/predicate"
 
 	"github.com/giantswarm/teleport-operator/internal/pkg/config"
@@ -305,9 +304,6 @@ func (r *ConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.ConfigMap{}).
-		WithOptions(controller.Options{
-			MaxConcurrentReconciles: 1,
-		}).
 		WithEventFilter(configMapPredicate).
 		Complete(r)
 }
