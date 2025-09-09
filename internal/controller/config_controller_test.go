@@ -53,6 +53,9 @@ func TestConfigReconciler_Reconcile(t *testing.T) {
 				"proxyAddr":             "proxy.example.com:443",
 				"teleportVersion":       "17.0.0",
 				"managementClusterName": "management",
+				"appName":               "teleport-kube-agent",
+				"appVersion":            "0.12.0",
+				"appCatalog":            "giantswarm",
 			},
 			configMapExists: true,
 			expectError:     false,
@@ -66,7 +69,7 @@ func TestConfigReconciler_Reconcile(t *testing.T) {
 			expectRequeue:   false,
 		},
 		{
-			name:          "Different ConfigMap - should not be processed",
+			name:          "Different ConfigMap - still triggers reconciliation",
 			configMapName: "other-configmap",
 			configMapData: map[string]string{
 				"somedata": "value",
@@ -101,6 +104,29 @@ func TestConfigReconciler_Reconcile(t *testing.T) {
 					Data: tc.configMapData,
 				}
 				objects = append(objects, configMap)
+			}
+
+			// Always add the teleport-operator ConfigMap for config parsing
+			// unless we're testing its deletion
+			if tc.configMapName != key.TeleportOperatorConfigName || tc.configMapExists {
+				teleportConfigMap := &corev1.ConfigMap{
+					ObjectMeta: metav1.ObjectMeta{
+						Name:      key.TeleportOperatorConfigName,
+						Namespace: "test-namespace",
+					},
+					Data: map[string]string{
+						"proxyAddr":             "proxy.example.com:443",
+						"teleportVersion":       "17.0.0",
+						"managementClusterName": "management",
+						"appName":               "teleport-kube-agent",
+						"appVersion":            "0.12.0",
+						"appCatalog":            "giantswarm",
+					},
+				}
+				// Only add if we haven't already added it above
+				if tc.configMapName != key.TeleportOperatorConfigName {
+					objects = append(objects, teleportConfigMap)
+				}
 			}
 
 			client := fake.NewClientBuilder().
@@ -142,13 +168,15 @@ func TestConfigReconciler_Reconcile(t *testing.T) {
 			}
 
 			// For successful ConfigMap updates, verify cluster annotation was added
-			if tc.expectError == false && tc.configMapExists && tc.configMapName == key.TeleportOperatorConfigName {
+			// Note: Any ConfigMap change triggers reconciliation, not just teleport-operator ConfigMap
+			// because the predicate filtering happens at the manager level, not in Reconcile
+			if tc.expectError == false && tc.configMapExists {
 				updatedCluster := &capi.Cluster{}
 				err := client.Get(context.Background(), types.NamespacedName{
 					Name:      "test-cluster",
 					Namespace: "default",
 				}, updatedCluster)
-
+				
 				if err != nil {
 					t.Errorf("Failed to get updated cluster: %v", err)
 				} else {
