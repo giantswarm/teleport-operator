@@ -138,12 +138,11 @@ func main() {
 
 	// Setup ConfigMap controller to watch for teleport-operator config changes
 	if err = (&controller.ConfigReconciler{
-		Client:          mgr.GetClient(),
-		Log:             ctrl.Log.WithName("controllers").WithName("Config"),
-		Scheme:          mgr.GetScheme(),
-		Teleport:        tele,
-		Namespace:       namespace,
-		LastKnownConfig: config, // Initialize with startup config
+		Client:    mgr.GetClient(),
+		Log:       ctrl.Log.WithName("controllers").WithName("Config"),
+		Scheme:    mgr.GetScheme(),
+		Teleport:  tele,
+		Namespace: namespace,
 	}).SetupWithManager(mgr); err != nil {
 		setupLog.Error(err, "unable to create controller", "controller", "Config")
 		os.Exit(1)
