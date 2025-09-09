@@ -53,15 +53,10 @@ type ConfigReconciler struct {
 func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("configmap", req.NamespacedName)
 
-	// Only process the teleport-operator ConfigMap
-	if req.Name != key.TeleportOperatorConfigName {
-		return ctrl.Result{}, nil
-	}
-
 	configMap := &corev1.ConfigMap{}
 	if err := r.Client.Get(ctx, req.NamespacedName, configMap); err != nil {
 		if apierrors.IsNotFound(err) {
-			log.Info("ConfigMap deleted, but we continue with cached config")
+			log.Info("ConfigMap deleted, operator will continue with existing configuration")
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, microerror.Mask(err)
@@ -84,6 +79,15 @@ func (r *ConfigReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctr
 	}
 
 	log.Info("Configuration changes detected", "changes", changes)
+
+	// Log all changes for audit purposes (before processing to ensure we don't lose them)
+	for _, change := range changes {
+		log.Info("Configuration change detected",
+			"field", change.Field,
+			"oldValue", change.OldValue,
+			"newValue", change.NewValue,
+			"impact", r.impactString(change.Impact))
+	}
 
 	// Update the Teleport instance configuration
 	r.Teleport.Config = newConfig
@@ -127,7 +131,9 @@ func (r *ConfigReconciler) detectConfigChanges(oldConfig, newConfig *config.Conf
 	var changes []ConfigChange
 
 	if oldConfig == nil {
-		// First time seeing config, no changes to process
+		// First time seeing config during startup - we don't treat this as "changes"
+		// since the system is initializing and no operational changes are needed.
+		// All components will use the new config through normal startup flow.
 		return changes
 	}
 
@@ -204,44 +210,31 @@ func (r *ConfigReconciler) handleConfigChanges(ctx context.Context, log logr.Log
 		}
 	}
 
-	// Handle critical changes (ProxyAddr)
-	if maxImpact >= ImpactCritical {
+	// Handle changes based on impact level
+
+	switch {
+	case maxImpact >= ImpactCritical:
 		log.Info("Critical configuration change detected, forcing reconnection and token invalidation")
-
-		// Force identity refresh by clearing cached identity
+		// Critical changes require clearing cached identity to force reconnection
 		r.Teleport.Identity = nil
+		return r.triggerClusterReconciliation(ctx, log, "Critical config change - identity cleared, tokens will be regenerated")
 
-		// Trigger immediate reconciliation of all clusters to regenerate tokens
-		if err := r.triggerClusterReconciliation(ctx, log, "Critical config change - tokens will be regenerated"); err != nil {
-			return microerror.Mask(err)
-		}
-	} else if maxImpact >= ImpactHigh {
+	case maxImpact >= ImpactHigh:
 		log.Info("High impact configuration change detected, invalidating tokens")
+		return r.triggerClusterReconciliation(ctx, log, "High impact config change - tokens will be regenerated")
 
-		// Trigger immediate reconciliation of all clusters to regenerate tokens
-		if err := r.triggerClusterReconciliation(ctx, log, "High impact config change - tokens will be regenerated"); err != nil {
-			return microerror.Mask(err)
-		}
-	} else if maxImpact >= ImpactMedium {
+	case maxImpact >= ImpactMedium:
 		log.Info("Medium impact configuration change detected, updating ConfigMaps")
+		return r.triggerClusterReconciliation(ctx, log, "Medium impact config change - ConfigMaps will be updated")
 
-		// For medium impact changes, we'll let the normal reconcile cycle handle updates
-		// but trigger it immediately
-		if err := r.triggerClusterReconciliation(ctx, log, "Medium impact config change - ConfigMaps will be updated"); err != nil {
-			return microerror.Mask(err)
-		}
+	case maxImpact >= ImpactLow:
+		log.Info("Low impact configuration change detected, no immediate action required")
+		// Low impact changes (AppVersion, AppCatalog) only affect future deployments
+		return nil
+
+	default:
+		return nil
 	}
-
-	// Log all changes for audit purposes
-	for _, change := range changes {
-		log.Info("Configuration change processed",
-			"field", change.Field,
-			"oldValue", change.OldValue,
-			"newValue", change.NewValue,
-			"impact", r.impactString(change.Impact))
-	}
-
-	return nil
 }
 
 // triggerClusterReconciliation forces immediate reconciliation of all cluster resources
@@ -267,7 +260,7 @@ func (r *ConfigReconciler) triggerClusterReconciliation(ctx context.Context, log
 		}
 
 		// Add annotation to trigger reconciliation
-		cluster.Annotations["teleport-operator.giantswarm.io/config-updated"] = timestamp
+		cluster.Annotations[key.ConfigUpdateAnnotation] = timestamp
 
 		if err := r.Client.Update(ctx, cluster); err != nil {
 			log.Error(err, "Failed to update cluster to trigger reconciliation",
@@ -313,7 +306,7 @@ func (r *ConfigReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&corev1.ConfigMap{}).
 		WithOptions(controller.Options{
-			MaxConcurrentReconciles: 1, // Process config changes sequentially
+			MaxConcurrentReconciles: 1,
 		}).
 		WithEventFilter(configMapPredicate).
 		Complete(r)
