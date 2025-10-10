@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"reflect"
 	"testing"
 	"time"
 
@@ -43,7 +42,6 @@ func Test_ClusterController(t *testing.T) {
 		expectedSecret      *corev1.Secret
 		expectedConfigMap   *corev1.ConfigMap
 		expectedError       error
-		expectedRoles       []string
 	}{
 		{
 			name:      "case 0: Register cluster with apps enabled",
@@ -64,7 +62,6 @@ func Test_ClusterController(t *testing.T) {
 			expectedCluster:   test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
 			expectedSecret:    test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
 			expectedConfigMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{key.RoleKube, key.RoleApp}),
-			expectedRoles:     []string{key.RoleKube, key.RoleApp},
 		},
 		{
 			name:      "case 1: Register cluster without apps",
@@ -85,7 +82,6 @@ func Test_ClusterController(t *testing.T) {
 			expectedCluster:   test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
 			expectedSecret:    test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
 			expectedConfigMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{key.RoleKube}),
-			expectedRoles:     []string{key.RoleKube},
 		},
 		{
 			name:              "case 2: Register cluster without user values ConfigMap",
@@ -97,7 +93,6 @@ func Test_ClusterController(t *testing.T) {
 			expectedCluster:   test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
 			expectedSecret:    test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
 			expectedConfigMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{key.RoleKube}),
-			expectedRoles:     []string{key.RoleKube},
 		},
 		{
 			name:      "case 3: Update Secret and ConfigMap resources in case join token changes",
@@ -120,7 +115,6 @@ func Test_ClusterController(t *testing.T) {
 			expectedCluster:   test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
 			expectedSecret:    test.NewSecret(test.ClusterName, test.NamespaceName, test.NewTokenName),
 			expectedConfigMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.NewTokenName, []string{key.RoleKube, key.RoleApp}),
-			expectedRoles:     []string{key.RoleKube, key.RoleApp},
 		},
 		{
 			name:          "case 4: Deregister cluster and delete resources in case the cluster is deleted",
@@ -131,7 +125,6 @@ func Test_ClusterController(t *testing.T) {
 			cluster:       test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Now()),
 			secret:        test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
 			configMap:     test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{key.RoleKube}),
-			expectedRoles: []string{key.RoleKube},
 		},
 		{
 			name:           "case 5: Reconnect to Teleport when credentials are rotated",
@@ -158,7 +151,6 @@ func Test_ClusterController(t *testing.T) {
 			expectedCluster:   test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
 			expectedSecret:    test.NewSecret(test.ClusterName, test.NamespaceName, test.NewTokenName),
 			expectedConfigMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.NewTokenName, []string{key.RoleKube, key.RoleApp}),
-			expectedRoles:     []string{key.RoleKube, key.RoleApp},
 		},
 		{
 			name:      "case 6: Return an error in case reconnection to Teleport fails after the credentials are rotated",
@@ -173,7 +165,6 @@ func Test_ClusterController(t *testing.T) {
 				return nil, errors.New("simulated error")
 			},
 			expectedError: errors.New("secrets \"identity-output\" not found"),
-			expectedRoles: []string{key.RoleKube},
 		},
 	}
 
@@ -298,19 +289,12 @@ func Test_ClusterController(t *testing.T) {
 				t.Fatalf("unexpected error %v", err)
 			}
 
-			// Check if the roles were set correctly
-			// This assumes you've added a method to expose the last assigned roles for testing
-			assignedRoles := controller.GetLastAssignedRoles()
-			if !reflect.DeepEqual(assignedRoles, tc.expectedRoles) {
-				t.Errorf("Expected roles %v, but got %v", tc.expectedRoles, assignedRoles)
-			}
+			// Note: Role correctness is already verified through the expectedConfigMap check above
+			// which contains the roles in the configmap data
 		})
 	}
 }
 
-func (r *ClusterReconciler) GetLastAssignedRoles() []string {
-	return r.lastAssignedRoles
-}
 
 func newConfig() *config.Config {
 	return &config.Config{

@@ -296,4 +296,3 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		For(&capi.Cluster{}).
 		Complete(r)
 }
-
