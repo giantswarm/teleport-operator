@@ -228,6 +228,10 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			// Don't fail the reconciliation, just log the error and continue
 		}
 
+		// Wait 10 seconds between state deletion and pod restart to allow cleanup to propagate
+		log.Info("Waiting 10 seconds before restarting pods to allow state cleanup to propagate")
+		time.Sleep(10 * time.Second)
+
 		if err := r.Teleport.RestartTeleportKubeAgentPods(ctx, log, r.Client); err != nil {
 			log.Error(err, "Failed to restart teleport-kube-agent pods")
 			// Don't fail the reconciliation, just log the error and continue
@@ -258,6 +262,10 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 				// Don't fail the reconciliation, just log the error and continue
 			}
 
+			// Wait 10 seconds between state deletion and pod restart to allow cleanup to propagate
+			log.Info("Waiting 10 seconds before restarting pods to allow state cleanup to propagate")
+			time.Sleep(10 * time.Second)
+
 			if err := r.Teleport.RestartTeleportKubeAgentPods(ctx, log, r.Client); err != nil {
 				log.Error(err, "Failed to restart teleport-kube-agent pods")
 				// Don't fail the reconciliation, just log the error and continue
@@ -272,6 +280,10 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 					log.Error(err, "Failed to delete teleport-kube-agent state secrets")
 					// Don't fail the reconciliation, just log the error and continue
 				}
+
+				// Wait 10 seconds between state deletion and pod restart to allow cleanup to propagate
+				log.Info("Waiting 10 seconds before restarting pods to allow state cleanup to propagate")
+				time.Sleep(10 * time.Second)
 
 				if err := r.Teleport.RestartTeleportKubeAgentPods(ctx, log, r.Client); err != nil {
 					log.Error(err, "Failed to restart teleport-kube-agent pods")
