@@ -117,14 +117,14 @@ func Test_ClusterController(t *testing.T) {
 			expectedConfigMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.NewTokenName, []string{key.RoleKube, key.RoleApp}),
 		},
 		{
-			name:          "case 4: Deregister cluster and delete resources in case the cluster is deleted",
-			namespace:     test.NamespaceName,
-			token:         test.TokenName,
-			config:        newConfig(),
-			identity:      newIdentity(test.LastReadValue),
-			cluster:       test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Now()),
-			secret:        test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
-			configMap:     test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{key.RoleKube}),
+			name:      "case 4: Deregister cluster and delete resources in case the cluster is deleted",
+			namespace: test.NamespaceName,
+			token:     test.TokenName,
+			config:    newConfig(),
+			identity:  newIdentity(test.LastReadValue),
+			cluster:   test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Now()),
+			secret:    test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
+			configMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{key.RoleKube}),
 		},
 		{
 			name:           "case 5: Reconnect to Teleport when credentials are rotated",
@@ -294,7 +294,6 @@ func Test_ClusterController(t *testing.T) {
 		})
 	}
 }
-
 
 func newConfig() *config.Config {
 	return &config.Config{
