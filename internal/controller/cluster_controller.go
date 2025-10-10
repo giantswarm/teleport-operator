@@ -39,13 +39,12 @@ const identityExpirationPeriod = 20 * time.Minute
 
 // ClusterReconciler reconciles a Cluster object
 type ClusterReconciler struct {
-	Client            client.Client
-	Log               logr.Logger
-	Scheme            *runtime.Scheme
-	Teleport          *teleport.Teleport
-	IsBotEnabled      bool
-	Namespace         string
-	lastAssignedRoles []string
+	Client       client.Client
+	Log          logr.Logger
+	Scheme       *runtime.Scheme
+	Teleport     *teleport.Teleport
+	IsBotEnabled bool
+	Namespace    string
 }
 
 //+kubebuilder:rbac:groups=cluster.x-k8s.io.giantswarm.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
@@ -87,11 +86,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if appsEnabled {
 		roles = append(roles, key.RoleApp)
 	}
-
-	// Check if roles have changed since last reconciliation
-	rolesChanged := !rolesEqual(r.lastAssignedRoles, roles)
-	previousRoles := r.lastAssignedRoles
-	r.lastAssignedRoles = roles
 	if r.Teleport.Identity != nil {
 		log.Info("Teleport identity", "last-read-minutes-ago", r.Teleport.Identity.Age(), "hash", r.Teleport.Identity.Hash())
 	}
@@ -272,24 +266,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			}
 		} else {
 			log.Info("ConfigMap has valid teleport join token", "configMapName", configMap.GetName(), "roles", roles)
-
-			// Check if roles have changed, and if so, trigger cleanup even with valid token
-			if rolesChanged {
-				log.Info("Roles changed, cleaning up teleport-kube-agent state and restarting pods", "oldRoles", previousRoles, "newRoles", roles)
-				if err := r.Teleport.DeleteTeleportKubeAgentStateSecrets(ctx, log, r.Client); err != nil {
-					log.Error(err, "Failed to delete teleport-kube-agent state secrets")
-					// Don't fail the reconciliation, just log the error and continue
-				}
-
-				// Wait 10 seconds between state deletion and pod restart to allow cleanup to propagate
-				log.Info("Waiting 10 seconds before restarting pods to allow state cleanup to propagate")
-				time.Sleep(10 * time.Second)
-
-				if err := r.Teleport.RestartTeleportKubeAgentPods(ctx, log, r.Client); err != nil {
-					log.Error(err, "Failed to restart teleport-kube-agent pods")
-					// Don't fail the reconciliation, just log the error and continue
-				}
-			}
 		}
 	}
 
@@ -321,19 +297,3 @@ func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 		Complete(r)
 }
 
-// rolesEqual compares two role slices for equality
-func rolesEqual(a, b []string) bool {
-	if len(a) != len(b) {
-		return false
-	}
-	roleMap := make(map[string]bool)
-	for _, role := range a {
-		roleMap[role] = true
-	}
-	for _, role := range b {
-		if !roleMap[role] {
-			return false
-		}
-	}
-	return true
-}
