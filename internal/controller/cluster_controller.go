@@ -39,18 +39,20 @@ const identityExpirationPeriod = 20 * time.Minute
 
 // ClusterReconciler reconciles a Cluster object
 type ClusterReconciler struct {
-	Client            client.Client
-	Log               logr.Logger
-	Scheme            *runtime.Scheme
-	Teleport          *teleport.Teleport
-	IsBotEnabled      bool
-	Namespace         string
-	lastAssignedRoles []string
+	Client       client.Client
+	Log          logr.Logger
+	Scheme       *runtime.Scheme
+	Teleport     *teleport.Teleport
+	IsBotEnabled bool
+	Namespace    string
 }
 
 //+kubebuilder:rbac:groups=cluster.x-k8s.io.giantswarm.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=cluster.x-k8s.io.giantswarm.io,resources=clusters/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=cluster.x-k8s.io.giantswarm.io,resources=clusters/finalizers,verbs=update
+//+kubebuilder:rbac:groups="",resources=secrets,verbs=get;list;create;update;patch;delete
+//+kubebuilder:rbac:groups="",resources=configmaps,verbs=get;list;create;update;patch;delete
+// NOTE: Pod permissions removed - operator runs in management cluster and cannot access workload cluster pods
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -84,7 +86,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	if appsEnabled {
 		roles = append(roles, key.RoleApp)
 	}
-	r.lastAssignedRoles = roles
 	if r.Teleport.Identity != nil {
 		log.Info("Teleport identity", "last-read-minutes-ago", r.Teleport.Identity.Age(), "hash", r.Teleport.Identity.Hash())
 	}
@@ -231,6 +232,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 				return ctrl.Result{}, microerror.Mask(err)
 			}
 			log.Info("Updated config map with new teleport join token", "configMapName", configMap.GetName(), "roles", roles)
+
 		} else {
 			log.Info("ConfigMap has valid teleport join token", "configMapName", configMap.GetName(), "roles", roles)
 		}

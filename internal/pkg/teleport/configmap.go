@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/giantswarm/k8smetadata/pkg/label"
 	"github.com/giantswarm/microerror"
 	"github.com/go-logr/logr"
 	corev1 "k8s.io/api/core/v1"
@@ -82,6 +83,21 @@ func (t *Teleport) CreateConfigMap(ctx context.Context, log logr.Logger, ctrlCli
 				ObjectMeta: metav1.ObjectMeta{
 					Name:      configMapName,
 					Namespace: clusterNamespace,
+					Labels: map[string]string{
+						// This label tells app-operator to watch this ConfigMap.
+						// When the ConfigMap changes, app-operator will detect it and trigger
+						// an App CR reconciliation, which updates the Chart CR, which causes
+						// chart-operator to perform a Helm upgrade in the workload cluster,
+						// which triggers a Kubernetes rolling update of the pods.
+						// This is the proper way to propagate config changes from the management
+						// cluster to workload cluster pods without direct pod access.
+						label.AppOperatorWatching: "true",
+
+						// Standard labels for resource identification
+						"app.kubernetes.io/name":       "teleport-kube-agent",
+						"app.kubernetes.io/managed-by": "teleport-operator",
+						"giantswarm.io/cluster":        clusterName,
+					},
 				},
 				Data: configMapData,
 			}
@@ -90,7 +106,7 @@ func (t *Teleport) CreateConfigMap(ctx context.Context, log logr.Logger, ctrlCli
 				return microerror.Mask(err)
 			}
 
-			log.Info("Created config map with new teleport kube join token", "configMapName", configMapName)
+			log.Info("Created config map with new teleport kube join token", "configMapName", configMapName, "watching", "true")
 			return nil
 		}
 
@@ -138,6 +154,25 @@ func (t *Teleport) EnsureTbotConfigMap(ctx context.Context, log logr.Logger, ctr
 }
 
 func (t *Teleport) UpdateConfigMap(ctx context.Context, log logr.Logger, ctrlClient client.Client, configMap *corev1.ConfigMap, token string, roles []string) error {
+	// Ensure labels exist
+	if configMap.Labels == nil {
+		configMap.Labels = make(map[string]string)
+	}
+
+	// Add/update app-operator watching label if missing (migration for existing ConfigMaps)
+	// This enables automatic propagation of config changes from management cluster to workload cluster.
+	// When app-operator detects this ConfigMap change, it will trigger App reconciliation,
+	// which updates the Chart CR, which causes chart-operator to perform a Helm upgrade,
+	// which triggers a Kubernetes rolling update of the pods in the workload cluster.
+	labelsAdded := false
+	if configMap.Labels[label.AppOperatorWatching] != "true" {
+		configMap.Labels[label.AppOperatorWatching] = "true"
+		configMap.Labels["app.kubernetes.io/name"] = "teleport-kube-agent"
+		configMap.Labels["app.kubernetes.io/managed-by"] = "teleport-operator"
+		labelsAdded = true
+		log.Info("Adding app-operator watching label to ConfigMap", "configMapName", configMap.Name)
+	}
+
 	valuesBytes, ok := configMap.Data["values"]
 	if !ok {
 		return microerror.Mask(fmt.Errorf("malformed ConfigMap: key `values` not found"))
@@ -161,7 +196,12 @@ func (t *Teleport) UpdateConfigMap(ctx context.Context, log logr.Logger, ctrlCli
 	if err := ctrlClient.Update(ctx, configMap); err != nil {
 		return microerror.Mask(fmt.Errorf("failed to update ConfigMap: %w", err))
 	}
-	log.Info("Updated config map with new teleport kube join token", "configMap", configMap.GetName())
+
+	if labelsAdded {
+		log.Info("Updated config map with new teleport kube join token and watching label", "configMap", configMap.GetName())
+	} else {
+		log.Info("Updated config map with new teleport kube join token", "configMap", configMap.GetName())
+	}
 	return nil
 }
 

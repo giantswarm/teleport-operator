@@ -65,6 +65,9 @@ rules:
     - create
     - patch
     - update
+# NOTE: Pod permissions removed - we cannot delete pods in workload clusters from management cluster
+# The operator only has access to management cluster resources. To trigger pod restarts in workload
+# clusters, use config hash annotations on DaemonSets to leverage Kubernetes rolling updates.
 ---
 apiVersion: rbac.authorization.k8s.io/v1
 kind: ClusterRoleBinding

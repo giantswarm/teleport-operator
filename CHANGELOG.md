@@ -7,6 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Add automatic cleanup of teleport-kube-agent state secrets and pod restart on configuration updates.
+- Trigger cleanup when teleport configuration changes (new configmap creation, token renewal, role changes).
+
 ### Changed
 
 - Resolve updated code linter findings.
