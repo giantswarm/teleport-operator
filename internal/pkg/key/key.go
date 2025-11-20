@@ -21,6 +21,7 @@ const (
 	TeleportAppTokenValidity        = 720 * time.Hour
 	TeleportKubeTokenValidity       = 720 * time.Hour
 	TeleportNodeTokenValidity       = 720 * time.Hour
+	ConfigUpdateAnnotation          = "teleport-operator.giantswarm.io/config-updated"
 
 	AppCatalog            = "appCatalog"
 	AppName               = "appName"
