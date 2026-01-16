@@ -8,8 +8,8 @@ require (
 	github.com/go-logr/logr v1.4.3
 	github.com/google/uuid v1.6.0
 	github.com/gravitational/teleport/api v0.0.0-20260116112244-d6726529a965
-	github.com/onsi/ginkgo/v2 v2.27.3
-	github.com/onsi/gomega v1.38.3
+	github.com/onsi/ginkgo/v2 v2.27.5
+	github.com/onsi/gomega v1.39.0
 	github.com/pkg/errors v0.9.1
 	google.golang.org/grpc v1.77.0
 	gopkg.in/yaml.v3 v3.0.1
