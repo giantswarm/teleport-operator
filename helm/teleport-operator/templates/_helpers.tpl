@@ -14,6 +14,13 @@ Create chart name and version as used by the chart label.
 {{- end -}}
 
 {{/*
+Define image tag.
+*/}}
+{{- define "image.tag" -}}
+{{- .Values.image.tag | default .Chart.AppVersion -}}
+{{- end -}}
+
+{{/*
 Common labels
 */}}
 {{- define "labels.common" -}}
@@ -21,7 +28,7 @@ app: {{ include "name" . | quote }}
 {{ include "labels.selector" . }}
 app.kubernetes.io/managed-by: {{ .Release.Service | quote }}
 application.giantswarm.io/team: {{ index .Chart.Annotations "application.giantswarm.io/team" | default "shield" | quote }}
-app.kubernetes.io/version: {{ .Chart.Version | quote }}
+app.kubernetes.io/version: {{ .Chart.AppVersion | quote }}
 helm.sh/chart: {{ include "chart" . | quote }}
 {{- end -}}
 
