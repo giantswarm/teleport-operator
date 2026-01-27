@@ -33,7 +33,7 @@ spec:
         env:
         - name: TELEPORT_TLS_ROUTING_CONN_UPGRADE
           value: "{{ .Values.teleport.proxyAddr }}=yes"
-        image: "{{ .Values.registry.domain }}/{{ .Values.image.name }}:{{ .Chart.Version }}"
+        image: "{{ .Values.registry.domain }}/{{ .Values.image.name }}:{{ include "image.tag" . }}"
         args:
         - "--namespace={{ include "resource.default.namespace" . }}"
         {{- if .Values.tbot.enabled }}
