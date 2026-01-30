@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
-
+- Build with up-to-date pipelines.
 - Resolve updated code linter findings.
 - Replace `Chart.Version` with `Chart.AppVersion` in labels and image tag defaults.
 
