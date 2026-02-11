@@ -5,7 +5,9 @@ description: "Teleport operator"
 home: "https://github.com/giantswarm/teleport-operator"
 apiVersion: v1
 annotations:
-  application.giantswarm.io/team: "shield"
+  io.giantswarm.application.audience: giantswarm
+  io.giantswarm.application.managed: "true"
+  io.giantswarm.application.team: "shield"
 icon: https://s.giantswarm.io/app-icons/teleport/1/light.png
 maintainers:
   - name: giantswarm/team-shield
