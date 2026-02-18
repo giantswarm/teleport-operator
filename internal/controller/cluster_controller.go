@@ -18,14 +18,22 @@ package controller
 
 import (
 	"context"
+	"strings"
 	"time"
 
 	"github.com/giantswarm/microerror"
 	"github.com/go-logr/logr"
+	corev1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/types"
 	capi "sigs.k8s.io/cluster-api/api/v1beta1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/builder"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/predicate"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 
 	"github.com/giantswarm/teleport-operator/internal/pkg/config"
 	"github.com/giantswarm/teleport-operator/internal/pkg/key"
@@ -63,6 +71,7 @@ type ClusterReconciler struct {
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.4/pkg/reconcile
 func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ctrl.Result, error) {
 	log := r.Log.WithValues("cluster", req.NamespacedName)
+	start := time.Now()
 
 	cluster := &capi.Cluster{}
 	if err := r.Client.Get(ctx, req.NamespacedName, cluster); err != nil {
@@ -72,7 +81,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 
-	log.Info("Reconciling cluster", "cluster", cluster)
+	log.Info("Reconciling cluster", "cluster", cluster, "creation_time", cluster.CreationTimestamp, "reconcile_start", start)
 
 	appsEnabled, err := r.Teleport.AreTeleportAppsEnabled(ctx, cluster.Name, cluster.Namespace)
 	if err != nil {
@@ -254,6 +263,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	// We need to requeue to check the teleport token validity
 	// and update secret for the cluster, if it expires
+	log.Info("Reconcile completed", "duration", time.Since(start))
 	return ctrl.Result{RequeueAfter: 5 * time.Minute}, nil
 }
 
@@ -261,5 +271,119 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 func (r *ClusterReconciler) SetupWithManager(mgr ctrl.Manager) error {
 	return ctrl.NewControllerManagedBy(mgr).
 		For(&capi.Cluster{}).
+		Watches(
+			&source.Kind{Type: &corev1.Secret{}},
+			handler.EnqueueRequestsFromMapFunc(r.findClustersForKubeconfigSecret),
+			builder.WithPredicates(predicate.NewPredicateFuncs(r.isKubeconfigSecret)),
+		).
+		Watches(
+			&source.Kind{Type: &corev1.ConfigMap{}},
+			handler.EnqueueRequestsFromMapFunc(r.findClustersForTbotConfigMap),
+			builder.WithPredicates(predicate.NewPredicateFuncs(r.isTbotConfigMap)),
+		).
 		Complete(r)
+}
+
+// isKubeconfigSecret checks if a secret is a teleport kubeconfig secret we should watch
+func (r *ClusterReconciler) isKubeconfigSecret(obj client.Object) bool {
+	secret, ok := obj.(*corev1.Secret)
+	if !ok {
+		return false
+	}
+
+	// Check if it's in the teleport bot namespace and matches our naming pattern
+	if secret.Namespace != key.TeleportBotNamespace {
+		return false
+	}
+
+	// Check if it matches teleport kubeconfig secret naming pattern: teleport-{cluster}-kubeconfig
+	return strings.HasPrefix(secret.Name, "teleport-") && strings.HasSuffix(secret.Name, "-kubeconfig")
+}
+
+// isTbotConfigMap checks if a configmap is a tbot configmap we should watch
+func (r *ClusterReconciler) isTbotConfigMap(obj client.Object) bool {
+	cm, ok := obj.(*corev1.ConfigMap)
+	if !ok {
+		return false
+	}
+
+	// Check if it's in the teleport bot namespace and matches our naming pattern
+	if cm.Namespace != key.TeleportBotNamespace {
+		return false
+	}
+
+	// Check if it matches tbot configmap naming pattern: teleport-tbot-{cluster}-config
+	return strings.HasPrefix(cm.Name, "teleport-tbot-") && strings.HasSuffix(cm.Name, "-config")
+}
+
+// findClustersForKubeconfigSecret maps kubeconfig secret changes back to cluster reconcile requests
+func (r *ClusterReconciler) findClustersForKubeconfigSecret(obj client.Object) []reconcile.Request {
+	secret, ok := obj.(*corev1.Secret)
+	if !ok {
+		return nil
+	}
+
+	// Extract cluster name from secret name: teleport-{cluster}-kubeconfig -> {cluster}
+	if !strings.HasPrefix(secret.Name, "teleport-") || !strings.HasSuffix(secret.Name, "-kubeconfig") {
+		return nil
+	}
+
+	clusterName := secret.Name[len("teleport-") : len(secret.Name)-len("-kubeconfig")]
+
+	// Find the cluster in all organization namespaces
+	clusters := &capi.ClusterList{}
+	if err := r.Client.List(context.TODO(), clusters); err != nil {
+		r.Log.Error(err, "Failed to list clusters for kubeconfig secret", "secret", secret.Name)
+		return nil
+	}
+
+	var requests []reconcile.Request
+	for _, cluster := range clusters.Items {
+		if cluster.Name == clusterName {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      cluster.Name,
+					Namespace: cluster.Namespace,
+				},
+			})
+		}
+	}
+
+	return requests
+}
+
+// findClustersForTbotConfigMap maps tbot configmap changes back to cluster reconcile requests
+func (r *ClusterReconciler) findClustersForTbotConfigMap(obj client.Object) []reconcile.Request {
+	cm, ok := obj.(*corev1.ConfigMap)
+	if !ok {
+		return nil
+	}
+
+	// Extract cluster name from configmap name: teleport-tbot-{cluster}-config -> {cluster}
+	if !strings.HasPrefix(cm.Name, "teleport-tbot-") || !strings.HasSuffix(cm.Name, "-config") {
+		return nil
+	}
+
+	clusterName := cm.Name[len("teleport-tbot-") : len(cm.Name)-len("-config")]
+
+	// Find the cluster in all organization namespaces
+	clusters := &capi.ClusterList{}
+	if err := r.Client.List(context.TODO(), clusters); err != nil {
+		r.Log.Error(err, "Failed to list clusters for tbot configmap", "configmap", cm.Name)
+		return nil
+	}
+
+	var requests []reconcile.Request
+	for _, cluster := range clusters.Items {
+		if cluster.Name == clusterName {
+			requests = append(requests, reconcile.Request{
+				NamespacedName: types.NamespacedName{
+					Name:      cluster.Name,
+					Namespace: cluster.Namespace,
+				},
+			})
+		}
+	}
+
+	return requests
 }
