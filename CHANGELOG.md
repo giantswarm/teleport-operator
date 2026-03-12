@@ -12,6 +12,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Add `io.giantswarm.application.audience` and `io.giantswarm.application.managed` chart annotations for Backstage visibility.
 
 ### Changed
+
+- Reduced join token TTL from 720h to 1h and added proactive 30-minute renewal threshold to limit the blast radius of a leaked token.
+- Replaced `GetTokens` (list all) with `GetToken` (by name) in `IsTokenValid`, removing the need for the `list` verb on the Teleport token resource.
+- Replaced label-scan-based `DeleteToken` with `DeleteTokenByName`; the controller now reads token names from the Secret and ConfigMap before deletion. This fixes a bug where only one of the two per-cluster tokens was cleaned up on cluster deletion.
+- Old tokens are explicitly revoked from Teleport immediately after Secret/ConfigMap rotation instead of waiting for natural TTL expiry.
+- Secret-backed join token no longer uses the `node` role; both Secret and ConfigMap tokens now use `kube` (and optionally `app`) only.
+- `UpdateSecret` now uses a strategic merge patch instead of a full update to preserve external labels and avoid optimistic concurrency conflicts.
+- Join tokens are now labelled with `app.kubernetes.io/managed-by` and `teleport-operator/cluster-uid` for auditability.
+- `GetRegisterName` appends the first 8 characters of `cluster.UID` to prevent name collisions on cluster recreation; empty UID falls back to the existing format for migration safety.
+
+### Fixed
+
+- Fixed `FakeTeleportClient` constructor wiring `FailsUpsert` to `FailsDelete`, causing `FailsUpsert` to be a no-op in all tests.
 ## [0.12.4] - 2026-01-30
 
 
