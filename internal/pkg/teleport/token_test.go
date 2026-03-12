@@ -144,12 +144,12 @@ func Test_IsTokenValid(t *testing.T) {
 		{
 			// IsTokenValid uses GetToken by name (not GetTokens list).
 			// A connectivity failure on GetToken must still propagate as an error.
-			name:        "case 3: Service should fail when token lookup fails due to client error",
+			name:         "case 3: Service should fail when token lookup fails due to client error",
 			registerName: key.GetRegisterName(test.ManagementClusterName, test.ClusterName, ""),
-			tokenName:   test.TokenName,
-			tokenType:   test.TokenTypeKube,
-			failsGet:    true,
-			expectError: true,
+			tokenName:    test.TokenName,
+			tokenType:    test.TokenTypeKube,
+			failsGet:     true,
+			expectError:  true,
 		},
 		{
 			name:           "case 4: Service should return false for an expired token",
@@ -232,11 +232,11 @@ func Test_DeleteTokenByName(t *testing.T) {
 			expectError:   false,
 		},
 		{
-			name:         "case 2: Fail when Teleport client returns a delete error",
-			tokenName:    test.TokenName,
-			tokens:       []types.ProvisionToken{test.NewToken(test.TokenName, test.ClusterName, []string{"kube"})},
-			failsDelete:  true,
-			expectError:  true,
+			name:        "case 2: Fail when Teleport client returns a delete error",
+			tokenName:   test.TokenName,
+			tokens:      []types.ProvisionToken{test.NewToken(test.TokenName, test.ClusterName, []string{"kube"})},
+			failsDelete: true,
+			expectError: true,
 		},
 	}
 

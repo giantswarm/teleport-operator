@@ -5,11 +5,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/giantswarm/microerror"
 	"github.com/go-logr/logr"
 	"github.com/gravitational/teleport/api/types"
 	"github.com/gravitational/trace"
-
-	"github.com/giantswarm/microerror"
 
 	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 )
