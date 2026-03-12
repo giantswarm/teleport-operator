@@ -29,31 +29,31 @@ func Test_GenerateToken(t *testing.T) {
 	}{
 		{
 			name:           "case 0: Generate a new kube token",
-			registerName:   key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
+			registerName:   key.GetRegisterName(test.ManagementClusterName, test.ClusterName, ""),
 			tokenType:      []string{"kube"},
 			expectError:    false,
 			expectedRoles:  []string{"kube"},
-			expectedExpiry: 720 * time.Hour,
+			expectedExpiry: 1 * time.Hour,
 		},
 		{
 			name:           "case 1: Generate a new node token",
-			registerName:   key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
+			registerName:   key.GetRegisterName(test.ManagementClusterName, test.ClusterName, ""),
 			tokenType:      []string{"node"},
 			expectError:    false,
 			expectedRoles:  []string{"node"},
-			expectedExpiry: 720 * time.Hour,
+			expectedExpiry: 1 * time.Hour,
 		},
 		{
 			name:           "case 2: Generate a new kube and app token",
-			registerName:   key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
+			registerName:   key.GetRegisterName(test.ManagementClusterName, test.ClusterName, ""),
 			tokenType:      []string{"kube", "app"},
 			expectError:    false,
 			expectedRoles:  []string{"kube", "app"},
-			expectedExpiry: 720 * time.Hour,
+			expectedExpiry: 1 * time.Hour,
 		},
 		{
 			name:         "case 3: Fail in case new token cannot be upserted",
-			registerName: key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
+			registerName: key.GetRegisterName(test.ManagementClusterName, test.ClusterName, ""),
 			failsUpsert:  true,
 			expectError:  true,
 		},
@@ -113,13 +113,13 @@ func Test_IsTokenValid(t *testing.T) {
 		tokenName      string
 		tokenType      string
 		tokens         []types.ProvisionToken
-		failsList      bool
+		failsGet       bool
 		expectError    bool
 		expectedResult bool
 	}{
 		{
 			name:           "case 0: Service should return true for a valid, non-expired token",
-			registerName:   key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
+			registerName:   key.GetRegisterName(test.ManagementClusterName, test.ClusterName, ""),
 			tokenName:      test.TokenName,
 			tokenType:      test.TokenTypeKube,
 			tokens:         []types.ProvisionToken{test.NewToken(test.TokenName, test.ClusterName, []string{"kube"}, time.Now().Add(1*time.Hour))},
@@ -127,7 +127,7 @@ func Test_IsTokenValid(t *testing.T) {
 		},
 		{
 			name:           "case 1: Service should return false for a non-existent token",
-			registerName:   key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
+			registerName:   key.GetRegisterName(test.ManagementClusterName, test.ClusterName, ""),
 			tokenName:      test.TokenName,
 			tokenType:      test.TokenTypeKube,
 			tokens:         nil,
@@ -135,23 +135,25 @@ func Test_IsTokenValid(t *testing.T) {
 		},
 		{
 			name:           "case 2: Service should return false for a token with mismatched type",
-			registerName:   key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
+			registerName:   key.GetRegisterName(test.ManagementClusterName, test.ClusterName, ""),
 			tokenName:      test.TokenName,
 			tokenType:      test.TokenTypeNode,
 			tokens:         []types.ProvisionToken{test.NewToken(test.TokenName, test.ClusterName, []string{"kube"})},
 			expectedResult: false,
 		},
 		{
-			name:         "case 3: Service should fail when token list cannot be retrieved",
-			registerName: key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
-			tokenName:    test.TokenName,
-			tokenType:    test.TokenTypeKube,
-			failsList:    true,
-			expectError:  true,
+			// IsTokenValid uses GetToken by name (not GetTokens list).
+			// A connectivity failure on GetToken must still propagate as an error.
+			name:        "case 3: Service should fail when token lookup fails due to client error",
+			registerName: key.GetRegisterName(test.ManagementClusterName, test.ClusterName, ""),
+			tokenName:   test.TokenName,
+			tokenType:   test.TokenTypeKube,
+			failsGet:    true,
+			expectError: true,
 		},
 		{
 			name:           "case 4: Service should return false for an expired token",
-			registerName:   key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
+			registerName:   key.GetRegisterName(test.ManagementClusterName, test.ClusterName, ""),
 			tokenName:      test.TokenName,
 			tokenType:      test.TokenTypeKube,
 			tokens:         []types.ProvisionToken{test.NewToken(test.TokenName, test.ClusterName, []string{"kube"}, time.Now().Add(-1*time.Hour))},
@@ -159,11 +161,30 @@ func Test_IsTokenValid(t *testing.T) {
 		},
 		{
 			name:           "case 5: Service should return false for a token with mismatched cluster name",
-			registerName:   key.GetRegisterName(test.ManagementClusterName, "wrong-cluster"),
+			registerName:   key.GetRegisterName(test.ManagementClusterName, "wrong-cluster", ""),
 			tokenName:      test.TokenName,
 			tokenType:      test.TokenTypeKube,
 			tokens:         []types.ProvisionToken{test.NewToken(test.TokenName, test.ClusterName, []string{"kube"}, time.Now().Add(1*time.Hour))},
 			expectedResult: false,
+		},
+		{
+			// Proactive renewal: a token that expires within TokenRenewalThreshold
+			// (30 min) must be treated as invalid so agents get a fresh token.
+			name:           "case 6: Service should return false for a token expiring within the renewal threshold",
+			registerName:   key.GetRegisterName(test.ManagementClusterName, test.ClusterName, ""),
+			tokenName:      test.TokenName,
+			tokenType:      test.TokenTypeKube,
+			tokens:         []types.ProvisionToken{test.NewToken(test.TokenName, test.ClusterName, []string{"kube"}, time.Now().Add(20*time.Minute))},
+			expectedResult: false,
+		},
+		{
+			// A token expiring just beyond the renewal threshold (31 min) is still valid.
+			name:           "case 7: Service should return true for a token expiring beyond the renewal threshold",
+			registerName:   key.GetRegisterName(test.ManagementClusterName, test.ClusterName, ""),
+			tokenName:      test.TokenName,
+			tokenType:      test.TokenTypeKube,
+			tokens:         []types.ProvisionToken{test.NewToken(test.TokenName, test.ClusterName, []string{"kube"}, time.Now().Add(31*time.Minute))},
+			expectedResult: true,
 		},
 	}
 
@@ -171,8 +192,8 @@ func Test_IsTokenValid(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			teleport := New(test.NamespaceName, &config.Config{}, token.NewGenerator())
 			teleport.TeleportClient = test.NewTeleportClient(test.FakeTeleportClientConfig{
-				Tokens:    tc.tokens,
-				FailsList: tc.failsList,
+				Tokens:   tc.tokens,
+				FailsGet: tc.failsGet,
 			})
 
 			ctx := context.TODO()
@@ -186,40 +207,33 @@ func Test_IsTokenValid(t *testing.T) {
 	}
 }
 
-func Test_DeleteToken(t *testing.T) {
+func Test_DeleteTokenByName(t *testing.T) {
 	testCases := []struct {
 		name          string
-		registerName  string
-		token         types.ProvisionToken
+		tokenName     string
 		tokens        []types.ProvisionToken
 		failsDelete   bool
 		expectDeleted bool
 		expectError   bool
 	}{
 		{
-			name:          "case 0: Delete token from Teleport",
-			registerName:  key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
-			token:         test.NewToken(test.TokenName, test.ClusterName, []string{"kube"}),
+			name:          "case 0: Delete existing token by name",
+			tokenName:     test.TokenName,
 			tokens:        []types.ProvisionToken{test.NewToken(test.TokenName, test.ClusterName, []string{"kube"})},
 			expectDeleted: true,
 		},
 		{
-			name:          "case 1: Do not delete token in case cluster label does not match",
-			registerName:  test.ManagementClusterName,
-			token:         test.NewToken(test.TokenName, test.ClusterName, []string{"kube"}),
-			tokens:        []types.ProvisionToken{test.NewToken(test.TokenName, test.ClusterName, []string{"kube"})},
-			expectDeleted: false,
+			// When a token has already expired and been cleaned up by Teleport,
+			// DeleteTokenByName must not return an error — cluster deletion must proceed.
+			name:          "case 1: Succeed when token does not exist (already expired or removed)",
+			tokenName:     test.TokenName,
+			tokens:        nil,
+			expectDeleted: false, // was not there to begin with
+			expectError:   false,
 		},
 		{
-			name:          "case 2: Succeed in case token does not exist",
-			registerName:  key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
-			token:         test.NewToken(test.TokenName, test.ManagementClusterName, []string{"kube"}),
-			expectDeleted: true,
-		},
-		{
-			name:         "case 3: Fail in case teleport client is unable to delete the token",
-			registerName: key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
-			token:        test.NewToken(test.TokenName, test.ManagementClusterName, []string{"kube"}),
+			name:         "case 2: Fail when Teleport client returns a delete error",
+			tokenName:    test.TokenName,
 			tokens:       []types.ProvisionToken{test.NewToken(test.TokenName, test.ClusterName, []string{"kube"})},
 			failsDelete:  true,
 			expectError:  true,
@@ -228,8 +242,6 @@ func Test_DeleteToken(t *testing.T) {
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			var storedToken types.ProvisionToken
-
 			ctx := context.TODO()
 			log := ctrl.Log.WithName("test")
 
@@ -239,17 +251,20 @@ func Test_DeleteToken(t *testing.T) {
 				Tokens:      tc.tokens,
 			})
 
-			err := teleport.DeleteToken(ctx, log, tc.registerName)
+			err := teleport.DeleteTokenByName(ctx, log, tc.tokenName)
 			test.CheckError(t, tc.expectError, err)
-			if err == nil {
-				storedToken, err = teleport.TeleportClient.GetToken(ctx, tc.token.GetName())
+			if err != nil {
+				return
+			}
 
-				if tc.expectDeleted && err == nil {
-					t.Fatalf("token %v was not deleted", storedToken)
-				}
-				if !tc.expectDeleted && err != nil {
-					t.Fatalf("token %v was unexpectedly deleted", tc.token)
-				}
+			_, getErr := teleport.TeleportClient.GetToken(ctx, tc.tokenName)
+			tokenGone := getErr != nil // trace.NotFound or similar
+
+			if tc.expectDeleted && !tokenGone {
+				t.Fatalf("token %q was expected to be deleted but still exists", tc.tokenName)
+			}
+			if !tc.expectDeleted && tokenGone && tc.tokens != nil {
+				t.Fatalf("token %q was unexpectedly deleted", tc.tokenName)
 			}
 		})
 	}

@@ -110,15 +110,43 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 
 	registerName := cluster.Name
 	if cluster.Name != r.Teleport.Config.ManagementClusterName {
-		registerName = key.GetRegisterName(r.Teleport.Config.ManagementClusterName, cluster.Name)
+		// Pass the cluster UID so that register names are unique across cluster
+		// re-creations. Empty UID falls back to the legacy two-component format.
+		registerName = key.GetRegisterName(r.Teleport.Config.ManagementClusterName, cluster.Name, string(cluster.UID))
 	}
 
 	// Check if the cluster instance is marked to be deleted, which is indicated by the deletion timestamp being set.
 	// if it is, delete the cluster from teleport
 	if !cluster.DeletionTimestamp.IsZero() {
-		// Delete teleport token for the cluster
-		if err := r.Teleport.DeleteToken(ctx, log, registerName); err != nil {
+		// Read token names from K8s resources before deleting them so we can
+		// delete the exact tokens from Teleport by name.  Using DeleteTokenByName
+		// avoids the `list` verb on the Teleport token resource, which would
+		// otherwise grant the operator visibility into every installation's tokens.
+		// Both the Secret token and the ConfigMap token are deleted; previously
+		// only the first token found by label was removed.
+
+		deletionSecret, err := r.Teleport.GetSecret(ctx, log, r.Client, cluster.Name, cluster.Namespace)
+		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
+		}
+		if deletionSecret != nil {
+			if tokenName, err := r.Teleport.GetTokenFromSecret(ctx, deletionSecret); err != nil {
+				log.Error(err, "Failed to read join token from Secret — Teleport token may require manual cleanup", "secret", deletionSecret.Name)
+			} else if err := r.Teleport.DeleteTokenByName(ctx, log, tokenName); err != nil {
+				return ctrl.Result{}, microerror.Mask(err)
+			}
+		}
+
+		deletionConfigMap, err := r.Teleport.GetConfigMap(ctx, log, r.Client, cluster.Name, cluster.Namespace)
+		if err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
+		}
+		if deletionConfigMap != nil {
+			if tokenName, err := r.Teleport.GetTokenFromConfigMap(ctx, deletionConfigMap); err != nil {
+				log.Error(err, "Failed to read join token from ConfigMap — Teleport token may require manual cleanup", "configMap", deletionConfigMap.Name)
+			} else if err := r.Teleport.DeleteTokenByName(ctx, log, tokenName); err != nil {
+				return ctrl.Result{}, microerror.Mask(err)
+			}
 		}
 
 		// Delete Secret for the cluster
@@ -162,35 +190,54 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
-	// Check and update Secret if necessary
+	// secretLabels are applied to every Secret this operator manages so that
+	// ownership can be determined without relying on OwnerReferences, and so
+	// that secrets can be scoped to a specific cluster UID for auditability.
+	secretLabels := map[string]string{
+		"app.kubernetes.io/managed-by":  "teleport-operator",
+		"teleport-operator/cluster-uid": string(cluster.UID),
+	}
+
+	// Check and update Secret if necessary.
+	// The Secret uses the same roles as the ConfigMap (kube + optionally app)
+	// because the node role is not required for kube-agent registration and
+	// granting excess roles violates least-privilege.
 	secret, err := r.Teleport.GetSecret(ctx, log, r.Client, cluster.Name, cluster.Namespace)
 	if err != nil {
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 	if secret == nil {
-		token, err := r.Teleport.GenerateToken(ctx, registerName, []string{key.RoleNode})
+		token, err := r.Teleport.GenerateToken(ctx, registerName, roles)
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
-		if err := r.Teleport.CreateSecret(ctx, log, r.Client, cluster.Name, cluster.Namespace, token); err != nil {
+		if err := r.Teleport.CreateSecret(ctx, log, r.Client, cluster.Name, cluster.Namespace, token, secretLabels); err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
 	} else {
-		token, err := r.Teleport.GetTokenFromSecret(ctx, secret)
+		oldSecretToken, err := r.Teleport.GetTokenFromSecret(ctx, secret)
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
-		tokenValid, err := r.Teleport.IsTokenValid(ctx, registerName, token, key.RoleNode)
+		tokenValid, err := r.Teleport.IsTokenValid(ctx, registerName, oldSecretToken, key.RolesToString(roles))
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
 		if !tokenValid {
-			token, err := r.Teleport.GenerateToken(ctx, registerName, []string{key.RoleNode})
+			newToken, err := r.Teleport.GenerateToken(ctx, registerName, roles)
 			if err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
-			if err := r.Teleport.UpdateSecret(ctx, log, r.Client, cluster.Name, cluster.Namespace, token); err != nil {
+			if err := r.Teleport.UpdateSecret(ctx, log, r.Client, cluster.Name, cluster.Namespace, newToken, secretLabels); err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
+			}
+			// Explicitly revoke the old token from Teleport now that the Secret
+			// has been updated.  This closes the window (≤30min) during which a
+			// stolen token would remain usable after rotation.  Failure is
+			// non-fatal: the token will expire naturally within the renewal
+			// threshold and the reconcile loop will succeed on the next pass.
+			if err := r.Teleport.DeleteTokenByName(ctx, log, oldSecretToken); err != nil {
+				log.Error(err, "Failed to revoke old Teleport token after Secret rotation — token will expire naturally", "tokenName", oldSecretToken)
 			}
 		} else {
 			log.Info("Secret has valid teleport node join token", "secretName", secret.GetName())
@@ -214,11 +261,11 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 		log.Info("Created new config map with teleport join token", "configMapName", key.GetConfigmapName(cluster.Name, r.Teleport.Config.AppName), "roles", roles)
 	} else {
-		token, err := r.Teleport.GetTokenFromConfigMap(ctx, configMap)
+		oldConfigMapToken, err := r.Teleport.GetTokenFromConfigMap(ctx, configMap)
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
-		tokenValid, err := r.Teleport.IsTokenValid(ctx, registerName, token, key.RolesToString(roles))
+		tokenValid, err := r.Teleport.IsTokenValid(ctx, registerName, oldConfigMapToken, key.RolesToString(roles))
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
@@ -231,6 +278,10 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 				return ctrl.Result{}, microerror.Mask(err)
 			}
 			log.Info("Updated config map with new teleport join token", "configMapName", configMap.GetName(), "roles", roles)
+			// Revoke the old token from Teleport now that the ConfigMap is updated.
+			if err := r.Teleport.DeleteTokenByName(ctx, log, oldConfigMapToken); err != nil {
+				log.Error(err, "Failed to revoke old Teleport token after ConfigMap rotation — token will expire naturally", "tokenName", oldConfigMapToken)
+			}
 		} else {
 			log.Info("ConfigMap has valid teleport join token", "configMapName", configMap.GetName(), "roles", roles)
 		}

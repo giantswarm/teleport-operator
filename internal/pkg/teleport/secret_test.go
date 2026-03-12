@@ -153,7 +153,7 @@ func Test_SecretCRUD(t *testing.T) {
 			}
 
 			if tc.secretToCreate != nil {
-				err = teleport.CreateSecret(ctx, log, ctrlClient, tc.clusterName, tc.namespace, tc.token)
+				err = teleport.CreateSecret(ctx, log, ctrlClient, tc.clusterName, tc.namespace, tc.token, nil)
 				test.CheckError(t, tc.expectError, err)
 				if err == nil {
 					actualSecret, err = loadSecret(ctx, ctrlClient, tc.secretToCreate)
@@ -165,7 +165,7 @@ func Test_SecretCRUD(t *testing.T) {
 			}
 
 			if tc.secretToUpdate != nil {
-				err = teleport.UpdateSecret(ctx, log, ctrlClient, tc.clusterName, tc.namespace, tc.token)
+				err = teleport.UpdateSecret(ctx, log, ctrlClient, tc.clusterName, tc.namespace, tc.token, nil)
 				test.CheckError(t, tc.expectError, err)
 				if err == nil {
 					actualSecret, err = loadSecret(ctx, ctrlClient, tc.secretToUpdate)

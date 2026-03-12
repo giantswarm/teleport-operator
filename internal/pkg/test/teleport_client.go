@@ -2,10 +2,10 @@ package test
 
 import (
 	"context"
-	"fmt"
 
 	"github.com/gravitational/teleport/api/client/proto"
 	"github.com/gravitational/teleport/api/types"
+	"github.com/gravitational/trace"
 	"github.com/pkg/errors"
 )
 
@@ -42,7 +42,7 @@ func NewTeleportClient(config FakeTeleportClientConfig) *FakeTeleportClient {
 		failsGet:    config.FailsGet,
 		failsList:   config.FailsList,
 		failsCreate: config.FailsCreate,
-		failsUpsert: config.FailsDelete,
+		failsUpsert: config.FailsUpsert,
 		failsDelete: config.FailsDelete,
 		tokens:      tokens,
 	}
@@ -64,7 +64,9 @@ func (c *FakeTeleportClient) GetToken(ctx context.Context, name string) (types.P
 	if ok {
 		return token, nil
 	}
-	return nil, fmt.Errorf("mock teleport client: token with name %s does not exist", name)
+	// Return a trace.NotFound error so callers can distinguish "token does not
+	// exist" from a genuine connectivity failure using trace.IsNotFound.
+	return nil, trace.NotFound("token %q not found", name)
 }
 
 func (c *FakeTeleportClient) GetTokens(ctx context.Context) ([]types.ProvisionToken, error) {

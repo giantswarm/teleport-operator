@@ -13,7 +13,14 @@ import (
 
 type Client interface {
 	Ping(ctx context.Context) (proto.PingResponse, error)
+	// GetToken fetches a single provision token by name. This is the only token
+	// read operation the operator uses; the Teleport role for this operator does
+	// NOT need the `list` verb on the token resource.
 	GetToken(ctx context.Context, name string) (types.ProvisionToken, error)
+	// GetTokens is retained in the interface to satisfy the upstream Teleport
+	// client type but is not called by the operator. Do not add calls to this
+	// method — doing so would reintroduce the `list` requirement and re-enable
+	// cross-tenant token enumeration.
 	GetTokens(ctx context.Context) ([]types.ProvisionToken, error)
 	CreateToken(ctx context.Context, token types.ProvisionToken) error
 	UpsertToken(ctx context.Context, token types.ProvisionToken) error

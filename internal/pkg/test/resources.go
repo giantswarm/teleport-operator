@@ -83,7 +83,7 @@ func NewIdentitySecret(namespaceName, identityFile string) *corev1.Secret {
 }
 
 func NewConfigMap(clusterName, appName, namespaceName, tokenName string, roles []string) *corev1.ConfigMap {
-	registerName := key.GetRegisterName(ManagementClusterName, clusterName)
+	registerName := key.GetRegisterName(ManagementClusterName, clusterName, "")
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      key.GetConfigmapName(clusterName, appName),
@@ -107,7 +107,7 @@ func NewToken(tokenName, clusterName string, roles []string, expiry ...time.Time
 		Metadata: teleportTypes.Metadata{
 			Name: tokenName,
 			Labels: map[string]string{
-				ClusterKey:   key.GetRegisterName(ManagementClusterName, clusterName),
+				ClusterKey:   key.GetRegisterName(ManagementClusterName, clusterName, ""),
 				TokenTypeKey: strings.Join(roles, ","),
 			},
 			Expires: &expiryTime,
@@ -155,7 +155,7 @@ func NewKubeServer(clusterName, hostId, hostName string) teleportTypes.KubeServe
 			Hostname: hostName,
 			Cluster: &teleportTypes.KubernetesClusterV3{
 				Metadata: teleportTypes.Metadata{
-					Name: key.GetRegisterName(ManagementClusterName, clusterName),
+					Name: key.GetRegisterName(ManagementClusterName, clusterName, ""),
 				},
 				Spec: teleportTypes.KubernetesClusterSpecV3{},
 			},
