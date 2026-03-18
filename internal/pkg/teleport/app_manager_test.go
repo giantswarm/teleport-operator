@@ -18,20 +18,20 @@ const (
 	testConfigMapName = "test-configmap"
 )
 
-func Test_NewTeleportAppManager_NoResource(t *testing.T) {
+func Test_NewTeleportAppConfigManager_NoResource(t *testing.T) {
 	fakeClient, err := test.NewFakeK8sClientFromObjects()
 	if err != nil {
 		t.Fatalf("failed to create fake client: %v", err)
 	}
 
-	mgr, err := NewTeleportAppManager(context.Background(), fakeClient, testResourceName, testNamespace, testConfigMapName)
+	mgr, err := NewTeleportAppConfigManager(context.Background(), fakeClient, testResourceName, testNamespace, testConfigMapName)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	_, isNoOp := mgr.(*noOpTeleportAppManager)
+	_, isNoOp := mgr.(*noOpTeleportAppConfigManager)
 	if !isNoOp {
-		t.Errorf("expected noOpTeleportAppManager, got %T", mgr)
+		t.Errorf("expected noOpTeleportAppConfigManager, got %T", mgr)
 	}
 
 	// No-op should succeed without panicking.
@@ -44,43 +44,43 @@ func Test_NewTeleportAppManager_NoResource(t *testing.T) {
 	}
 }
 
-func Test_NewTeleportAppManager_HelmReleaseExists(t *testing.T) {
+func Test_NewTeleportAppConfigManager_HelmReleaseExists(t *testing.T) {
 	hr := test.NewHelmRelease(testResourceName, testNamespace)
 	fakeClient, err := test.NewFakeK8sClientFromObjects(hr)
 	if err != nil {
 		t.Fatalf("failed to create fake client: %v", err)
 	}
 
-	mgr, err := NewTeleportAppManager(context.Background(), fakeClient, testResourceName, testNamespace, testConfigMapName)
+	mgr, err := NewTeleportAppConfigManager(context.Background(), fakeClient, testResourceName, testNamespace, testConfigMapName)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	_, isHR := mgr.(*helmReleaseTeleportAppManager)
+	_, isHR := mgr.(*helmReleaseTeleportAppConfigManager)
 	if !isHR {
-		t.Errorf("expected helmReleaseTeleportAppManager, got %T", mgr)
+		t.Errorf("expected helmReleaseTeleportAppConfigManager, got %T", mgr)
 	}
 }
 
-func Test_NewTeleportAppManager_AppCRExists(t *testing.T) {
+func Test_NewTeleportAppConfigManager_AppCRExists(t *testing.T) {
 	app := test.NewApp(testResourceName, testNamespace)
 	fakeClient, err := test.NewFakeK8sClientFromObjects(app)
 	if err != nil {
 		t.Fatalf("failed to create fake client: %v", err)
 	}
 
-	mgr, err := NewTeleportAppManager(context.Background(), fakeClient, testResourceName, testNamespace, testConfigMapName)
+	mgr, err := NewTeleportAppConfigManager(context.Background(), fakeClient, testResourceName, testNamespace, testConfigMapName)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	_, isApp := mgr.(*appCRTeleportAppManager)
+	_, isApp := mgr.(*appCRTeleportAppConfigManager)
 	if !isApp {
-		t.Errorf("expected appCRTeleportAppManager, got %T", mgr)
+		t.Errorf("expected appCRTeleportAppConfigManager, got %T", mgr)
 	}
 }
 
-func Test_NewTeleportAppManager_BothExist_HelmReleaseTakesPrecedence(t *testing.T) {
+func Test_NewTeleportAppConfigManager_BothExist_HelmReleaseTakesPrecedence(t *testing.T) {
 	hr := test.NewHelmRelease(testResourceName, testNamespace)
 	app := test.NewApp(testResourceName, testNamespace)
 	fakeClient, err := test.NewFakeK8sClientFromObjects(hr, app)
@@ -88,14 +88,14 @@ func Test_NewTeleportAppManager_BothExist_HelmReleaseTakesPrecedence(t *testing.
 		t.Fatalf("failed to create fake client: %v", err)
 	}
 
-	mgr, err := NewTeleportAppManager(context.Background(), fakeClient, testResourceName, testNamespace, testConfigMapName)
+	mgr, err := NewTeleportAppConfigManager(context.Background(), fakeClient, testResourceName, testNamespace, testConfigMapName)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	_, isHR := mgr.(*helmReleaseTeleportAppManager)
+	_, isHR := mgr.(*helmReleaseTeleportAppConfigManager)
 	if !isHR {
-		t.Errorf("expected helmReleaseTeleportAppManager when both exist, got %T", mgr)
+		t.Errorf("expected helmReleaseTeleportAppConfigManager when both exist, got %T", mgr)
 	}
 }
 
@@ -108,7 +108,7 @@ func Test_HelmRelease_EnsureConfig_AddsEntry(t *testing.T) {
 		t.Fatalf("failed to create fake client: %v", err)
 	}
 
-	mgr, err := NewTeleportAppManager(context.Background(), fakeClient, testResourceName, testNamespace, testConfigMapName)
+	mgr, err := NewTeleportAppConfigManager(context.Background(), fakeClient, testResourceName, testNamespace, testConfigMapName)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -142,7 +142,7 @@ func Test_HelmRelease_EnsureConfig_Idempotent(t *testing.T) {
 		t.Fatalf("failed to create fake client: %v", err)
 	}
 
-	mgr, err := NewTeleportAppManager(context.Background(), fakeClient, testResourceName, testNamespace, testConfigMapName)
+	mgr, err := NewTeleportAppConfigManager(context.Background(), fakeClient, testResourceName, testNamespace, testConfigMapName)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -172,7 +172,7 @@ func Test_HelmRelease_DeleteConfig_RemovesEntry(t *testing.T) {
 		t.Fatalf("failed to create fake client: %v", err)
 	}
 
-	mgr, err := NewTeleportAppManager(context.Background(), fakeClient, testResourceName, testNamespace, testConfigMapName)
+	mgr, err := NewTeleportAppConfigManager(context.Background(), fakeClient, testResourceName, testNamespace, testConfigMapName)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -199,7 +199,7 @@ func Test_HelmRelease_DeleteConfig_NoOp_WhenEntryAbsent(t *testing.T) {
 		t.Fatalf("failed to create fake client: %v", err)
 	}
 
-	mgr, err := NewTeleportAppManager(context.Background(), fakeClient, testResourceName, testNamespace, testConfigMapName)
+	mgr, err := NewTeleportAppConfigManager(context.Background(), fakeClient, testResourceName, testNamespace, testConfigMapName)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -227,7 +227,7 @@ func Test_AppCR_EnsureConfig_AddsEntry(t *testing.T) {
 		t.Fatalf("failed to create fake client: %v", err)
 	}
 
-	mgr, err := NewTeleportAppManager(context.Background(), fakeClient, testResourceName, testNamespace, testConfigMapName)
+	mgr, err := NewTeleportAppConfigManager(context.Background(), fakeClient, testResourceName, testNamespace, testConfigMapName)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -261,7 +261,7 @@ func Test_AppCR_EnsureConfig_Idempotent(t *testing.T) {
 		t.Fatalf("failed to create fake client: %v", err)
 	}
 
-	mgr, err := NewTeleportAppManager(context.Background(), fakeClient, testResourceName, testNamespace, testConfigMapName)
+	mgr, err := NewTeleportAppConfigManager(context.Background(), fakeClient, testResourceName, testNamespace, testConfigMapName)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -291,7 +291,7 @@ func Test_AppCR_DeleteConfig_RemovesEntry(t *testing.T) {
 		t.Fatalf("failed to create fake client: %v", err)
 	}
 
-	mgr, err := NewTeleportAppManager(context.Background(), fakeClient, testResourceName, testNamespace, testConfigMapName)
+	mgr, err := NewTeleportAppConfigManager(context.Background(), fakeClient, testResourceName, testNamespace, testConfigMapName)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -318,7 +318,7 @@ func Test_AppCR_DeleteConfig_NoOp_WhenEntryAbsent(t *testing.T) {
 		t.Fatalf("failed to create fake client: %v", err)
 	}
 
-	mgr, err := NewTeleportAppManager(context.Background(), fakeClient, testResourceName, testNamespace, testConfigMapName)
+	mgr, err := NewTeleportAppConfigManager(context.Background(), fakeClient, testResourceName, testNamespace, testConfigMapName)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}

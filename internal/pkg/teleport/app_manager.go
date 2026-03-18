@@ -12,30 +12,29 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
 
-// TeleportAppManager abstracts injecting a ConfigMap reference into either a
+// TeleportAppConfigManager abstracts injecting a ConfigMap reference into either a
 // Giant Swarm App CR (via spec.extraConfigs) or a Flux HelmRelease (via
-// spec.valuesFrom). Implementations are constructed per-cluster per-reconcile
-// by NewTeleportAppManager.
-type TeleportAppManager interface {
+// spec.valuesFrom).
+type TeleportAppConfigManager interface {
 	EnsureConfig(ctx context.Context, log logr.Logger) error
 	DeleteConfig(ctx context.Context, log logr.Logger) error
 }
 
-// NewTeleportAppManager detects at call time whether the named resource is a
+// NewTeleportAppConfigManager detects at call time whether the named resource is a
 // Flux HelmRelease or a Giant Swarm App CR and returns the appropriate manager.
 // HelmRelease takes precedence when both exist. Never returns nil — returns a
-// noOpTeleportAppManager when neither resource is found.
-func NewTeleportAppManager(
+// noOpTeleportAppConfigManager when neither resource is found.
+func NewTeleportAppConfigManager(
 	ctx context.Context,
 	ctrlClient client.Client,
 	resourceName string,
 	namespace string,
 	configMapName string,
-) (TeleportAppManager, error) {
+) (TeleportAppConfigManager, error) {
 	hr := &helmv2.HelmRelease{}
 	err := ctrlClient.Get(ctx, client.ObjectKey{Name: resourceName, Namespace: namespace}, hr)
 	if err == nil {
-		return &helmReleaseTeleportAppManager{
+		return &helmReleaseTeleportAppConfigManager{
 			client:        ctrlClient,
 			resourceName:  resourceName,
 			namespace:     namespace,
@@ -49,7 +48,7 @@ func NewTeleportAppManager(
 	app := &v1alpha1.App{}
 	err = ctrlClient.Get(ctx, client.ObjectKey{Name: resourceName, Namespace: namespace}, app)
 	if err == nil {
-		return &appCRTeleportAppManager{
+		return &appCRTeleportAppConfigManager{
 			client:        ctrlClient,
 			resourceName:  resourceName,
 			namespace:     namespace,
@@ -60,7 +59,7 @@ func NewTeleportAppManager(
 		return nil, microerror.Mask(err)
 	}
 
-	return &noOpTeleportAppManager{
+	return &noOpTeleportAppConfigManager{
 		resourceName: resourceName,
 		namespace:    namespace,
 	}, nil
@@ -68,14 +67,14 @@ func NewTeleportAppManager(
 
 // --- HelmRelease implementation ---
 
-type helmReleaseTeleportAppManager struct {
+type helmReleaseTeleportAppConfigManager struct {
 	client        client.Client
 	resourceName  string
 	namespace     string
 	configMapName string
 }
 
-func (m *helmReleaseTeleportAppManager) EnsureConfig(ctx context.Context, log logr.Logger) error {
+func (m *helmReleaseTeleportAppConfigManager) EnsureConfig(ctx context.Context, log logr.Logger) error {
 	hr := &helmv2.HelmRelease{}
 	if err := m.client.Get(ctx, client.ObjectKey{Name: m.resourceName, Namespace: m.namespace}, hr); err != nil {
 		return microerror.Mask(err)
@@ -103,7 +102,7 @@ func (m *helmReleaseTeleportAppManager) EnsureConfig(ctx context.Context, log lo
 	return nil
 }
 
-func (m *helmReleaseTeleportAppManager) DeleteConfig(ctx context.Context, log logr.Logger) error {
+func (m *helmReleaseTeleportAppConfigManager) DeleteConfig(ctx context.Context, log logr.Logger) error {
 	hr := &helmv2.HelmRelease{}
 	if err := m.client.Get(ctx, client.ObjectKey{Name: m.resourceName, Namespace: m.namespace}, hr); err != nil {
 		if apierrors.IsNotFound(err) {
@@ -155,14 +154,14 @@ func removeValuesReference(refs []helmv2.ValuesReference, ref helmv2.ValuesRefer
 
 // --- App CR implementation ---
 
-type appCRTeleportAppManager struct {
+type appCRTeleportAppConfigManager struct {
 	client        client.Client
 	resourceName  string
 	namespace     string
 	configMapName string
 }
 
-func (m *appCRTeleportAppManager) EnsureConfig(ctx context.Context, log logr.Logger) error {
+func (m *appCRTeleportAppConfigManager) EnsureConfig(ctx context.Context, log logr.Logger) error {
 	app := &v1alpha1.App{}
 	if err := m.client.Get(ctx, client.ObjectKey{Name: m.resourceName, Namespace: m.namespace}, app); err != nil {
 		return microerror.Mask(err)
@@ -191,7 +190,7 @@ func (m *appCRTeleportAppManager) EnsureConfig(ctx context.Context, log logr.Log
 	return nil
 }
 
-func (m *appCRTeleportAppManager) DeleteConfig(ctx context.Context, log logr.Logger) error {
+func (m *appCRTeleportAppConfigManager) DeleteConfig(ctx context.Context, log logr.Logger) error {
 	app := &v1alpha1.App{}
 	if err := m.client.Get(ctx, client.ObjectKey{Name: m.resourceName, Namespace: m.namespace}, app); err != nil {
 		if apierrors.IsNotFound(err) {
@@ -248,18 +247,18 @@ func removeExtraConfig(configs []v1alpha1.AppExtraConfig, config v1alpha1.AppExt
 
 // --- No-op implementation ---
 
-type noOpTeleportAppManager struct {
+type noOpTeleportAppConfigManager struct {
 	resourceName string
 	namespace    string
 }
 
-func (n *noOpTeleportAppManager) EnsureConfig(ctx context.Context, log logr.Logger) error {
+func (n *noOpTeleportAppConfigManager) EnsureConfig(ctx context.Context, log logr.Logger) error {
 	log.Info("No HelmRelease or App CR found, skipping config injection",
 		"resource", n.resourceName, "namespace", n.namespace)
 	return nil
 }
 
-func (n *noOpTeleportAppManager) DeleteConfig(ctx context.Context, log logr.Logger) error {
+func (n *noOpTeleportAppConfigManager) DeleteConfig(ctx context.Context, log logr.Logger) error {
 	log.Info("No HelmRelease or App CR found, skipping config deletion",
 		"resource", n.resourceName, "namespace", n.namespace)
 	return nil
