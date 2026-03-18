@@ -24,8 +24,8 @@ import (
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 
-	appv1alpha1 "github.com/giantswarm/apiextensions-application/api/v1alpha1"
 	helmv2 "github.com/fluxcd/helm-controller/api/v2"
+	appv1alpha1 "github.com/giantswarm/apiextensions-application/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
 	utilruntime "k8s.io/apimachinery/pkg/util/runtime"
