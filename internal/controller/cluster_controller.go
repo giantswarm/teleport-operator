@@ -132,7 +132,14 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 
 		if r.IsBotEnabled {
-			if err := r.Teleport.DeleteBotAppExtraConfig(ctx, log, r.Client, cluster.Name); err != nil {
+			botMgr, err := teleport.NewTeleportAppManager(ctx, r.Client,
+				key.TeleportBotAppName,
+				key.TeleportBotNamespace,
+				key.GetTbotConfigmapName(cluster.Name))
+			if err != nil {
+				return ctrl.Result{}, microerror.Mask(err)
+			}
+			if err := botMgr.DeleteConfig(ctx, log); err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
 
@@ -143,6 +150,17 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			if err := r.Teleport.DeleteKubeconfigSecret(ctx, log, r.Client, cluster.Name, key.TeleportBotNamespace); err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
+		}
+
+		kubeAgentMgr, err := teleport.NewTeleportAppManager(ctx, r.Client,
+			key.GetAppName(cluster.Name, r.Teleport.Config.AppName),
+			cluster.Namespace,
+			key.GetConfigmapName(cluster.Name, r.Teleport.Config.AppName))
+		if err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
+		}
+		if err := kubeAgentMgr.DeleteConfig(ctx, log); err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
 		}
 
 		// Remove finalizer from the Cluster CR
@@ -236,6 +254,17 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
+	kubeAgentMgr, err := teleport.NewTeleportAppManager(ctx, r.Client,
+		key.GetAppName(cluster.Name, r.Teleport.Config.AppName),
+		cluster.Namespace,
+		key.GetConfigmapName(cluster.Name, r.Teleport.Config.AppName))
+	if err != nil {
+		return ctrl.Result{}, microerror.Mask(err)
+	}
+	if err := kubeAgentMgr.EnsureConfig(ctx, log); err != nil {
+		return ctrl.Result{}, microerror.Mask(err)
+	}
+
 	if r.IsBotEnabled {
 		secret, err := r.Teleport.GetKubeconfigSecret(ctx, r.Client, cluster.Name, key.TeleportBotNamespace)
 		if err != nil {
@@ -246,7 +275,14 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 				return ctrl.Result{}, microerror.Mask(err)
 			}
 
-			if err := r.Teleport.EnsureBotAppExtraConfig(ctx, log, r.Client, cluster.Name); err != nil {
+			botMgr, err := teleport.NewTeleportAppManager(ctx, r.Client,
+				key.TeleportBotAppName,
+				key.TeleportBotNamespace,
+				key.GetTbotConfigmapName(cluster.Name))
+			if err != nil {
+				return ctrl.Result{}, microerror.Mask(err)
+			}
+			if err := botMgr.EnsureConfig(ctx, log); err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
 		}

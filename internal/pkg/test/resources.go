@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	helmv2 "github.com/fluxcd/helm-controller/api/v2"
 	appv1alpha1 "github.com/giantswarm/apiextensions-application/api/v1alpha1"
 	teleportTypes "github.com/gravitational/teleport/api/types"
 	corev1 "k8s.io/api/core/v1"
@@ -163,10 +164,48 @@ func NewKubeServer(clusterName, hostId, hostName string) teleportTypes.KubeServe
 	}
 }
 
+func NewHelmRelease(name, namespace string) *helmv2.HelmRelease {
+	return &helmv2.HelmRelease{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+	}
+}
+
+func NewApp(name, namespace string) *appv1alpha1.App {
+	return &appv1alpha1.App{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+	}
+}
+
+// NewFakeK8sClientFromObjects creates a fake client from client.Object variadic args.
+func NewFakeK8sClientFromObjects(objects ...client.Object) (client.Client, error) {
+	schemeBuilder := runtime.SchemeBuilder{}
+	schemeBuilder.Register(capi.AddToScheme)
+	schemeBuilder.Register(appv1alpha1.AddToScheme)
+	schemeBuilder.Register(helmv2.AddToScheme)
+
+	err := schemeBuilder.AddToScheme(scheme.Scheme)
+	if err != nil {
+		return nil, err
+	}
+
+	builder := clientfake.NewClientBuilder().WithScheme(scheme.Scheme)
+	if len(objects) > 0 {
+		builder = builder.WithObjects(objects...)
+	}
+	return builder.Build(), nil
+}
+
 func NewFakeK8sClient(runtimeObjects []runtime.Object) (client.Client, error) {
 	schemeBuilder := runtime.SchemeBuilder{}
 	schemeBuilder.Register(capi.AddToScheme)
 	schemeBuilder.Register(appv1alpha1.AddToScheme)
+	schemeBuilder.Register(helmv2.AddToScheme)
 
 	err := schemeBuilder.AddToScheme(scheme.Scheme)
 	if err != nil {
