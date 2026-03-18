@@ -3,6 +3,7 @@ module github.com/giantswarm/teleport-operator
 go 1.25.8
 
 require (
+	github.com/fluxcd/helm-controller/api v1.5.3
 	github.com/giantswarm/apiextensions-application v0.6.2
 	github.com/giantswarm/microerror v0.4.1
 	github.com/go-logr/logr v1.4.3
@@ -33,7 +34,6 @@ require (
 	github.com/emicklei/go-restful/v3 v3.13.0 // indirect
 	github.com/evanphx/json-patch/v5 v5.9.11 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
-	github.com/fluxcd/helm-controller/api v1.5.3 // indirect
 	github.com/fluxcd/pkg/apis/kustomize v1.15.1 // indirect
 	github.com/fluxcd/pkg/apis/meta v1.25.1 // indirect
 	github.com/fsnotify/fsnotify v1.9.0 // indirect
