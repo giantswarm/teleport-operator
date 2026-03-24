@@ -24,6 +24,7 @@ import (
 	// Import all Kubernetes client auth plugins (e.g. Azure, GCP, OIDC, etc.)
 	// to ensure that exec-entrypoint and run can make use of them.
 
+	helmv2 "github.com/fluxcd/helm-controller/api/v2"
 	appv1alpha1 "github.com/giantswarm/apiextensions-application/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -34,8 +35,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	webhookserver "sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 
 	"github.com/giantswarm/teleport-operator/internal/controller"
 	"github.com/giantswarm/teleport-operator/internal/pkg/config"
@@ -53,6 +56,7 @@ func init() {
 	utilruntime.Must(clientgoscheme.AddToScheme(scheme))
 	utilruntime.Must(capi.AddToScheme(scheme))
 	utilruntime.Must(appv1alpha1.AddToScheme(scheme))
+	utilruntime.Must(helmv2.AddToScheme(scheme))
 	utilruntime.Must(corev1.AddToScheme(scheme))
 
 	//+kubebuilder:scaffold:scheme
@@ -86,9 +90,13 @@ func main() {
 
 	restConfig := ctrl.GetConfigOrDie()
 	mgr, err := ctrl.NewManager(restConfig, ctrl.Options{
-		Scheme:                 scheme,
-		MetricsBindAddress:     metricsAddr,
-		Port:                   9443,
+		Scheme: scheme,
+		Metrics: metricsserver.Options{
+			BindAddress: metricsAddr,
+		},
+		WebhookServer: webhookserver.NewServer(webhookserver.Options{
+			Port: 9443,
+		}),
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "765979b4.giantswarm.io",

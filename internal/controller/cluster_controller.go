@@ -24,7 +24,7 @@ import (
 	"github.com/go-logr/logr"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	"k8s.io/apimachinery/pkg/runtime"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	ctrl "sigs.k8s.io/controller-runtime"
 
 	"github.com/giantswarm/teleport-operator/internal/pkg/config"
@@ -51,13 +51,10 @@ type ClusterReconciler struct {
 //+kubebuilder:rbac:groups=cluster.x-k8s.io.giantswarm.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=cluster.x-k8s.io.giantswarm.io,resources=clusters/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=cluster.x-k8s.io.giantswarm.io,resources=clusters/finalizers,verbs=update
+//+kubebuilder:rbac:groups=helm.toolkit.fluxcd.io,resources=helmreleases,verbs=get;list;watch;update;patch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
-// TODO(user): Modify the Reconcile function to compare the state specified by
-// the Cluster object against the actual cluster state, and then
-// perform operations to make the cluster state reflect the state specified by
-// the user.
 //
 // For more details, check Reconcile and its Result here:
 // - https://pkg.go.dev/sigs.k8s.io/controller-runtime@v0.14.4/pkg/reconcile
@@ -132,7 +129,14 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 
 		if r.IsBotEnabled {
-			if err := r.Teleport.DeleteBotAppExtraConfig(ctx, log, r.Client, cluster.Name); err != nil {
+			botMgr, err := teleport.NewTeleportAppConfigManager(ctx, r.Client,
+				key.TeleportBotAppName,
+				key.TeleportBotNamespace,
+				key.GetTbotConfigmapName(cluster.Name))
+			if err != nil {
+				return ctrl.Result{}, microerror.Mask(err)
+			}
+			if err := botMgr.DeleteConfig(ctx, log); err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
 
@@ -143,6 +147,17 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			if err := r.Teleport.DeleteKubeconfigSecret(ctx, log, r.Client, cluster.Name, key.TeleportBotNamespace); err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
+		}
+
+		kubeAgentMgr, err := teleport.NewTeleportAppConfigManager(ctx, r.Client,
+			key.GetAppName(cluster.Name, r.Teleport.Config.AppName),
+			cluster.Namespace,
+			key.GetConfigmapName(cluster.Name, r.Teleport.Config.AppName))
+		if err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
+		}
+		if err := kubeAgentMgr.DeleteConfig(ctx, log); err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
 		}
 
 		// Remove finalizer from the Cluster CR
@@ -236,6 +251,17 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
+	kubeAgentMgr, err := teleport.NewTeleportAppConfigManager(ctx, r.Client,
+		key.GetAppName(cluster.Name, r.Teleport.Config.AppName),
+		cluster.Namespace,
+		key.GetConfigmapName(cluster.Name, r.Teleport.Config.AppName))
+	if err != nil {
+		return ctrl.Result{}, microerror.Mask(err)
+	}
+	if err := kubeAgentMgr.EnsureConfig(ctx, log); err != nil {
+		return ctrl.Result{}, microerror.Mask(err)
+	}
+
 	if r.IsBotEnabled {
 		secret, err := r.Teleport.GetKubeconfigSecret(ctx, r.Client, cluster.Name, key.TeleportBotNamespace)
 		if err != nil {
@@ -246,7 +272,14 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 				return ctrl.Result{}, microerror.Mask(err)
 			}
 
-			if err := r.Teleport.EnsureBotAppExtraConfig(ctx, log, r.Client, cluster.Name); err != nil {
+			botMgr, err := teleport.NewTeleportAppConfigManager(ctx, r.Client,
+				key.TeleportBotAppName,
+				key.TeleportBotNamespace,
+				key.GetTbotConfigmapName(cluster.Name))
+			if err != nil {
+				return ctrl.Result{}, microerror.Mask(err)
+			}
+			if err := botMgr.EnsureConfig(ctx, log); err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
 		}
