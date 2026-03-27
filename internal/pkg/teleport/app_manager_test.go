@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	helmv2 "github.com/fluxcd/helm-controller/api/v2"
 	appv1alpha1 "github.com/giantswarm/apiextensions-application/api/v1alpha1"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
@@ -118,24 +117,34 @@ func Test_HelmRelease_EnsureConfig_AddsEntry(t *testing.T) {
 		t.Fatalf("EnsureConfig returned error: %v", err)
 	}
 
-	updated := &helmv2.HelmRelease{}
+	updated := newHelmReleaseUnstructured()
 	if err := fakeClient.Get(context.Background(), client.ObjectKey{Name: testResourceName, Namespace: testNamespace}, updated); err != nil {
 		t.Fatalf("failed to get HelmRelease: %v", err)
 	}
 
-	if len(updated.Spec.ValuesFrom) != 1 {
-		t.Fatalf("expected 1 ValuesFrom entry, got %d", len(updated.Spec.ValuesFrom))
+	valuesFrom := getValuesFrom(updated)
+	if len(valuesFrom) != 1 {
+		t.Fatalf("expected 1 ValuesFrom entry, got %d", len(valuesFrom))
 	}
-	ref := updated.Spec.ValuesFrom[0]
-	if ref.Kind != "ConfigMap" || ref.Name != testConfigMapName || ref.ValuesKey != "values" {
+	ref, ok := valuesFrom[0].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected map[string]interface{}, got %T", valuesFrom[0])
+	}
+	if ref["kind"] != "ConfigMap" || ref["name"] != testConfigMapName || ref["valuesKey"] != "values" {
 		t.Errorf("unexpected ValuesFrom entry: %+v", ref)
 	}
 }
 
 func Test_HelmRelease_EnsureConfig_Idempotent(t *testing.T) {
 	hr := test.NewHelmRelease(testResourceName, testNamespace)
-	hr.Spec.ValuesFrom = []helmv2.ValuesReference{
-		{Kind: "ConfigMap", Name: testConfigMapName, ValuesKey: "values"},
+	hr.Object["spec"] = map[string]interface{}{
+		"valuesFrom": []interface{}{
+			map[string]interface{}{
+				"kind":      "ConfigMap",
+				"name":      testConfigMapName,
+				"valuesKey": "values",
+			},
+		},
 	}
 	fakeClient, err := test.NewFakeK8sClientFromObjects(hr)
 	if err != nil {
@@ -152,20 +161,27 @@ func Test_HelmRelease_EnsureConfig_Idempotent(t *testing.T) {
 		t.Fatalf("EnsureConfig returned error: %v", err)
 	}
 
-	updated := &helmv2.HelmRelease{}
+	updated := newHelmReleaseUnstructured()
 	if err := fakeClient.Get(context.Background(), client.ObjectKey{Name: testResourceName, Namespace: testNamespace}, updated); err != nil {
 		t.Fatalf("failed to get HelmRelease: %v", err)
 	}
 
-	if len(updated.Spec.ValuesFrom) != 1 {
-		t.Errorf("expected 1 ValuesFrom entry (no duplicate), got %d", len(updated.Spec.ValuesFrom))
+	valuesFrom := getValuesFrom(updated)
+	if len(valuesFrom) != 1 {
+		t.Errorf("expected 1 ValuesFrom entry (no duplicate), got %d", len(valuesFrom))
 	}
 }
 
 func Test_HelmRelease_DeleteConfig_RemovesEntry(t *testing.T) {
 	hr := test.NewHelmRelease(testResourceName, testNamespace)
-	hr.Spec.ValuesFrom = []helmv2.ValuesReference{
-		{Kind: "ConfigMap", Name: testConfigMapName, ValuesKey: "values"},
+	hr.Object["spec"] = map[string]interface{}{
+		"valuesFrom": []interface{}{
+			map[string]interface{}{
+				"kind":      "ConfigMap",
+				"name":      testConfigMapName,
+				"valuesKey": "values",
+			},
+		},
 	}
 	fakeClient, err := test.NewFakeK8sClientFromObjects(hr)
 	if err != nil {
@@ -182,13 +198,14 @@ func Test_HelmRelease_DeleteConfig_RemovesEntry(t *testing.T) {
 		t.Fatalf("DeleteConfig returned error: %v", err)
 	}
 
-	updated := &helmv2.HelmRelease{}
+	updated := newHelmReleaseUnstructured()
 	if err := fakeClient.Get(context.Background(), client.ObjectKey{Name: testResourceName, Namespace: testNamespace}, updated); err != nil {
 		t.Fatalf("failed to get HelmRelease: %v", err)
 	}
 
-	if len(updated.Spec.ValuesFrom) != 0 {
-		t.Errorf("expected empty ValuesFrom after delete, got %d entries", len(updated.Spec.ValuesFrom))
+	valuesFrom := getValuesFrom(updated)
+	if len(valuesFrom) != 0 {
+		t.Errorf("expected empty ValuesFrom after delete, got %d entries", len(valuesFrom))
 	}
 }
 
@@ -209,12 +226,13 @@ func Test_HelmRelease_DeleteConfig_NoOp_WhenEntryAbsent(t *testing.T) {
 		t.Fatalf("DeleteConfig returned error: %v", err)
 	}
 
-	updated := &helmv2.HelmRelease{}
+	updated := newHelmReleaseUnstructured()
 	if err := fakeClient.Get(context.Background(), client.ObjectKey{Name: testResourceName, Namespace: testNamespace}, updated); err != nil {
 		t.Fatalf("failed to get HelmRelease: %v", err)
 	}
-	if len(updated.Spec.ValuesFrom) != 0 {
-		t.Errorf("expected ValuesFrom unchanged (empty), got %d entries", len(updated.Spec.ValuesFrom))
+	valuesFrom := getValuesFrom(updated)
+	if len(valuesFrom) != 0 {
+		t.Errorf("expected ValuesFrom unchanged (empty), got %d entries", len(valuesFrom))
 	}
 }
 

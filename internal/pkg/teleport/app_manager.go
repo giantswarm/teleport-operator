@@ -4,13 +4,26 @@ import (
 	"context"
 	"reflect"
 
-	helmv2 "github.com/fluxcd/helm-controller/api/v2"
 	"github.com/giantswarm/apiextensions-application/api/v1alpha1"
 	"github.com/giantswarm/microerror"
 	"github.com/go-logr/logr"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 )
+
+var helmReleaseGVK = schema.GroupVersionKind{
+	Group:   "helm.toolkit.fluxcd.io",
+	Version: "v2",
+	Kind:    "HelmRelease",
+}
+
+func newHelmReleaseUnstructured() *unstructured.Unstructured {
+	hr := &unstructured.Unstructured{}
+	hr.SetGroupVersionKind(helmReleaseGVK)
+	return hr
+}
 
 // TeleportAppConfigManager abstracts injecting a ConfigMap reference into either a
 // Giant Swarm App CR (via spec.extraConfigs) or a Flux HelmRelease (via
@@ -31,7 +44,7 @@ func NewTeleportAppConfigManager(
 	namespace string,
 	configMapName string,
 ) (TeleportAppConfigManager, error) {
-	hr := &helmv2.HelmRelease{}
+	hr := newHelmReleaseUnstructured()
 	err := ctrlClient.Get(ctx, client.ObjectKey{Name: resourceName, Namespace: namespace}, hr)
 	if err == nil {
 		return &helmReleaseTeleportAppConfigManager{
@@ -75,22 +88,24 @@ type helmReleaseTeleportAppConfigManager struct {
 }
 
 func (m *helmReleaseTeleportAppConfigManager) EnsureConfig(ctx context.Context, log logr.Logger) error {
-	hr := &helmv2.HelmRelease{}
+	hr := newHelmReleaseUnstructured()
 	if err := m.client.Get(ctx, client.ObjectKey{Name: m.resourceName, Namespace: m.namespace}, hr); err != nil {
 		return microerror.Mask(err)
 	}
 
-	desired := helmv2.ValuesReference{
-		Kind:      "ConfigMap",
-		Name:      m.configMapName,
-		ValuesKey: "values",
+	desired := map[string]interface{}{
+		"kind":      "ConfigMap",
+		"name":      m.configMapName,
+		"valuesKey": "values",
 	}
 
-	before := hr.Spec.ValuesFrom
-	hr.Spec.ValuesFrom = appendValuesReference(before, desired)
-	if reflect.DeepEqual(before, hr.Spec.ValuesFrom) {
+	before := getValuesFrom(hr)
+	updated := appendValuesReference(before, desired)
+	if reflect.DeepEqual(before, updated) {
 		return nil
 	}
+
+	setValuesFrom(hr, updated)
 
 	log.Info("Updating HelmRelease ValuesFrom", "helmrelease", m.resourceName, "configMap", m.configMapName)
 	if err := m.client.Update(ctx, hr); err != nil {
@@ -103,7 +118,7 @@ func (m *helmReleaseTeleportAppConfigManager) EnsureConfig(ctx context.Context, 
 }
 
 func (m *helmReleaseTeleportAppConfigManager) DeleteConfig(ctx context.Context, log logr.Logger) error {
-	hr := &helmv2.HelmRelease{}
+	hr := newHelmReleaseUnstructured()
 	if err := m.client.Get(ctx, client.ObjectKey{Name: m.resourceName, Namespace: m.namespace}, hr); err != nil {
 		if apierrors.IsNotFound(err) {
 			return nil
@@ -111,17 +126,19 @@ func (m *helmReleaseTeleportAppConfigManager) DeleteConfig(ctx context.Context, 
 		return microerror.Mask(err)
 	}
 
-	desired := helmv2.ValuesReference{
-		Kind:      "ConfigMap",
-		Name:      m.configMapName,
-		ValuesKey: "values",
+	desired := map[string]interface{}{
+		"kind":      "ConfigMap",
+		"name":      m.configMapName,
+		"valuesKey": "values",
 	}
 
-	before := hr.Spec.ValuesFrom
-	hr.Spec.ValuesFrom = removeValuesReference(before, desired)
-	if reflect.DeepEqual(before, hr.Spec.ValuesFrom) {
+	before := getValuesFrom(hr)
+	updated := removeValuesReference(before, desired)
+	if reflect.DeepEqual(before, updated) {
 		return nil
 	}
+
+	setValuesFrom(hr, updated)
 
 	log.Info("Removing HelmRelease ValuesFrom entry", "helmrelease", m.resourceName, "configMap", m.configMapName)
 	if err := m.client.Update(ctx, hr); err != nil {
@@ -133,7 +150,28 @@ func (m *helmReleaseTeleportAppConfigManager) DeleteConfig(ctx context.Context, 
 	return nil
 }
 
-func appendValuesReference(refs []helmv2.ValuesReference, ref helmv2.ValuesReference) []helmv2.ValuesReference {
+func getValuesFrom(hr *unstructured.Unstructured) []interface{} {
+	spec, ok := hr.Object["spec"].(map[string]interface{})
+	if !ok {
+		return nil
+	}
+	valuesFrom, ok := spec["valuesFrom"].([]interface{})
+	if !ok {
+		return nil
+	}
+	return valuesFrom
+}
+
+func setValuesFrom(hr *unstructured.Unstructured, valuesFrom []interface{}) {
+	spec, ok := hr.Object["spec"].(map[string]interface{})
+	if !ok {
+		spec = map[string]interface{}{}
+		hr.Object["spec"] = spec
+	}
+	spec["valuesFrom"] = valuesFrom
+}
+
+func appendValuesReference(refs []interface{}, ref map[string]interface{}) []interface{} {
 	for _, existing := range refs {
 		if reflect.DeepEqual(existing, ref) {
 			return refs
@@ -142,8 +180,8 @@ func appendValuesReference(refs []helmv2.ValuesReference, ref helmv2.ValuesRefer
 	return append(refs, ref)
 }
 
-func removeValuesReference(refs []helmv2.ValuesReference, ref helmv2.ValuesReference) []helmv2.ValuesReference {
-	result := make([]helmv2.ValuesReference, 0, len(refs))
+func removeValuesReference(refs []interface{}, ref map[string]interface{}) []interface{} {
+	result := make([]interface{}, 0, len(refs))
 	for _, existing := range refs {
 		if !reflect.DeepEqual(existing, ref) {
 			result = append(result, existing)

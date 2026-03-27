@@ -5,7 +5,6 @@ import (
 	"testing"
 	"time"
 
-	helmv2 "github.com/fluxcd/helm-controller/api/v2"
 	appv1alpha1 "github.com/giantswarm/apiextensions-application/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -151,7 +150,7 @@ func Test_ClusterController_BotEnabled_TbotHelmRelease_EnsureConfig(t *testing.T
 
 	fakeClient := reconcileWithBot(t, cluster, tbotHR)
 
-	updated := &helmv2.HelmRelease{}
+	updated := test.NewHelmRelease(key.TeleportBotAppName, key.TeleportBotNamespace)
 	if err := fakeClient.Get(context.TODO(),
 		client.ObjectKey{Name: key.TeleportBotAppName, Namespace: key.TeleportBotNamespace},
 		updated); err != nil {
@@ -159,12 +158,15 @@ func Test_ClusterController_BotEnabled_TbotHelmRelease_EnsureConfig(t *testing.T
 	}
 
 	wantCM := key.GetTbotConfigmapName(test.ClusterName)
-	for _, ref := range updated.Spec.ValuesFrom {
-		if ref.Name == wantCM {
+	spec, _ := updated.Object["spec"].(map[string]interface{})
+	valuesFrom, _ := spec["valuesFrom"].([]interface{})
+	for _, entry := range valuesFrom {
+		ref, ok := entry.(map[string]interface{})
+		if ok && ref["name"] == wantCM {
 			return // found — test passes
 		}
 	}
-	t.Errorf("expected ValuesFrom to contain %q, got %+v", wantCM, updated.Spec.ValuesFrom)
+	t.Errorf("expected ValuesFrom to contain %q, got %+v", wantCM, valuesFrom)
 }
 
 // case C: neither tbot App CR nor HelmRelease exists — reconcile succeeds (no-op).
@@ -203,13 +205,19 @@ func Test_ClusterController_BotEnabled_TbotAppCR_DeleteConfig(t *testing.T) {
 func Test_ClusterController_BotEnabled_TbotHelmRelease_DeleteConfig(t *testing.T) {
 	cluster := test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Now())
 	tbotHR := test.NewHelmRelease(key.TeleportBotAppName, key.TeleportBotNamespace)
-	tbotHR.Spec.ValuesFrom = []helmv2.ValuesReference{
-		{Kind: "ConfigMap", Name: key.GetTbotConfigmapName(test.ClusterName), ValuesKey: "values"},
+	tbotHR.Object["spec"] = map[string]interface{}{
+		"valuesFrom": []interface{}{
+			map[string]interface{}{
+				"kind":      "ConfigMap",
+				"name":      key.GetTbotConfigmapName(test.ClusterName),
+				"valuesKey": "values",
+			},
+		},
 	}
 
 	fakeClient := reconcileDeleteWithBot(t, cluster, tbotHR)
 
-	updated := &helmv2.HelmRelease{}
+	updated := test.NewHelmRelease(key.TeleportBotAppName, key.TeleportBotNamespace)
 	if err := fakeClient.Get(context.TODO(),
 		client.ObjectKey{Name: key.TeleportBotAppName, Namespace: key.TeleportBotNamespace},
 		updated); err != nil {
@@ -217,8 +225,11 @@ func Test_ClusterController_BotEnabled_TbotHelmRelease_DeleteConfig(t *testing.T
 	}
 
 	wantCM := key.GetTbotConfigmapName(test.ClusterName)
-	for _, ref := range updated.Spec.ValuesFrom {
-		if ref.Name == wantCM {
+	spec, _ := updated.Object["spec"].(map[string]interface{})
+	valuesFrom, _ := spec["valuesFrom"].([]interface{})
+	for _, entry := range valuesFrom {
+		ref, ok := entry.(map[string]interface{})
+		if ok && ref["name"] == wantCM {
 			t.Errorf("expected ValuesFrom entry %q to be removed, still present", wantCM)
 		}
 	}
@@ -359,7 +370,7 @@ func Test_ClusterController_KubeAgent_HelmRelease_EnsureConfig(t *testing.T) {
 
 	fakeClient := reconcileWithKubeAgent(t, cluster, kubeHR)
 
-	updated := &helmv2.HelmRelease{}
+	updated := test.NewHelmRelease(kubeAgentAppName(), test.NamespaceName)
 	if err := fakeClient.Get(context.TODO(),
 		client.ObjectKey{Name: kubeAgentAppName(), Namespace: test.NamespaceName},
 		updated); err != nil {
@@ -367,12 +378,15 @@ func Test_ClusterController_KubeAgent_HelmRelease_EnsureConfig(t *testing.T) {
 	}
 
 	wantCM := key.GetConfigmapName(test.ClusterName, test.AppName)
-	for _, ref := range updated.Spec.ValuesFrom {
-		if ref.Name == wantCM {
+	spec, _ := updated.Object["spec"].(map[string]interface{})
+	valuesFrom, _ := spec["valuesFrom"].([]interface{})
+	for _, entry := range valuesFrom {
+		ref, ok := entry.(map[string]interface{})
+		if ok && ref["name"] == wantCM {
 			return
 		}
 	}
-	t.Errorf("expected ValuesFrom to contain %q, got %+v", wantCM, updated.Spec.ValuesFrom)
+	t.Errorf("expected ValuesFrom to contain %q, got %+v", wantCM, valuesFrom)
 }
 
 // case H: neither kube-agent resource exists — reconcile succeeds (no-op).
@@ -385,8 +399,14 @@ func Test_ClusterController_KubeAgent_NoResource_NoOp(t *testing.T) {
 func Test_ClusterController_KubeAgent_HelmRelease_DeleteConfig(t *testing.T) {
 	cluster := test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Now())
 	kubeHR := test.NewHelmRelease(kubeAgentAppName(), test.NamespaceName)
-	kubeHR.Spec.ValuesFrom = []helmv2.ValuesReference{
-		{Kind: "ConfigMap", Name: key.GetConfigmapName(test.ClusterName, test.AppName), ValuesKey: "values"},
+	kubeHR.Object["spec"] = map[string]interface{}{
+		"valuesFrom": []interface{}{
+			map[string]interface{}{
+				"kind":      "ConfigMap",
+				"name":      key.GetConfigmapName(test.ClusterName, test.AppName),
+				"valuesKey": "values",
+			},
+		},
 	}
 	// Also provide the existing secret/configmap so deletion path runs cleanly.
 	secret := test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName)
@@ -394,7 +414,7 @@ func Test_ClusterController_KubeAgent_HelmRelease_DeleteConfig(t *testing.T) {
 
 	fakeClient := reconcileDeleteWithKubeAgent(t, cluster, kubeHR, secret, configMap)
 
-	updated := &helmv2.HelmRelease{}
+	updated := test.NewHelmRelease(kubeAgentAppName(), test.NamespaceName)
 	if err := fakeClient.Get(context.TODO(),
 		client.ObjectKey{Name: kubeAgentAppName(), Namespace: test.NamespaceName},
 		updated); err != nil {
@@ -402,8 +422,11 @@ func Test_ClusterController_KubeAgent_HelmRelease_DeleteConfig(t *testing.T) {
 	}
 
 	wantCM := key.GetConfigmapName(test.ClusterName, test.AppName)
-	for _, ref := range updated.Spec.ValuesFrom {
-		if ref.Name == wantCM {
+	spec, _ := updated.Object["spec"].(map[string]interface{})
+	valuesFrom, _ := spec["valuesFrom"].([]interface{})
+	for _, entry := range valuesFrom {
+		ref, ok := entry.(map[string]interface{})
+		if ok && ref["name"] == wantCM {
 			t.Errorf("expected ValuesFrom entry %q to be removed, still present", wantCM)
 		}
 	}
