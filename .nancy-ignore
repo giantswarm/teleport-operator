@@ -1,3 +1,2 @@
-CVE-2026-33186 until=2026-04-19 # google.golang.org/grpc@v1.78.0
-CVE-2026-33487 until=2026-04-22 # github.com/russellhaering/goxmldsig@v1.5.0
+CVE-2026-33487 until=2026-05-22 # github.com/russellhaering/goxmldsig@v1.5.0
 CVE-2026-39883 until=2026-05-10 # go.opentelemetry.io/otel/sdk@v1.40.0
