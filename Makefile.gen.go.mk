@@ -2,7 +2,7 @@
 #
 #    devctl
 #
-#    https://github.com/giantswarm/devctl/blob/d0c8f03c86ad4cfaef54d2315dc6f6d402be716d/pkg/gen/input/makefile/internal/file/Makefile.gen.go.mk.template
+#    https://github.com/giantswarm/devctl/blob/243afc98a2832b4f85f9b1d99b15fcd2af5dff06/pkg/gen/input/makefile/internal/file/Makefile.gen.go.mk.template
 #
 
 APPLICATION    := $(shell go list -m | cut -d '/' -f 3)
