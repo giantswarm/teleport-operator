@@ -34,8 +34,10 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/healthz"
 	"sigs.k8s.io/controller-runtime/pkg/log/zap"
+	metricsserver "sigs.k8s.io/controller-runtime/pkg/metrics/server"
+	webhookserver "sigs.k8s.io/controller-runtime/pkg/webhook"
 
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 
 	"github.com/giantswarm/teleport-operator/internal/controller"
 	"github.com/giantswarm/teleport-operator/internal/pkg/config"
@@ -86,9 +88,13 @@ func main() {
 
 	restConfig := ctrl.GetConfigOrDie()
 	mgr, err := ctrl.NewManager(restConfig, ctrl.Options{
-		Scheme:                 scheme,
-		MetricsBindAddress:     metricsAddr,
-		Port:                   9443,
+		Scheme: scheme,
+		Metrics: metricsserver.Options{
+			BindAddress: metricsAddr,
+		},
+		WebhookServer: webhookserver.NewServer(webhookserver.Options{
+			Port: 9443,
+		}),
 		HealthProbeBindAddress: probeAddr,
 		LeaderElection:         enableLeaderElection,
 		LeaderElectionID:       "765979b4.giantswarm.io",

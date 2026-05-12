@@ -8,10 +8,13 @@ import (
 	appv1alpha1 "github.com/giantswarm/apiextensions-application/api/v1alpha1"
 	teleportTypes "github.com/gravitational/teleport/api/types"
 	corev1 "k8s.io/api/core/v1"
+	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/runtime"
+	"k8s.io/apimachinery/pkg/runtime/schema"
 	"k8s.io/client-go/kubernetes/scheme"
-	capi "sigs.k8s.io/cluster-api/api/v1beta1"
+	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	clientfake "sigs.k8s.io/controller-runtime/pkg/client/fake"
 
@@ -163,6 +166,58 @@ func NewKubeServer(clusterName, hostId, hostName string) teleportTypes.KubeServe
 	}
 }
 
+func NewHelmRelease(name, namespace string) *unstructured.Unstructured {
+	hr := &unstructured.Unstructured{}
+	hr.SetGroupVersionKind(schema.GroupVersionKind{
+		Group:   "helm.toolkit.fluxcd.io",
+		Version: "v2",
+		Kind:    "HelmRelease",
+	})
+	hr.SetName(name)
+	hr.SetNamespace(namespace)
+	return hr
+}
+
+func NewApp(name, namespace string) *appv1alpha1.App {
+	return &appv1alpha1.App{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      name,
+			Namespace: namespace,
+		},
+	}
+}
+
+func newFakeRESTMapper() *apimeta.DefaultRESTMapper {
+	rm := apimeta.NewDefaultRESTMapper(nil)
+	for gvk := range scheme.Scheme.AllKnownTypes() {
+		rm.Add(gvk, apimeta.RESTScopeNamespace)
+	}
+	rm.Add(schema.GroupVersionKind{
+		Group:   "helm.toolkit.fluxcd.io",
+		Version: "v2",
+		Kind:    "HelmRelease",
+	}, apimeta.RESTScopeNamespace)
+	return rm
+}
+
+// NewFakeK8sClientFromObjects creates a fake client from client.Object variadic args.
+func NewFakeK8sClientFromObjects(objects ...client.Object) (client.Client, error) {
+	schemeBuilder := runtime.SchemeBuilder{}
+	schemeBuilder.Register(capi.AddToScheme)
+	schemeBuilder.Register(appv1alpha1.AddToScheme)
+
+	err := schemeBuilder.AddToScheme(scheme.Scheme)
+	if err != nil {
+		return nil, err
+	}
+
+	builder := clientfake.NewClientBuilder().WithScheme(scheme.Scheme).WithRESTMapper(newFakeRESTMapper())
+	if len(objects) > 0 {
+		builder = builder.WithObjects(objects...)
+	}
+	return builder.Build(), nil
+}
+
 func NewFakeK8sClient(runtimeObjects []runtime.Object) (client.Client, error) {
 	schemeBuilder := runtime.SchemeBuilder{}
 	schemeBuilder.Register(capi.AddToScheme)
@@ -173,7 +228,7 @@ func NewFakeK8sClient(runtimeObjects []runtime.Object) (client.Client, error) {
 		return nil, err
 	}
 
-	fakeK8sClientBuilder := clientfake.NewClientBuilder().WithScheme(scheme.Scheme)
+	fakeK8sClientBuilder := clientfake.NewClientBuilder().WithScheme(scheme.Scheme).WithRESTMapper(newFakeRESTMapper())
 	if runtimeObjects != nil {
 		fakeK8sClientBuilder.WithRuntimeObjects(runtimeObjects...)
 	}
