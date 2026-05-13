@@ -38,12 +38,15 @@ const (
 
 	AppCatalog            = "app-catalog"
 	AppVersion            = "appVersion"
+	AppVersionNested      = "0.11.0"
 	ManagementClusterName = "management-cluster"
 	ProxyAddr             = "127.0.0.1"
 	IdentityFileValue     = "identity-file-value"
 	TeleportVersion       = "1.0.0"
+	TeleportVersionNew    = "2.0.0"
 
-	ConfigMapValuesFormat = "authToken: %s\nproxyAddr: %s\nroles: %s\nkubeClusterName: %s\nteleportVersionOverride: %s"
+	ConfigMapValuesFormat       = "authToken: %s\nproxyAddr: %s\nroles: %s\nkubeClusterName: %s\nteleportVersionOverride: %s"
+	ConfigMapValuesNestedFormat = "teleport-kube-agent:\n  authToken: %s\n  proxyAddr: %s\n  roles: %s\n  kubeClusterName: %s\n  teleportVersionOverride: %s"
 )
 
 var LastReadValue = time.Now()
@@ -86,6 +89,18 @@ func NewIdentitySecret(namespaceName, identityFile string) *corev1.Secret {
 }
 
 func NewConfigMap(clusterName, appName, namespaceName, tokenName string, roles []string) *corev1.ConfigMap {
+	return newConfigMap(clusterName, appName, namespaceName, tokenName, roles, TeleportVersion, ConfigMapValuesFormat)
+}
+
+func NewConfigMapWithTeleportVersion(clusterName, appName, namespaceName, tokenName, teleportVersion string, roles []string) *corev1.ConfigMap {
+	return newConfigMap(clusterName, appName, namespaceName, tokenName, roles, teleportVersion, ConfigMapValuesFormat)
+}
+
+func NewNestedConfigMap(clusterName, appName, namespaceName, tokenName string, roles []string) *corev1.ConfigMap {
+	return newConfigMap(clusterName, appName, namespaceName, tokenName, roles, TeleportVersion, ConfigMapValuesNestedFormat)
+}
+
+func newConfigMap(clusterName, appName, namespaceName, tokenName string, roles []string, teleportVersion, valuesFormat string) *corev1.ConfigMap {
 	registerName := key.GetRegisterName(ManagementClusterName, clusterName)
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
@@ -93,7 +108,7 @@ func NewConfigMap(clusterName, appName, namespaceName, tokenName string, roles [
 			Namespace: namespaceName,
 		},
 		Data: map[string]string{
-			"values": fmt.Sprintf(ConfigMapValuesFormat, tokenName, ProxyAddr, strings.Join(roles, ","), registerName, TeleportVersion),
+			"values": fmt.Sprintf(valuesFormat, tokenName, ProxyAddr, strings.Join(roles, ","), registerName, teleportVersion),
 		},
 	}
 }

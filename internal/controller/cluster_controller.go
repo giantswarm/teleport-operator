@@ -237,7 +237,19 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
-		if !tokenValid {
+
+		currentTeleportVersion, err := r.Teleport.GetTeleportVersionFromConfigMap(configMap)
+		if err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
+		}
+		layoutUpToDate, err := r.Teleport.IsConfigMapLayoutUpToDate(configMap)
+		if err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
+		}
+		versionDrifted := currentTeleportVersion != r.Teleport.Config.TeleportVersion
+
+		switch {
+		case !tokenValid:
 			newToken, err := r.Teleport.GenerateToken(ctx, registerName, roles)
 			if err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
@@ -246,7 +258,15 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 				return ctrl.Result{}, microerror.Mask(err)
 			}
 			log.Info("Updated config map with new teleport join token", "configMapName", configMap.GetName(), "roles", roles)
-		} else {
+		case versionDrifted, !layoutUpToDate:
+			if err := r.Teleport.UpdateConfigMap(ctx, log, r.Client, configMap, token, roles); err != nil {
+				return ctrl.Result{}, microerror.Mask(err)
+			}
+			log.Info("Updated config map to align teleport version and values layout",
+				"configMapName", configMap.GetName(),
+				"teleportVersion", r.Teleport.Config.TeleportVersion,
+				"nestedValues", key.UsesNestedKubeAgentValues(r.Teleport.Config.AppVersion))
+		default:
 			log.Info("ConfigMap has valid teleport join token", "configMapName", configMap.GetName(), "roles", roles)
 		}
 	}

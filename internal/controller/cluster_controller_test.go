@@ -161,6 +161,24 @@ func Test_ClusterController(t *testing.T) {
 			expectedRoles:     []string{key.RoleKube, key.RoleApp},
 		},
 		{
+			name:      "case 6.5: Rewrite configmap when teleportVersionOverride drifts even if token is valid",
+			namespace: test.NamespaceName,
+			token:     test.TokenName,
+			config:    newConfigWithTeleportVersion(test.TeleportVersionNew),
+			identity:  newIdentity(test.LastReadValue),
+			tokens: []teleportTypes.ProvisionToken{
+				test.NewToken(test.TokenName, test.ClusterName, []string{key.RoleKube}),
+				test.NewToken(test.TokenName, test.ClusterName, []string{key.RoleNode}),
+			},
+			cluster:           test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
+			secret:            test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
+			configMap:         test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{key.RoleKube}),
+			expectedCluster:   test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
+			expectedSecret:    test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
+			expectedConfigMap: test.NewConfigMapWithTeleportVersion(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, test.TeleportVersionNew, []string{key.RoleKube}),
+			expectedRoles:     []string{key.RoleKube},
+		},
+		{
 			name:      "case 6: Return an error in case reconnection to Teleport fails after the credentials are rotated",
 			namespace: test.NamespaceName,
 			token:     test.TokenName,
@@ -321,6 +339,12 @@ func newConfig() *config.Config {
 		ProxyAddr:             test.ProxyAddr,
 		TeleportVersion:       test.TeleportVersion,
 	}
+}
+
+func newConfigWithTeleportVersion(teleportVersion string) *config.Config {
+	cfg := newConfig()
+	cfg.TeleportVersion = teleportVersion
+	return cfg
 }
 
 func newIdentity(lastRead time.Time) *config.IdentityConfig {

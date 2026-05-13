@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/gravitational/teleport/api/types"
 )
 
@@ -33,6 +34,15 @@ const (
 	RoleKube              = "kube"
 	RoleApp               = "app"
 	RoleNode              = "node"
+
+	// TeleportKubeAgentValuesKey is the top-level key under which
+	// teleport-kube-agent chart versions newer than v0.10.8 expect their
+	// values to be nested.
+	TeleportKubeAgentValuesKey = "teleport-kube-agent"
+
+	// teleportKubeAgentNestedSinceVersion is the threshold above which the
+	// chart switched to nested values.
+	teleportKubeAgentNestedSinceVersion = "0.10.8"
 )
 
 func ParseRoles(s string) ([]string, error) {
@@ -97,7 +107,20 @@ func GetAppName(clusterName string, appName string) string {
 	return fmt.Sprintf("%s-%s", clusterName, appName)
 }
 
-func GetConfigmapDataFromTemplate(authToken string, proxyAddr string, kubeClusterName string, teleportVersion string, roles []string) string {
+// UsesNestedKubeAgentValues reports whether the teleport-kube-agent chart
+// version expects its values nested under the `teleport-kube-agent` key.
+// Versions strictly greater than v0.10.8 use the nested layout. An
+// unparseable version is treated as the legacy (flat) layout.
+func UsesNestedKubeAgentValues(appVersion string) bool {
+	v, err := semver.NewVersion(strings.TrimPrefix(appVersion, "v"))
+	if err != nil {
+		return false
+	}
+	threshold := semver.MustParse(teleportKubeAgentNestedSinceVersion)
+	return v.GreaterThan(threshold)
+}
+
+func GetConfigmapDataFromTemplate(authToken string, proxyAddr string, kubeClusterName string, teleportVersion string, roles []string, appVersion string) string {
 	dataTpl := `roles: "%s"
 authToken: "%s"
 proxyAddr: "%s"
@@ -108,7 +131,20 @@ kubeClusterName: "%s"
 		dataTpl = fmt.Sprintf("%steleportVersionOverride: %q", dataTpl, teleportVersion)
 	}
 
-	return fmt.Sprintf(dataTpl, RolesToString(roles), authToken, proxyAddr, kubeClusterName)
+	body := fmt.Sprintf(dataTpl, RolesToString(roles), authToken, proxyAddr, kubeClusterName)
+	if !UsesNestedKubeAgentValues(appVersion) {
+		return body
+	}
+
+	var nested strings.Builder
+	nested.WriteString(TeleportKubeAgentValuesKey)
+	nested.WriteString(":\n")
+	for line := range strings.SplitSeq(strings.TrimRight(body, "\n"), "\n") {
+		nested.WriteString("  ")
+		nested.WriteString(line)
+		nested.WriteString("\n")
+	}
+	return nested.String()
 }
 
 func GetTbotConfigmapDataFromTemplate(kubeClusterName string, clusterName string) string {

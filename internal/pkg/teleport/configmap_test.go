@@ -249,3 +249,139 @@ func loadConfigMap(ctx context.Context, ctrlClient client.Client, expected *core
 	}
 	return actual, err
 }
+
+func Test_CreateConfigMap_NestedLayout(t *testing.T) {
+	ctx := context.TODO()
+	log := ctrl.Log.WithName("test")
+
+	ctrlClient, err := test.NewFakeK8sClient(nil)
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+
+	teleport := New(test.NamespaceName, &config.Config{
+		AppName:         test.AppName,
+		AppVersion:      test.AppVersionNested,
+		ProxyAddr:       test.ProxyAddr,
+		TeleportVersion: test.TeleportVersion,
+	}, token.NewGenerator())
+
+	registerName := key.GetRegisterName(test.ManagementClusterName, test.ClusterName)
+	if err := teleport.CreateConfigMap(ctx, log, ctrlClient, test.ClusterName, test.NamespaceName, registerName, test.TokenName, []string{"kube", "app"}); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+
+	expected := test.NewNestedConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{"kube", "app"})
+	actual, err := loadConfigMap(ctx, ctrlClient, expected)
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	test.CheckConfigMap(t, expected, actual)
+}
+
+func Test_UpdateConfigMap_MigratesFlatToNested(t *testing.T) {
+	ctx := context.TODO()
+	log := ctrl.Log.WithName("test")
+
+	existing := test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{"kube", "app"})
+	ctrlClient, err := test.NewFakeK8sClient([]runtime.Object{existing})
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+
+	teleport := New(test.NamespaceName, &config.Config{
+		AppName:         test.AppName,
+		AppVersion:      test.AppVersionNested,
+		ProxyAddr:       test.ProxyAddr,
+		TeleportVersion: test.TeleportVersion,
+	}, token.NewGenerator())
+
+	if err := teleport.UpdateConfigMap(ctx, log, ctrlClient, existing, test.NewTokenName, []string{"kube", "app"}); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+
+	expected := test.NewNestedConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.NewTokenName, []string{"kube", "app"})
+	actual, err := loadConfigMap(ctx, ctrlClient, expected)
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	test.CheckConfigMap(t, expected, actual)
+}
+
+func Test_UpdateConfigMap_RefreshesTeleportVersionOverride(t *testing.T) {
+	ctx := context.TODO()
+	log := ctrl.Log.WithName("test")
+
+	existing := test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{"kube", "app"})
+	ctrlClient, err := test.NewFakeK8sClient([]runtime.Object{existing})
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+
+	teleport := New(test.NamespaceName, &config.Config{
+		AppName:         test.AppName,
+		ProxyAddr:       test.ProxyAddr,
+		TeleportVersion: test.TeleportVersionNew,
+	}, token.NewGenerator())
+
+	if err := teleport.UpdateConfigMap(ctx, log, ctrlClient, existing, test.TokenName, []string{"kube", "app"}); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+
+	expected := test.NewConfigMapWithTeleportVersion(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, test.TeleportVersionNew, []string{"kube", "app"})
+	actual, err := loadConfigMap(ctx, ctrlClient, expected)
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	test.CheckConfigMap(t, expected, actual)
+}
+
+func Test_GetTokenFromConfigMap_NestedLayout(t *testing.T) {
+	ctx := context.TODO()
+
+	nested := test.NewNestedConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{"kube", "app"})
+	teleport := New(test.NamespaceName, &config.Config{
+		AppName:    test.AppName,
+		AppVersion: test.AppVersionNested,
+		ProxyAddr:  test.ProxyAddr,
+	}, token.NewGenerator())
+
+	got, err := teleport.GetTokenFromConfigMap(ctx, nested)
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	if got != test.TokenName {
+		t.Fatalf("unexpected token: expected %s, actual %s", test.TokenName, got)
+	}
+}
+
+func Test_IsConfigMapLayoutUpToDate(t *testing.T) {
+	flat := test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{"kube"})
+	nested := test.NewNestedConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{"kube"})
+
+	newApp := New(test.NamespaceName, &config.Config{AppName: test.AppName, AppVersion: test.AppVersionNested}, token.NewGenerator())
+	oldApp := New(test.NamespaceName, &config.Config{AppName: test.AppName, AppVersion: "0.3.0"}, token.NewGenerator())
+
+	cases := []struct {
+		name    string
+		tele    *Teleport
+		cm      *corev1.ConfigMap
+		wantOk  bool
+	}{
+		{"flat-old-ok", oldApp, flat, true},
+		{"flat-new-mismatch", newApp, flat, false},
+		{"nested-new-ok", newApp, nested, true},
+		{"nested-old-mismatch", oldApp, nested, false},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			ok, err := c.tele.IsConfigMapLayoutUpToDate(c.cm)
+			if err != nil {
+				t.Fatalf("unexpected error %v", err)
+			}
+			if ok != c.wantOk {
+				t.Fatalf("got %v, want %v", ok, c.wantOk)
+			}
+		})
+	}
+}

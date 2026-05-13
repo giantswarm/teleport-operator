@@ -50,14 +50,9 @@ func (t *Teleport) GetTbotConfigMap(ctx context.Context, ctrlClient client.Clien
 }
 
 func (t *Teleport) GetTokenFromConfigMap(ctx context.Context, configMap *corev1.ConfigMap) (string, error) {
-	valuesBytes, ok := configMap.Data["values"]
-	if !ok {
-		return "", microerror.Mask(fmt.Errorf("malformed ConfigMap: key `values` not found"))
-	}
-
-	var valuesYaml map[string]interface{}
-	if err := yaml.Unmarshal([]byte(valuesBytes), &valuesYaml); err != nil {
-		return "", microerror.Mask(fmt.Errorf("failed to parse YAML: %w", err))
+	valuesYaml, err := parseConfigMapValues(configMap)
+	if err != nil {
+		return "", err
 	}
 
 	token, ok := valuesYaml["authToken"].(string)
@@ -66,6 +61,53 @@ func (t *Teleport) GetTokenFromConfigMap(ctx context.Context, configMap *corev1.
 	}
 
 	return token, nil
+}
+
+// GetTeleportVersionFromConfigMap returns the teleportVersionOverride
+// currently stored in the ConfigMap, or an empty string if not set.
+func (t *Teleport) GetTeleportVersionFromConfigMap(configMap *corev1.ConfigMap) (string, error) {
+	valuesYaml, err := parseConfigMapValues(configMap)
+	if err != nil {
+		return "", err
+	}
+
+	version, _ := valuesYaml["teleportVersionOverride"].(string)
+	return version, nil
+}
+
+// IsConfigMapLayoutUpToDate reports whether the ConfigMap's top-level shape
+// matches what the configured AppVersion expects (nested under
+// `teleport-kube-agent` vs. flat at the root).
+func (t *Teleport) IsConfigMapLayoutUpToDate(configMap *corev1.ConfigMap) (bool, error) {
+	valuesBytes, ok := configMap.Data["values"]
+	if !ok {
+		return false, microerror.Mask(fmt.Errorf("malformed ConfigMap: key `values` not found"))
+	}
+
+	var root map[string]interface{}
+	if err := yaml.Unmarshal([]byte(valuesBytes), &root); err != nil {
+		return false, microerror.Mask(fmt.Errorf("failed to parse YAML: %w", err))
+	}
+
+	_, isNested := root[key.TeleportKubeAgentValuesKey].(map[string]interface{})
+	return isNested == key.UsesNestedKubeAgentValues(t.Config.AppVersion), nil
+}
+
+func parseConfigMapValues(configMap *corev1.ConfigMap) (map[string]interface{}, error) {
+	valuesBytes, ok := configMap.Data["values"]
+	if !ok {
+		return nil, microerror.Mask(fmt.Errorf("malformed ConfigMap: key `values` not found"))
+	}
+
+	var root map[string]interface{}
+	if err := yaml.Unmarshal([]byte(valuesBytes), &root); err != nil {
+		return nil, microerror.Mask(fmt.Errorf("failed to parse YAML: %w", err))
+	}
+
+	if nested, ok := root[key.TeleportKubeAgentValuesKey].(map[string]interface{}); ok {
+		return nested, nil
+	}
+	return root, nil
 }
 
 func (t *Teleport) CreateConfigMap(ctx context.Context, log logr.Logger, ctrlClient client.Client, clusterName string, clusterNamespace string, registerName string, token string, roles []string) error {
@@ -138,20 +180,29 @@ func (t *Teleport) EnsureTbotConfigMap(ctx context.Context, log logr.Logger, ctr
 }
 
 func (t *Teleport) UpdateConfigMap(ctx context.Context, log logr.Logger, ctrlClient client.Client, configMap *corev1.ConfigMap, token string, roles []string) error {
-	valuesBytes, ok := configMap.Data["values"]
-	if !ok {
-		return microerror.Mask(fmt.Errorf("malformed ConfigMap: key `values` not found"))
-	}
-
-	var valuesYaml map[string]interface{}
-	if err := yaml.Unmarshal([]byte(valuesBytes), &valuesYaml); err != nil {
-		return microerror.Mask(fmt.Errorf("failed to parse YAML: %w", err))
+	valuesYaml, err := parseConfigMapValues(configMap)
+	if err != nil {
+		return err
 	}
 
 	valuesYaml["authToken"] = token
 	valuesYaml["roles"] = key.RolesToString(roles)
+	if currentVersion, _ := valuesYaml["teleportVersionOverride"].(string); currentVersion != t.Config.TeleportVersion {
+		if t.Config.TeleportVersion != "" {
+			valuesYaml["teleportVersionOverride"] = t.Config.TeleportVersion
+		} else {
+			delete(valuesYaml, "teleportVersionOverride")
+		}
+	}
 
-	updatedValuesYaml, err := yaml.Marshal(valuesYaml)
+	var out interface{} = valuesYaml
+	if key.UsesNestedKubeAgentValues(t.Config.AppVersion) {
+		out = map[string]interface{}{
+			key.TeleportKubeAgentValuesKey: valuesYaml,
+		}
+	}
+
+	updatedValuesYaml, err := yaml.Marshal(out)
 	if err != nil {
 		return fmt.Errorf("failed to marshal updated content into YAML: %w", err)
 	}
@@ -213,7 +264,7 @@ func (t *Teleport) getConfigMapData(registerName string, token string, roles []s
 		teleportVersionOverride = t.Config.TeleportVersion
 	)
 
-	return key.GetConfigmapDataFromTemplate(authToken, proxyAddr, kubeClusterName, teleportVersionOverride, roles)
+	return key.GetConfigmapDataFromTemplate(authToken, proxyAddr, kubeClusterName, teleportVersionOverride, roles, t.Config.AppVersion)
 }
 
 func (t *Teleport) getTbotConfigMapData(registerName string, clusterName string) string {

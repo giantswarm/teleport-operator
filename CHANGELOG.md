@@ -10,8 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add `io.giantswarm.application.audience` and `io.giantswarm.application.managed` chart annotations for Backstage visibility.
+- Emit `teleport-kube-agent` config map values nested under the `teleport-kube-agent` key when the configured app version is newer than v0.10.8, and migrate existing flat config maps on reconcile.
 
 ### Changed
+
+- Reconcile loop now refreshes `teleportVersionOverride` in the teleport-kube-agent config map whenever the operator's `teleportVersion` changes, even when the join token is still valid.
 ## [0.12.4] - 2026-01-30
 
 
