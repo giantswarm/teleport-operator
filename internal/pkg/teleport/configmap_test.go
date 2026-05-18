@@ -421,10 +421,10 @@ func Test_IsConfigMapLayoutUpToDate(t *testing.T) {
 	oldApp := New(test.NamespaceName, &config.Config{AppName: test.AppName, AppVersion: "0.3.0"}, token.NewGenerator())
 
 	cases := []struct {
-		name    string
-		tele    *Teleport
-		cm      *corev1.ConfigMap
-		wantOk  bool
+		name   string
+		tele   *Teleport
+		cm     *corev1.ConfigMap
+		wantOk bool
 	}{
 		{"flat-old-ok", oldApp, flat, true},
 		{"flat-new-mismatch", newApp, flat, false},
