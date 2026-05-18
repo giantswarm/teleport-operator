@@ -246,7 +246,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
-		versionDrifted := currentTeleportVersion != r.Teleport.Config.TeleportVersion
+		desiredTeleportVersion := key.ResolveTeleportVersionOverride(r.Teleport.Config.AppVersion, r.Teleport.Config.TeleportVersion)
+		versionDrifted := currentTeleportVersion != desiredTeleportVersion
 
 		switch {
 		case !tokenValid:

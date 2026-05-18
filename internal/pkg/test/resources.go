@@ -36,17 +36,20 @@ const (
 	TokenTypeNode = "node"
 	TokenTypeApp  = "app"
 
-	AppCatalog            = "app-catalog"
-	AppVersion            = "appVersion"
-	AppVersionNested      = "0.11.0"
-	ManagementClusterName = "management-cluster"
-	ProxyAddr             = "127.0.0.1"
-	IdentityFileValue     = "identity-file-value"
-	TeleportVersion       = "1.0.0"
-	TeleportVersionNew    = "2.0.0"
+	AppCatalog                  = "app-catalog"
+	AppVersion                  = "appVersion"
+	AppVersionNested            = "0.11.0"
+	ManagementClusterName       = "management-cluster"
+	ProxyAddr                   = "127.0.0.1"
+	IdentityFileValue           = "identity-file-value"
+	TeleportVersion             = "1.0.0"
+	TeleportVersionNew          = "2.0.0"
+	TeleportVersionForNested    = "18.7.6"
+	TeleportVersionForNestedNew = "18.8.0"
 
-	ConfigMapValuesFormat       = "authToken: %s\nproxyAddr: %s\nroles: %s\nkubeClusterName: %s\nteleportVersionOverride: %s"
-	ConfigMapValuesNestedFormat = "teleport-kube-agent:\n  authToken: %s\n  proxyAddr: %s\n  roles: %s\n  kubeClusterName: %s\n  teleportVersionOverride: %s"
+	ConfigMapValuesFormat               = "authToken: %s\nproxyAddr: %s\nroles: %s\nkubeClusterName: %s\nteleportVersionOverride: %s"
+	ConfigMapValuesNestedFormat         = "teleport-kube-agent:\n  authToken: %s\n  proxyAddr: %s\n  roles: %s\n  kubeClusterName: %s\n  teleportVersionOverride: %s"
+	ConfigMapValuesNestedFormatNoVerOvr = "teleport-kube-agent:\n  authToken: %s\n  proxyAddr: %s\n  roles: %s\n  kubeClusterName: %s\n"
 )
 
 var LastReadValue = time.Now()
@@ -97,18 +100,30 @@ func NewConfigMapWithTeleportVersion(clusterName, appName, namespaceName, tokenN
 }
 
 func NewNestedConfigMap(clusterName, appName, namespaceName, tokenName string, roles []string) *corev1.ConfigMap {
-	return newConfigMap(clusterName, appName, namespaceName, tokenName, roles, TeleportVersion, ConfigMapValuesNestedFormat)
+	return newConfigMap(clusterName, appName, namespaceName, tokenName, roles, TeleportVersionForNested, ConfigMapValuesNestedFormat)
+}
+
+func NewNestedConfigMapWithTeleportVersion(clusterName, appName, namespaceName, tokenName, teleportVersion string, roles []string) *corev1.ConfigMap {
+	return newConfigMap(clusterName, appName, namespaceName, tokenName, roles, teleportVersion, ConfigMapValuesNestedFormat)
+}
+
+func NewNestedConfigMapWithoutVersionOverride(clusterName, appName, namespaceName, tokenName string, roles []string) *corev1.ConfigMap {
+	return newConfigMap(clusterName, appName, namespaceName, tokenName, roles, "", ConfigMapValuesNestedFormatNoVerOvr)
 }
 
 func newConfigMap(clusterName, appName, namespaceName, tokenName string, roles []string, teleportVersion, valuesFormat string) *corev1.ConfigMap {
 	registerName := key.GetRegisterName(ManagementClusterName, clusterName)
+	values := fmt.Sprintf(valuesFormat, tokenName, ProxyAddr, strings.Join(roles, ","), registerName, teleportVersion)
+	if valuesFormat == ConfigMapValuesNestedFormatNoVerOvr {
+		values = fmt.Sprintf(valuesFormat, tokenName, ProxyAddr, strings.Join(roles, ","), registerName)
+	}
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      key.GetConfigmapName(clusterName, appName),
 			Namespace: namespaceName,
 		},
 		Data: map[string]string{
-			"values": fmt.Sprintf(valuesFormat, tokenName, ProxyAddr, strings.Join(roles, ","), registerName, teleportVersion),
+			"values": values,
 		},
 	}
 }

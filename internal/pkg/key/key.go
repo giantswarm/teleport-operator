@@ -36,13 +36,19 @@ const (
 	RoleNode              = "node"
 
 	// TeleportKubeAgentValuesKey is the top-level key under which
-	// teleport-kube-agent chart versions newer than v0.10.8 expect their
+	// teleport-kube-agent chart versions v0.11.0 and newer expect their
 	// values to be nested.
 	TeleportKubeAgentValuesKey = "teleport-kube-agent"
 
-	// teleportKubeAgentNestedSinceVersion is the threshold above which the
-	// chart switched to nested values.
-	teleportKubeAgentNestedSinceVersion = "0.10.8"
+	// teleportKubeAgentNestedSinceVersion is the lowest chart version that
+	// expects the nested values layout.
+	teleportKubeAgentNestedSinceVersion = "0.11.0"
+
+	// teleportKubeAgentBundledTeleportVersion is the Teleport version
+	// bundled by teleport-kube-agent v0.11.0. With the nested-layout chart
+	// we skip teleportVersionOverride when the configured override would
+	// be a downgrade against this bundled version.
+	teleportKubeAgentBundledTeleportVersion = "18.7.6"
 )
 
 func ParseRoles(s string) ([]string, error) {
@@ -109,15 +115,43 @@ func GetAppName(clusterName string, appName string) string {
 
 // UsesNestedKubeAgentValues reports whether the teleport-kube-agent chart
 // version expects its values nested under the `teleport-kube-agent` key.
-// Versions strictly greater than v0.10.8 use the nested layout. An
-// unparseable version is treated as the legacy (flat) layout.
+// Versions at or above v0.11.0 use the nested layout. An unparseable
+// version is treated as the legacy (flat) layout.
 func UsesNestedKubeAgentValues(appVersion string) bool {
 	v, err := semver.NewVersion(strings.TrimPrefix(appVersion, "v"))
 	if err != nil {
 		return false
 	}
 	threshold := semver.MustParse(teleportKubeAgentNestedSinceVersion)
-	return v.GreaterThan(threshold)
+	return v.Compare(threshold) >= 0
+}
+
+// ResolveTeleportVersionOverride returns the value that should be written
+// as `teleportVersionOverride` for a given chart appVersion and operator
+// teleportVersion, or an empty string when the override should be omitted.
+//
+// For the nested-layout chart (>= v0.11.0) the chart already bundles
+// Teleport v18.7.6, so an override below that would be a downgrade and is
+// skipped. An unparseable teleportVersion is also skipped in that case.
+// Older flat-layout charts keep the legacy behaviour: any non-empty value
+// is written through.
+func ResolveTeleportVersionOverride(appVersion, teleportVersion string) string {
+	if teleportVersion == "" {
+		return ""
+	}
+	if !UsesNestedKubeAgentValues(appVersion) {
+		return teleportVersion
+	}
+
+	v, err := semver.NewVersion(strings.TrimPrefix(teleportVersion, "v"))
+	if err != nil {
+		return ""
+	}
+	bundled := semver.MustParse(teleportKubeAgentBundledTeleportVersion)
+	if v.Compare(bundled) < 0 {
+		return ""
+	}
+	return teleportVersion
 }
 
 func GetConfigmapDataFromTemplate(authToken string, proxyAddr string, kubeClusterName string, teleportVersion string, roles []string, appVersion string) string {
@@ -127,8 +161,8 @@ proxyAddr: "%s"
 kubeClusterName: "%s"
 `
 
-	if teleportVersion != "" {
-		dataTpl = fmt.Sprintf("%steleportVersionOverride: %q", dataTpl, teleportVersion)
+	if override := ResolveTeleportVersionOverride(appVersion, teleportVersion); override != "" {
+		dataTpl = fmt.Sprintf("%steleportVersionOverride: %q", dataTpl, override)
 	}
 
 	body := fmt.Sprintf(dataTpl, RolesToString(roles), authToken, proxyAddr, kubeClusterName)

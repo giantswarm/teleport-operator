@@ -263,7 +263,7 @@ func Test_CreateConfigMap_NestedLayout(t *testing.T) {
 		AppName:         test.AppName,
 		AppVersion:      test.AppVersionNested,
 		ProxyAddr:       test.ProxyAddr,
-		TeleportVersion: test.TeleportVersion,
+		TeleportVersion: test.TeleportVersionForNested,
 	}, token.NewGenerator())
 
 	registerName := key.GetRegisterName(test.ManagementClusterName, test.ClusterName)
@@ -272,6 +272,35 @@ func Test_CreateConfigMap_NestedLayout(t *testing.T) {
 	}
 
 	expected := test.NewNestedConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{"kube", "app"})
+	actual, err := loadConfigMap(ctx, ctrlClient, expected)
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	test.CheckConfigMap(t, expected, actual)
+}
+
+func Test_CreateConfigMap_NestedLayout_SkipsDowngradeOverride(t *testing.T) {
+	ctx := context.TODO()
+	log := ctrl.Log.WithName("test")
+
+	ctrlClient, err := test.NewFakeK8sClient(nil)
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+
+	teleport := New(test.NamespaceName, &config.Config{
+		AppName:         test.AppName,
+		AppVersion:      test.AppVersionNested,
+		ProxyAddr:       test.ProxyAddr,
+		TeleportVersion: test.TeleportVersion, // 1.0.0 - below bundled 18.7.6
+	}, token.NewGenerator())
+
+	registerName := key.GetRegisterName(test.ManagementClusterName, test.ClusterName)
+	if err := teleport.CreateConfigMap(ctx, log, ctrlClient, test.ClusterName, test.NamespaceName, registerName, test.TokenName, []string{"kube", "app"}); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+
+	expected := test.NewNestedConfigMapWithoutVersionOverride(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{"kube", "app"})
 	actual, err := loadConfigMap(ctx, ctrlClient, expected)
 	if err != nil {
 		t.Fatalf("unexpected error %v", err)
@@ -293,7 +322,7 @@ func Test_UpdateConfigMap_MigratesFlatToNested(t *testing.T) {
 		AppName:         test.AppName,
 		AppVersion:      test.AppVersionNested,
 		ProxyAddr:       test.ProxyAddr,
-		TeleportVersion: test.TeleportVersion,
+		TeleportVersion: test.TeleportVersionForNested,
 	}, token.NewGenerator())
 
 	if err := teleport.UpdateConfigMap(ctx, log, ctrlClient, existing, test.NewTokenName, []string{"kube", "app"}); err != nil {
@@ -301,6 +330,35 @@ func Test_UpdateConfigMap_MigratesFlatToNested(t *testing.T) {
 	}
 
 	expected := test.NewNestedConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.NewTokenName, []string{"kube", "app"})
+	actual, err := loadConfigMap(ctx, ctrlClient, expected)
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+	test.CheckConfigMap(t, expected, actual)
+}
+
+func Test_UpdateConfigMap_NestedLayout_StripsDowngradeOverride(t *testing.T) {
+	ctx := context.TODO()
+	log := ctrl.Log.WithName("test")
+
+	existing := test.NewNestedConfigMapWithTeleportVersion(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, test.TeleportVersionForNested, []string{"kube", "app"})
+	ctrlClient, err := test.NewFakeK8sClient([]runtime.Object{existing})
+	if err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+
+	teleport := New(test.NamespaceName, &config.Config{
+		AppName:         test.AppName,
+		AppVersion:      test.AppVersionNested,
+		ProxyAddr:       test.ProxyAddr,
+		TeleportVersion: test.TeleportVersion, // downgrade vs bundled 18.7.6
+	}, token.NewGenerator())
+
+	if err := teleport.UpdateConfigMap(ctx, log, ctrlClient, existing, test.TokenName, []string{"kube", "app"}); err != nil {
+		t.Fatalf("unexpected error %v", err)
+	}
+
+	expected := test.NewNestedConfigMapWithoutVersionOverride(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{"kube", "app"})
 	actual, err := loadConfigMap(ctx, ctrlClient, expected)
 	if err != nil {
 		t.Fatalf("unexpected error %v", err)

@@ -187,12 +187,10 @@ func (t *Teleport) UpdateConfigMap(ctx context.Context, log logr.Logger, ctrlCli
 
 	valuesYaml["authToken"] = token
 	valuesYaml["roles"] = key.RolesToString(roles)
-	if currentVersion, _ := valuesYaml["teleportVersionOverride"].(string); currentVersion != t.Config.TeleportVersion {
-		if t.Config.TeleportVersion != "" {
-			valuesYaml["teleportVersionOverride"] = t.Config.TeleportVersion
-		} else {
-			delete(valuesYaml, "teleportVersionOverride")
-		}
+	if override := key.ResolveTeleportVersionOverride(t.Config.AppVersion, t.Config.TeleportVersion); override != "" {
+		valuesYaml["teleportVersionOverride"] = override
+	} else {
+		delete(valuesYaml, "teleportVersionOverride")
 	}
 
 	var out interface{} = valuesYaml
