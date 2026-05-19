@@ -76,9 +76,14 @@ func (t *Teleport) GetTeleportVersionFromConfigMap(configMap *corev1.ConfigMap) 
 }
 
 // IsConfigMapLayoutUpToDate reports whether the ConfigMap's top-level shape
-// matches what the configured AppVersion expects (nested under
-// `teleport-kube-agent` vs. flat at the root).
-func (t *Teleport) IsConfigMapLayoutUpToDate(configMap *corev1.ConfigMap) (bool, error) {
+// matches what the cluster's deployed teleport-kube-agent chart version
+// expects:
+//
+//   - tkaVersion >= v0.11.0: nested-only — the `teleport-kube-agent:` block
+//     must exist and the flat block must be absent (root has no authToken).
+//   - tkaVersion < v0.11.0 or unknown: dual — both the nested block AND
+//     the flat root keys must be present.
+func (t *Teleport) IsConfigMapLayoutUpToDate(configMap *corev1.ConfigMap, tkaVersion string) (bool, error) {
 	valuesBytes, ok := configMap.Data["values"]
 	if !ok {
 		return false, microerror.Mask(fmt.Errorf("malformed ConfigMap: key `values` not found"))
@@ -89,8 +94,13 @@ func (t *Teleport) IsConfigMapLayoutUpToDate(configMap *corev1.ConfigMap) (bool,
 		return false, microerror.Mask(fmt.Errorf("failed to parse YAML: %w", err))
 	}
 
-	_, isNested := root[key.TeleportKubeAgentValuesKey].(map[string]interface{})
-	return isNested == key.UsesNestedKubeAgentValues(t.Config.AppVersion), nil
+	_, hasNested := root[key.TeleportKubeAgentValuesKey].(map[string]interface{})
+	_, hasFlat := root["authToken"].(string)
+
+	if key.UsesNestedKubeAgentValues(tkaVersion) {
+		return hasNested && !hasFlat, nil
+	}
+	return hasNested && hasFlat, nil
 }
 
 func parseConfigMapValues(configMap *corev1.ConfigMap) (map[string]interface{}, error) {
@@ -110,11 +120,11 @@ func parseConfigMapValues(configMap *corev1.ConfigMap) (map[string]interface{}, 
 	return root, nil
 }
 
-func (t *Teleport) CreateConfigMap(ctx context.Context, log logr.Logger, ctrlClient client.Client, clusterName string, clusterNamespace string, registerName string, token string, roles []string) error {
+func (t *Teleport) CreateConfigMap(ctx context.Context, log logr.Logger, ctrlClient client.Client, clusterName string, clusterNamespace string, registerName string, token string, roles []string, tkaVersion string) error {
 	configMapName := key.GetConfigmapName(clusterName, t.Config.AppName)
 
 	configMapData := map[string]string{
-		"values": t.getConfigMapData(registerName, token, roles),
+		"values": t.getConfigMapData(registerName, token, roles, tkaVersion),
 	}
 
 	cm := corev1.ConfigMap{}
@@ -179,39 +189,40 @@ func (t *Teleport) EnsureTbotConfigMap(ctx context.Context, log logr.Logger, ctr
 	return nil
 }
 
-func (t *Teleport) UpdateConfigMap(ctx context.Context, log logr.Logger, ctrlClient client.Client, configMap *corev1.ConfigMap, token string, roles []string) error {
-	valuesYaml, err := parseConfigMapValues(configMap)
+// UpdateConfigMap rewrites the ConfigMap's `values` from the template so the
+// produced YAML matches what GetConfigmapDataFromTemplate would emit for the
+// given tkaVersion. This means the controller can do a single string compare
+// to detect drift, and a tkaVersion crossing 0.11.0 actually drops the flat
+// block from the stored ConfigMap.
+func (t *Teleport) UpdateConfigMap(ctx context.Context, log logr.Logger, ctrlClient client.Client, configMap *corev1.ConfigMap, token string, roles []string, tkaVersion string) error {
+	registerName, err := registerNameFromConfigMap(configMap)
 	if err != nil {
 		return err
 	}
 
-	valuesYaml["authToken"] = token
-	valuesYaml["roles"] = key.RolesToString(roles)
-	if override := key.ResolveTeleportVersionOverride(t.Config.AppVersion, t.Config.TeleportVersion); override != "" {
-		valuesYaml["teleportVersionOverride"] = override
-	} else {
-		delete(valuesYaml, "teleportVersionOverride")
+	if configMap.Data == nil {
+		configMap.Data = map[string]string{}
 	}
-
-	var out interface{} = valuesYaml
-	if key.UsesNestedKubeAgentValues(t.Config.AppVersion) {
-		out = map[string]interface{}{
-			key.TeleportKubeAgentValuesKey: valuesYaml,
-		}
-	}
-
-	updatedValuesYaml, err := yaml.Marshal(out)
-	if err != nil {
-		return fmt.Errorf("failed to marshal updated content into YAML: %w", err)
-	}
-
-	// Update the ConfigMap's data with the modified value
-	configMap.Data["values"] = string(updatedValuesYaml)
+	configMap.Data["values"] = t.getConfigMapData(registerName, token, roles, tkaVersion)
 	if err := ctrlClient.Update(ctx, configMap); err != nil {
 		return microerror.Mask(fmt.Errorf("failed to update ConfigMap: %w", err))
 	}
 	log.Info("Updated config map with new teleport kube join token", "configMap", configMap.GetName())
 	return nil
+}
+
+// registerNameFromConfigMap extracts the kubeClusterName from the stored
+// values — it's the register name and doesn't change between reconciles.
+func registerNameFromConfigMap(configMap *corev1.ConfigMap) (string, error) {
+	values, err := parseConfigMapValues(configMap)
+	if err != nil {
+		return "", err
+	}
+	name, ok := values["kubeClusterName"].(string)
+	if !ok || name == "" {
+		return "", microerror.Mask(fmt.Errorf("malformed ConfigMap: key `kubeClusterName` not found"))
+	}
+	return name, nil
 }
 
 func (t *Teleport) DeleteConfigMap(ctx context.Context, log logr.Logger, ctrlClient client.Client, clusterName string, clusterNamespace string) error {
@@ -254,15 +265,16 @@ func (t *Teleport) DeleteTbotConfigMap(ctx context.Context, log logr.Logger, ctr
 	return nil
 }
 
-func (t *Teleport) getConfigMapData(registerName string, token string, roles []string) string {
-	var (
-		authToken               = token
-		proxyAddr               = t.Config.ProxyAddr
-		kubeClusterName         = registerName
-		teleportVersionOverride = t.Config.TeleportVersion
-	)
+// RenderConfigMapValues returns the deterministic YAML the operator wants
+// the cluster's teleport-kube-agent values ConfigMap to contain. The
+// controller uses it both for the initial write and for byte-compare
+// drift detection on subsequent reconciles.
+func (t *Teleport) RenderConfigMapValues(registerName, token string, roles []string, tkaVersion string) string {
+	return t.getConfigMapData(registerName, token, roles, tkaVersion)
+}
 
-	return key.GetConfigmapDataFromTemplate(authToken, proxyAddr, kubeClusterName, teleportVersionOverride, roles, t.Config.AppVersion)
+func (t *Teleport) getConfigMapData(registerName, token string, roles []string, tkaVersion string) string {
+	return key.GetConfigmapDataFromTemplate(token, t.Config.ProxyAddr, registerName, t.Config.TeleportVersion, roles, tkaVersion)
 }
 
 func (t *Teleport) getTbotConfigMapData(registerName string, clusterName string) string {

@@ -25,6 +25,80 @@ func newHelmReleaseUnstructured() *unstructured.Unstructured {
 	return hr
 }
 
+// GetTeleportKubeAgentVersion returns the chart version of the deployed
+// teleport-kube-agent for a cluster, or "" if no matching HelmRelease or
+// App CR exists. HelmRelease takes precedence (same order as
+// NewTeleportAppConfigManager). For HelmReleases we prefer
+// status.history[0].chartVersion (Flux's actually-installed version,
+// independent of how the chart reference was authored), falling back to
+// spec.chart.spec.version for HelmReleases that haven't reconciled yet.
+// Callers treat the empty string as "unknown / pre-0.11.0".
+func GetTeleportKubeAgentVersion(
+	ctx context.Context,
+	ctrlClient client.Client,
+	resourceName, namespace string,
+) (string, error) {
+	hr := newHelmReleaseUnstructured()
+	err := ctrlClient.Get(ctx, client.ObjectKey{Name: resourceName, Namespace: namespace}, hr)
+	if err == nil {
+		if v := helmReleaseInstalledChartVersion(hr); v != "" {
+			return v, nil
+		}
+		if v := helmReleaseSpecChartVersion(hr); v != "" {
+			return v, nil
+		}
+		return "", nil
+	}
+	if !apierrors.IsNotFound(err) {
+		return "", microerror.Mask(err)
+	}
+
+	app := &v1alpha1.App{}
+	err = ctrlClient.Get(ctx, client.ObjectKey{Name: resourceName, Namespace: namespace}, app)
+	if err == nil {
+		return app.Spec.Version, nil
+	}
+	if !apierrors.IsNotFound(err) {
+		return "", microerror.Mask(err)
+	}
+
+	return "", nil
+}
+
+func helmReleaseInstalledChartVersion(hr *unstructured.Unstructured) string {
+	status, ok := hr.Object["status"].(map[string]interface{})
+	if !ok {
+		return ""
+	}
+	history, ok := status["history"].([]interface{})
+	if !ok || len(history) == 0 {
+		return ""
+	}
+	entry, ok := history[0].(map[string]interface{})
+	if !ok {
+		return ""
+	}
+	v, _ := entry["chartVersion"].(string)
+	return v
+}
+
+func helmReleaseSpecChartVersion(hr *unstructured.Unstructured) string {
+	spec, ok := hr.Object["spec"].(map[string]interface{})
+	if !ok {
+		return ""
+	}
+	chart, ok := spec["chart"].(map[string]interface{})
+	if !ok {
+		return ""
+	}
+	chartSpec, ok := chart["spec"].(map[string]interface{})
+	if !ok {
+		return ""
+	}
+	v, _ := chartSpec["version"].(string)
+	return v
+}
+
 // TeleportAppConfigManager abstracts injecting a ConfigMap reference into either a
 // Giant Swarm App CR (via spec.extraConfigs) or a Flux HelmRelease (via
 // spec.valuesFrom).

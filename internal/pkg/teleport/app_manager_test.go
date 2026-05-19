@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	appv1alpha1 "github.com/giantswarm/apiextensions-application/api/v1alpha1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
@@ -352,5 +353,105 @@ func Test_AppCR_DeleteConfig_NoOp_WhenEntryAbsent(t *testing.T) {
 	}
 	if len(updated.Spec.ExtraConfigs) != 0 {
 		t.Errorf("expected ExtraConfigs unchanged (nil/empty), got %d entries", len(updated.Spec.ExtraConfigs))
+	}
+}
+
+func Test_GetTeleportKubeAgentVersion_NoResource(t *testing.T) {
+	fakeClient, err := test.NewFakeK8sClientFromObjects()
+	if err != nil {
+		t.Fatalf("failed to create fake client: %v", err)
+	}
+
+	v, err := GetTeleportKubeAgentVersion(context.Background(), fakeClient, testResourceName, testNamespace)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if v != "" {
+		t.Errorf("expected empty version, got %q", v)
+	}
+}
+
+func Test_GetTeleportKubeAgentVersion_AppCR(t *testing.T) {
+	app := test.NewApp(testResourceName, testNamespace)
+	app.Spec.Version = "0.11.0"
+
+	fakeClient, err := test.NewFakeK8sClientFromObjects(app)
+	if err != nil {
+		t.Fatalf("failed to create fake client: %v", err)
+	}
+
+	v, err := GetTeleportKubeAgentVersion(context.Background(), fakeClient, testResourceName, testNamespace)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if v != "0.11.0" {
+		t.Errorf("expected 0.11.0, got %q", v)
+	}
+}
+
+func Test_GetTeleportKubeAgentVersion_HelmRelease_FromStatusHistory(t *testing.T) {
+	hr := test.NewHelmRelease(testResourceName, testNamespace)
+	if err := unstructured.SetNestedSlice(hr.Object, []interface{}{
+		map[string]interface{}{"chartVersion": "0.11.0+abc"},
+	}, "status", "history"); err != nil {
+		t.Fatalf("set history: %v", err)
+	}
+
+	fakeClient, err := test.NewFakeK8sClientFromObjects(hr)
+	if err != nil {
+		t.Fatalf("failed to create fake client: %v", err)
+	}
+
+	v, err := GetTeleportKubeAgentVersion(context.Background(), fakeClient, testResourceName, testNamespace)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if v != "0.11.0+abc" {
+		t.Errorf("expected 0.11.0+abc, got %q", v)
+	}
+}
+
+func Test_GetTeleportKubeAgentVersion_HelmRelease_FromSpecChart(t *testing.T) {
+	hr := test.NewHelmRelease(testResourceName, testNamespace)
+	if err := unstructured.SetNestedField(hr.Object, "0.11.0", "spec", "chart", "spec", "version"); err != nil {
+		t.Fatalf("set spec.chart.spec.version: %v", err)
+	}
+
+	fakeClient, err := test.NewFakeK8sClientFromObjects(hr)
+	if err != nil {
+		t.Fatalf("failed to create fake client: %v", err)
+	}
+
+	v, err := GetTeleportKubeAgentVersion(context.Background(), fakeClient, testResourceName, testNamespace)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if v != "0.11.0" {
+		t.Errorf("expected 0.11.0, got %q", v)
+	}
+}
+
+func Test_GetTeleportKubeAgentVersion_HelmReleaseTakesPrecedence(t *testing.T) {
+	hr := test.NewHelmRelease(testResourceName, testNamespace)
+	if err := unstructured.SetNestedSlice(hr.Object, []interface{}{
+		map[string]interface{}{"chartVersion": "0.11.0-hr"},
+	}, "status", "history"); err != nil {
+		t.Fatalf("set history: %v", err)
+	}
+
+	app := test.NewApp(testResourceName, testNamespace)
+	app.Spec.Version = "0.10.0-app"
+
+	fakeClient, err := test.NewFakeK8sClientFromObjects(hr, app)
+	if err != nil {
+		t.Fatalf("failed to create fake client: %v", err)
+	}
+
+	v, err := GetTeleportKubeAgentVersion(context.Background(), fakeClient, testResourceName, testNamespace)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if v != "0.11.0-hr" {
+		t.Errorf("expected HelmRelease to win, got %q", v)
 	}
 }
