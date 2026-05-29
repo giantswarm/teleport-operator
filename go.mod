@@ -112,3 +112,5 @@ require (
 )
 
 replace github.com/golang-jwt/jwt/v4 v4.2.0 => github.com/golang-jwt/jwt/v4 v4.5.2
+
+replace golang.org/x/sys v0.43.0 => golang.org/x/sys v0.45.0
