@@ -5,6 +5,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Masterminds/semver/v3"
 	"github.com/gravitational/teleport/api/types"
 )
 
@@ -33,6 +34,20 @@ const (
 	RoleKube              = "kube"
 	RoleApp               = "app"
 	RoleNode              = "node"
+
+	// TeleportKubeAgentValuesKey is the top-level key under which
+	// teleport-kube-agent v0.11.0+ reads its values.
+	TeleportKubeAgentValuesKey = "teleport-kube-agent"
+
+	// teleportKubeAgentNestedSinceVersion is the lowest chart version that
+	// reads its values nested under TeleportKubeAgentValuesKey.
+	teleportKubeAgentNestedSinceVersion = "0.11.0"
+
+	// teleportKubeAgentBundledTeleportVersion is the Teleport version that
+	// teleport-kube-agent v0.11.0 bundles by default. The nested block
+	// skips teleportVersionOverride when the operator-configured override
+	// would be a downgrade against this bundled version.
+	teleportKubeAgentBundledTeleportVersion = "18.7.6"
 )
 
 func ParseRoles(s string) ([]string, error) {
@@ -97,18 +112,91 @@ func GetAppName(clusterName string, appName string) string {
 	return fmt.Sprintf("%s-%s", clusterName, appName)
 }
 
-func GetConfigmapDataFromTemplate(authToken string, proxyAddr string, kubeClusterName string, teleportVersion string, roles []string) string {
-	dataTpl := `roles: "%s"
+// UsesNestedKubeAgentValues reports whether the teleport-kube-agent chart
+// version expects its values nested under the `teleport-kube-agent` key.
+// Versions at or above v0.11.0 use the nested layout. An unparseable
+// version is treated as the legacy (flat) layout.
+func UsesNestedKubeAgentValues(appVersion string) bool {
+	v, err := semver.NewVersion(strings.TrimPrefix(appVersion, "v"))
+	if err != nil {
+		return false
+	}
+	threshold := semver.MustParse(teleportKubeAgentNestedSinceVersion)
+	return v.Compare(threshold) >= 0
+}
+
+// ResolveNestedTeleportVersionOverride returns the value to write as
+// `teleportVersionOverride` inside the nested `teleport-kube-agent:` block,
+// or "" when the override should be omitted. The nested block always
+// targets chart v0.11.0+ consumers (whether emitted alone or alongside a
+// flat block for upgrade safety), so the floor applies unconditionally:
+// any teleportVersion below teleportKubeAgentBundledTeleportVersion — or
+// one that doesn't parse as semver — is dropped to avoid a downgrade
+// against the chart's bundled Teleport.
+func ResolveNestedTeleportVersionOverride(teleportVersion string) string {
+	if teleportVersion == "" {
+		return ""
+	}
+	v, err := semver.NewVersion(strings.TrimPrefix(teleportVersion, "v"))
+	if err != nil {
+		return ""
+	}
+	bundled := semver.MustParse(teleportKubeAgentBundledTeleportVersion)
+	if v.Compare(bundled) < 0 {
+		return ""
+	}
+	return teleportVersion
+}
+
+// GetConfigmapDataFromTemplate renders the teleport-kube-agent values document
+// for a cluster. The layout depends on the cluster's deployed chart version:
+//
+//   - tkaVersion >= v0.11.0: a single nested block under TeleportKubeAgentValuesKey,
+//     because that's the only place the chart looks.
+//   - tkaVersion < v0.11.0 or unknown ("" / unparseable): the legacy flat
+//     layout at the root, PLUS the nested block. The flat block keeps the
+//     chart working today; the nested block is there so an in-place upgrade
+//     past v0.11.0 doesn't lose values in the window before the operator's
+//     next reconcile.
+//
+// teleportVersionOverride is passed through in the flat block when non-empty,
+// but the nested block applies a floor (see ResolveTeleportVersionOverride):
+// the override is dropped if it would be a downgrade against the v0.11.0
+// chart's bundled Teleport version.
+func GetConfigmapDataFromTemplate(authToken, proxyAddr, kubeClusterName, teleportVersion string, roles []string, tkaVersion string) string {
+	flat := renderFlatValuesBlock(authToken, proxyAddr, kubeClusterName, teleportVersion, roles)
+	nestedOverride := ResolveNestedTeleportVersionOverride(teleportVersion)
+	nested := renderNestedValuesBlock(authToken, proxyAddr, kubeClusterName, nestedOverride, roles)
+
+	if UsesNestedKubeAgentValues(tkaVersion) {
+		return nested
+	}
+	return flat + nested
+}
+
+func renderFlatValuesBlock(authToken, proxyAddr, kubeClusterName, teleportVersion string, roles []string) string {
+	body := fmt.Sprintf(`roles: "%s"
 authToken: "%s"
 proxyAddr: "%s"
 kubeClusterName: "%s"
-`
-
+`, RolesToString(roles), authToken, proxyAddr, kubeClusterName)
 	if teleportVersion != "" {
-		dataTpl = fmt.Sprintf("%steleportVersionOverride: %q", dataTpl, teleportVersion)
+		body += fmt.Sprintf("teleportVersionOverride: %q\n", teleportVersion)
 	}
+	return body
+}
 
-	return fmt.Sprintf(dataTpl, RolesToString(roles), authToken, proxyAddr, kubeClusterName)
+func renderNestedValuesBlock(authToken, proxyAddr, kubeClusterName, teleportVersion string, roles []string) string {
+	body := fmt.Sprintf(`%s:
+  roles: "%s"
+  authToken: "%s"
+  proxyAddr: "%s"
+  kubeClusterName: "%s"
+`, TeleportKubeAgentValuesKey, RolesToString(roles), authToken, proxyAddr, kubeClusterName)
+	if teleportVersion != "" {
+		body += fmt.Sprintf("  teleportVersionOverride: %q\n", teleportVersion)
+	}
+	return body
 }
 
 func GetTbotConfigmapDataFromTemplate(kubeClusterName string, clusterName string) string {

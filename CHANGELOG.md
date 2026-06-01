@@ -10,8 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add `io.giantswarm.application.audience` and `io.giantswarm.application.managed` chart annotations for Backstage visibility.
+- Handle new `teleport-kube-agent` values schema and drop `teleportVersionOverride` for newer versions.
 
-### Changed
 ## [0.12.4] - 2026-01-30
 
 

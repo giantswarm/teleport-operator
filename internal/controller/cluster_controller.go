@@ -69,7 +69,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		return ctrl.Result{}, microerror.Mask(err)
 	}
 
-	log.Info("Reconciling cluster", "cluster", cluster)
+	log.Info("Reconciling cluster")
 
 	appsEnabled, err := r.Teleport.AreTeleportAppsEnabled(ctx, cluster.Name, cluster.Namespace)
 	if err != nil {
@@ -212,6 +212,16 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		}
 	}
 
+	// Look up the deployed teleport-kube-agent chart version for this cluster.
+	// The layout of the values ConfigMap we write depends on it: nested-only
+	// for v0.11.0+, dual (flat + nested) for older or unknown versions.
+	tkaResourceName := key.GetAppName(cluster.Name, r.Teleport.Config.AppName)
+	tkaVersion, err := teleport.GetTeleportKubeAgentVersion(ctx, r.Client, tkaResourceName, cluster.Namespace)
+	if err != nil {
+		return ctrl.Result{}, microerror.Mask(err)
+	}
+	log = log.WithValues("tkaVersion", tkaVersion)
+
 	// Check if the configmap exists in the cluster, if not, generate teleport token and create the config map
 	// if it is, check teleport token validity, and update the configmap if teleport token has expired
 	configMap, err := r.Teleport.GetConfigMap(ctx, log, r.Client, cluster.Name, cluster.Namespace)
@@ -224,7 +234,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
-		if err := r.Teleport.CreateConfigMap(ctx, log, r.Client, cluster.Name, cluster.Namespace, registerName, token, roles); err != nil {
+		if err := r.Teleport.CreateConfigMap(ctx, log, r.Client, cluster.Name, cluster.Namespace, registerName, token, roles, tkaVersion); err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
 		log.Info("Created new config map with teleport join token", "configMapName", key.GetConfigmapName(cluster.Name, r.Teleport.Config.AppName), "roles", roles)
@@ -237,17 +247,36 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		if err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
+
+		writeToken := token
 		if !tokenValid {
-			newToken, err := r.Teleport.GenerateToken(ctx, registerName, roles)
+			writeToken, err = r.Teleport.GenerateToken(ctx, registerName, roles)
 			if err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
-			if err := r.Teleport.UpdateConfigMap(ctx, log, r.Client, configMap, newToken, roles); err != nil {
+		}
+
+		// Single drift check: compare the stored values document to what the
+		// template would produce now. This catches token rotation, teleport
+		// version drift, and layout changes (dual ↔ nested-only) in one shot.
+		desiredValues := r.Teleport.RenderConfigMapValues(registerName, writeToken, roles, tkaVersion)
+
+		switch {
+		case configMap.Data["values"] == desiredValues:
+			log.Info("ConfigMap has valid teleport join token", "configMapName", configMap.GetName(), "roles", roles)
+		case !tokenValid:
+			if err := r.Teleport.UpdateConfigMap(ctx, log, r.Client, configMap, writeToken, roles, tkaVersion); err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
 			log.Info("Updated config map with new teleport join token", "configMapName", configMap.GetName(), "roles", roles)
-		} else {
-			log.Info("ConfigMap has valid teleport join token", "configMapName", configMap.GetName(), "roles", roles)
+		default:
+			if err := r.Teleport.UpdateConfigMap(ctx, log, r.Client, configMap, writeToken, roles, tkaVersion); err != nil {
+				return ctrl.Result{}, microerror.Mask(err)
+			}
+			log.Info("Updated config map to align teleport version and values layout",
+				"configMapName", configMap.GetName(),
+				"teleportVersion", r.Teleport.Config.TeleportVersion,
+				"nestedValuesOnly", key.UsesNestedKubeAgentValues(tkaVersion))
 		}
 	}
 

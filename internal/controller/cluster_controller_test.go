@@ -38,6 +38,7 @@ func Test_ClusterController(t *testing.T) {
 		secret              *corev1.Secret
 		configMap           *corev1.ConfigMap
 		userValuesConfigMap *corev1.ConfigMap
+		tkaApp              *appv1alpha1.App
 		newTeleportClient   func(ctx context.Context, proxyAddr, identityFile string) (teleport.Client, error)
 		expectedCluster     *capi.Cluster
 		expectedSecret      *corev1.Secret
@@ -63,7 +64,7 @@ func Test_ClusterController(t *testing.T) {
 			},
 			expectedCluster:   test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
 			expectedSecret:    test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
-			expectedConfigMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{key.RoleKube, key.RoleApp}),
+			expectedConfigMap: test.NewDualBlockConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{key.RoleKube, key.RoleApp}),
 			expectedRoles:     []string{key.RoleKube, key.RoleApp},
 		},
 		{
@@ -84,7 +85,7 @@ func Test_ClusterController(t *testing.T) {
 			},
 			expectedCluster:   test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
 			expectedSecret:    test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
-			expectedConfigMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{key.RoleKube}),
+			expectedConfigMap: test.NewDualBlockConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{key.RoleKube}),
 			expectedRoles:     []string{key.RoleKube},
 		},
 		{
@@ -96,7 +97,7 @@ func Test_ClusterController(t *testing.T) {
 			cluster:           test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
 			expectedCluster:   test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
 			expectedSecret:    test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
-			expectedConfigMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{key.RoleKube}),
+			expectedConfigMap: test.NewDualBlockConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{key.RoleKube}),
 			expectedRoles:     []string{key.RoleKube},
 		},
 		{
@@ -119,7 +120,7 @@ func Test_ClusterController(t *testing.T) {
 			},
 			expectedCluster:   test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
 			expectedSecret:    test.NewSecret(test.ClusterName, test.NamespaceName, test.NewTokenName),
-			expectedConfigMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.NewTokenName, []string{key.RoleKube, key.RoleApp}),
+			expectedConfigMap: test.NewDualBlockConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.NewTokenName, []string{key.RoleKube, key.RoleApp}),
 			expectedRoles:     []string{key.RoleKube, key.RoleApp},
 		},
 		{
@@ -157,8 +158,45 @@ func Test_ClusterController(t *testing.T) {
 			},
 			expectedCluster:   test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
 			expectedSecret:    test.NewSecret(test.ClusterName, test.NamespaceName, test.NewTokenName),
-			expectedConfigMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.NewTokenName, []string{key.RoleKube, key.RoleApp}),
+			expectedConfigMap: test.NewDualBlockConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.NewTokenName, []string{key.RoleKube, key.RoleApp}),
 			expectedRoles:     []string{key.RoleKube, key.RoleApp},
+		},
+		{
+			name:      "case 6.5: Rewrite configmap when teleportVersionOverride drifts even if token is valid",
+			namespace: test.NamespaceName,
+			token:     test.TokenName,
+			config:    newConfigWithTeleportVersion(test.TeleportVersionNew),
+			identity:  newIdentity(test.LastReadValue),
+			tokens: []teleportTypes.ProvisionToken{
+				test.NewToken(test.TokenName, test.ClusterName, []string{key.RoleKube}),
+				test.NewToken(test.TokenName, test.ClusterName, []string{key.RoleNode}),
+			},
+			cluster:           test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
+			secret:            test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
+			configMap:         test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{key.RoleKube}),
+			expectedCluster:   test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
+			expectedSecret:    test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
+			expectedConfigMap: test.NewDualBlockConfigMapWithTeleportVersion(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, test.TeleportVersionNew, []string{key.RoleKube}),
+			expectedRoles:     []string{key.RoleKube},
+		},
+		{
+			name:      "case 7: Migrate flat configmap to nested when TKA App is v0.11.0",
+			namespace: test.NamespaceName,
+			token:     test.TokenName,
+			config:    newConfig(),
+			identity:  newIdentity(test.LastReadValue),
+			tokens: []teleportTypes.ProvisionToken{
+				test.NewToken(test.TokenName, test.ClusterName, []string{key.RoleKube}),
+				test.NewToken(test.TokenName, test.ClusterName, []string{key.RoleNode}),
+			},
+			cluster:           test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
+			secret:            test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
+			configMap:         test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{key.RoleKube}),
+			tkaApp:            tkaAppWithVersion(test.ClusterName, test.AppName, test.NamespaceName, test.AppVersionNested),
+			expectedCluster:   test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{}),
+			expectedSecret:    test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
+			expectedConfigMap: test.NewNestedConfigMapWithoutVersionOverride(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{key.RoleKube}),
+			expectedRoles:     []string{key.RoleKube},
 		},
 		{
 			name:      "case 6: Return an error in case reconnection to Teleport fails after the credentials are rotated",
@@ -194,6 +232,9 @@ func Test_ClusterController(t *testing.T) {
 			}
 			if tc.userValuesConfigMap != nil {
 				runtimeObjects = append(runtimeObjects, tc.userValuesConfigMap)
+			}
+			if tc.tkaApp != nil {
+				runtimeObjects = append(runtimeObjects, tc.tkaApp)
 			}
 
 			newTeleportClient := teleport.NewClient
@@ -323,11 +364,23 @@ func newConfig() *config.Config {
 	}
 }
 
+func newConfigWithTeleportVersion(teleportVersion string) *config.Config {
+	cfg := newConfig()
+	cfg.TeleportVersion = teleportVersion
+	return cfg
+}
+
 func newIdentity(lastRead time.Time) *config.IdentityConfig {
 	return &config.IdentityConfig{
 		IdentityFile: test.IdentityFileValue,
 		LastRead:     lastRead,
 	}
+}
+
+func tkaAppWithVersion(clusterName, appName, namespace, version string) *appv1alpha1.App {
+	app := test.NewApp(key.GetAppName(clusterName, appName), namespace)
+	app.Spec.Version = version
+	return app
 }
 
 func findSecretInList(secretList *corev1.SecretList, name string) *corev1.Secret {

@@ -69,20 +69,20 @@ func CheckConfigMap(t *testing.T, expected, actual *corev1.ConfigMap) {
 		t.Fatalf("config maps do not match:\nexpected %v\nactual %v", expected, actual)
 	}
 
-	var expectedValues map[string]string
+	var expectedValues map[string]interface{}
 	err := yaml.Unmarshal([]byte(expected.Data["values"]), &expectedValues)
 	if err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
 
-	var actualValues map[string]string
+	var actualValues map[string]interface{}
 	err = yaml.Unmarshal([]byte(actual.Data["values"]), &actualValues)
 	if err != nil {
 		t.Fatalf("unexpected error %v", err)
 	}
 
 	if !reflect.DeepEqual(expectedValues, actualValues) {
-		t.Fatalf("config maps do not match:\nexpected %v\nactual %v", expected, actual)
+		t.Fatalf("config maps do not match:\nexpected %v\nactual %v", expected.Data["values"], actual.Data["values"])
 	}
 }
 
