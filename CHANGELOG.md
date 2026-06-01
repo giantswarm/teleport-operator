@@ -10,13 +10,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Add `io.giantswarm.application.audience` and `io.giantswarm.application.managed` chart annotations for Backstage visibility.
-- Decide the teleport-kube-agent values layout per cluster, based on the actually-deployed chart version (HelmRelease `status.history[0].chartVersion` preferred, App CR `spec.version` fallback). For chart versions below v0.11.0 (or when no resource is found) the operator emits both the legacy flat layout AND a nested `teleport-kube-agent:` block, so a cluster upgrade across the v0.11.0 boundary stays live during the upgrade window. For v0.11.0+ only the nested block is emitted.
+- Handle new `teleport-kube-agent` values schema and drop `teleportVersionOverride` for newer versions.
 
-### Changed
-
-- The operator's own `teleport.appVersion` configuration no longer influences the values layout decision — the per-cluster chart version does.
-- Drift detection on the values config map is now a single byte-compare against the rendered desired document, collapsing token rotation, teleport-version drift, and layout migration into one path.
-- The nested `teleport-kube-agent:` block always applies the bundled-default floor: `teleportVersionOverride` is dropped when the configured Teleport version is below v18.7.6 (the chart's bundled default) or unparseable, to avoid silently downgrading. The flat block keeps the legacy passthrough behaviour.
 ## [0.12.4] - 2026-01-30
 
 
