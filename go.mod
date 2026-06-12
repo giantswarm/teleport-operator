@@ -14,9 +14,9 @@ require (
 	github.com/pkg/errors v0.9.1
 	google.golang.org/grpc v1.81.1
 	gopkg.in/yaml.v3 v3.0.1
-	k8s.io/api v0.36.1
-	k8s.io/apimachinery v0.36.1
-	k8s.io/client-go v0.36.1
+	k8s.io/api v0.36.2
+	k8s.io/apimachinery v0.36.2
+	k8s.io/client-go v0.36.2
 	sigs.k8s.io/cluster-api v1.12.4
 	sigs.k8s.io/controller-runtime v0.24.1
 )
