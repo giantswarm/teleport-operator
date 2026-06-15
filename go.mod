@@ -3,7 +3,7 @@ module github.com/giantswarm/teleport-operator
 go 1.26.0
 
 require (
-	github.com/Masterminds/semver/v3 v3.4.0
+	github.com/Masterminds/semver/v3 v3.5.0
 	github.com/giantswarm/apiextensions-application v0.6.2
 	github.com/giantswarm/microerror v0.4.1
 	github.com/go-logr/logr v1.4.3
