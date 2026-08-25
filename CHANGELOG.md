@@ -9,6 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.14.0] - 2026-08-25
 
+### Changed
+
+- Update `tbot` to v18.7.6.
+- Swap `auth_server` setting for `proxy_server` in tbot config.
+
 ## [0.13.0] - 2026-06-01
 
 ### Added
