@@ -7,6 +7,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.14.0] - 2026-08-25
+
+### Changed
+
+- Update `tbot` to v18.7.6.
+- Swap `auth_server` setting for `proxy_server` in tbot config.
+
 ## [0.13.0] - 2026-06-01
 
 ### Added
@@ -192,7 +199,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.1.0] - 2023-08-09
 
-[Unreleased]: https://github.com/giantswarm/teleport-operator/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/giantswarm/teleport-operator/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/giantswarm/teleport-operator/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/giantswarm/teleport-operator/compare/v0.12.4...v0.13.0
 [0.12.4]: https://github.com/giantswarm/teleport-operator/compare/v0.12.3...v0.12.4
 [0.12.3]: https://github.com/giantswarm/teleport-operator/compare/v0.12.2...v0.12.3
