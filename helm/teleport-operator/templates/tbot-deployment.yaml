@@ -15,6 +15,8 @@ spec:
       app.kubernetes.io/name: tbot
   template:
     metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/tbot-configmap.yaml") . | sha256sum }}
       labels:
         app.kubernetes.io/name: tbot
     spec:
@@ -26,7 +28,7 @@ spec:
         {{- end }}
       containers:
       - name: tbot
-        image: gsoci.azurecr.io/giantswarm/tbot-distroless:{{ .Values.teleport.teleportVersion }}
+        image: gsoci.azurecr.io/giantswarm/tbot-distroless:{{ .Values.teleport.tbotVersion | default .Values.teleport.teleportVersion }}
         command:
           - tbot
         args:

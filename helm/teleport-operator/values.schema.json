@@ -1,15 +1,42 @@
 {
-    "$schema": "http://json-schema.org/schema#",
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
     "type": "object",
     "properties": {
-        "global": {
+        "affinity": {
             "type": "object",
             "properties": {
-                "podSecurityStandards": {
+                "nodeAffinity": {
                     "type": "object",
                     "properties": {
-                        "enforced": {
-                            "type": "boolean"
+                        "preferredDuringSchedulingIgnoredDuringExecution": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "preference": {
+                                        "type": "object",
+                                        "properties": {
+                                            "matchExpressions": {
+                                                "type": "array",
+                                                "items": {
+                                                    "type": "object",
+                                                    "properties": {
+                                                        "key": {
+                                                            "type": "string"
+                                                        },
+                                                        "operator": {
+                                                            "type": "string"
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    },
+                                    "weight": {
+                                        "type": "integer"
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -23,6 +50,41 @@
                 }
             }
         },
+        "containerSecurityContext": {
+            "type": "object",
+            "properties": {
+                "allowPrivilegeEscalation": {
+                    "type": "boolean"
+                },
+                "capabilities": {
+                    "type": "object",
+                    "properties": {
+                        "drop": {
+                            "type": "array",
+                            "items": {
+                                "type": "string"
+                            }
+                        }
+                    }
+                },
+                "readOnlyRootFilesystem": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "global": {
+            "type": "object",
+            "properties": {
+                "podSecurityStandards": {
+                    "type": "object",
+                    "properties": {
+                        "enforced": {
+                            "type": "boolean"
+                        }
+                    }
+                }
+            }
+        },
         "image": {
             "type": "object",
             "properties": {
@@ -30,35 +92,6 @@
                     "type": "string"
                 },
                 "tag": {
-                    "type": "string"
-                }
-            }
-        },
-        "teleport": {
-            "type": "object",
-            "properties": {
-                "appCatalog": {
-                    "type": "string"
-                },
-                "appName": {
-                    "type": "string"
-                },
-                "appVersion": {
-                    "type": "string"
-                },
-                "identityFile": {
-                    "type": "string"
-                },
-                "managementClusterName": {
-                    "type": "string"
-                },
-                "proxyAddr": {
-                    "type": "string"
-                },
-                "teleportClusterName": {
-                    "type": "string"
-                },
-                "teleportVersion": {
                     "type": "string"
                 }
             }
@@ -87,6 +120,9 @@
         "podSecurityContext": {
             "type": "object",
             "properties": {
+                "runAsNonRoot": {
+                    "type": "boolean"
+                },
                 "seccompProfile": {
                     "type": "object",
                     "properties": {
@@ -94,17 +130,6 @@
                             "type": "string"
                         }
                     }
-                }
-            }
-        },
-        "project": {
-            "type": "object",
-            "properties": {
-                "branch": {
-                    "type": "string"
-                },
-                "commit": {
-                    "type": "string"
                 }
             }
         },
@@ -143,19 +168,6 @@
                 }
             }
         },
-        "securityContext": {
-            "type": "object",
-            "properties": {
-                "seccompProfile": {
-                    "type": "object",
-                    "properties": {
-                        "type": {
-                            "type": "string"
-                        }
-                    }
-                }
-            }
-        },
         "tbot": {
             "type": "object",
             "properties": {
@@ -169,6 +181,52 @@
             "properties": {
                 "enabled": {
                     "type": "boolean"
+                }
+            }
+        },
+        "teleport": {
+            "type": "object",
+            "properties": {
+                "appCatalog": {
+                    "type": "string"
+                },
+                "appName": {
+                    "type": "string"
+                },
+                "appVersion": {
+                    "type": "string"
+                },
+                "managementClusterName": {
+                    "type": "string"
+                },
+                "proxyAddr": {
+                    "type": "string"
+                },
+                "tbotVersion": {
+                    "type": "string"
+                },
+                "teleportClusterName": {
+                    "type": "string"
+                },
+                "teleportVersion": {
+                    "type": "string"
+                }
+            }
+        },
+        "tolerations": {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {
+                    "effect": {
+                        "type": "string"
+                    },
+                    "key": {
+                        "type": "string"
+                    },
+                    "operator": {
+                        "type": "string"
+                    }
                 }
             }
         }
