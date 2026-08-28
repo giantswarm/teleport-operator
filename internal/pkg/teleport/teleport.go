@@ -11,6 +11,7 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/giantswarm/teleport-operator/internal/pkg/config"
+	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 	"github.com/giantswarm/teleport-operator/internal/pkg/token"
 )
 
@@ -56,6 +57,25 @@ func (t *Teleport) AreTeleportAppsEnabled(ctx context.Context, clusterName, name
 		return false, microerror.Mask(err)
 	}
 
+	// The apps may sit flat at the root, or nested under the
+	// `teleport-kube-agent` key that chart v0.11.0+ reads (see
+	// key.UsesNestedKubeAgentValues). Accept either, and don't let one layout
+	// mask the other: during the migration installations legitimately carry
+	// both, and a nested block that exists for some unrelated setting must not
+	// hide a flat `apps` list. Getting this wrong drops the `app` role, which
+	// silently stops advertising every app instead of failing loudly.
+	if hasApps(values) {
+		return true, nil
+	}
+	if nested, ok := values[key.TeleportKubeAgentValuesKey].(map[string]interface{}); ok {
+		return hasApps(nested), nil
+	}
+
+	return false, nil
+}
+
+// hasApps reports whether the given values define a non-empty `apps` list.
+func hasApps(values map[string]interface{}) bool {
 	apps, ok := values["apps"].([]interface{})
-	return ok && len(apps) > 0, nil
+	return ok && len(apps) > 0
 }

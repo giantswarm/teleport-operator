@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Detect the Teleport `apps` list when it is nested under the `teleport-kube-agent` key, which is the only place `teleport-kube-agent-app` v0.11.0+ (release v35) reads its values. Previously only the flat layout was recognised, so installations that moved the list into the nested block lost the `app` role and silently stopped advertising their apps.
+
 ## [0.14.0] - 2026-08-25
 
 ### Changed
