@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Maintain a single aggregate ConfigMap `teleport-tbot-outputs` in `giantswarm` holding every cluster's tbot output under `outputs`, alongside the existing per-cluster ConfigMaps. Nothing consumes it yet; it is the first step towards tbot reading one Git-declared `valuesFrom`/`extraConfigs` reference instead of one per cluster, so the operator stops writing the tbot App CR or HelmRelease on every cluster. Entries are merged on a fresh read and retried on conflict, so concurrent cluster reconcilers cannot drop each other's entry.
+
 ### Fixed
 
 - Stop appending a second `spec.valuesFrom` reference to the operator's own ConfigMap on HelmRelease-managed clusters. The cluster chart already declares that entry and renders it with an explicit `optional: false`, which never deep-equalled the operator's entry, so a duplicate was added on every cluster and the operator wrote to a field it does not own. It now recognises the chart's entry and issues no update at all. Existing duplicates are left in place — pruning them would mean another write to that field — and are harmless, since both entries resolve to the same ConfigMap and key.

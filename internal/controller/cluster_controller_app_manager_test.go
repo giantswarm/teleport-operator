@@ -6,6 +6,7 @@ import (
 	"time"
 
 	appv1alpha1 "github.com/giantswarm/apiextensions-application/api/v1alpha1"
+	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/types"
@@ -442,4 +443,68 @@ func identitySecretInGiantswarm() *corev1.Secret {
 		},
 		Data: map[string][]byte{key.Identity: []byte(test.IdentityFileValue)},
 	}
+}
+
+// case H: bot enabled — the cluster's tbot output lands in the aggregate ConfigMap.
+func Test_ClusterController_BotEnabled_RecordsAggregateTbotOutput(t *testing.T) {
+	cluster := test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{})
+	tbotApp := test.NewApp(key.TeleportBotAppName, key.TeleportBotNamespace)
+
+	fakeClient := reconcileWithBot(t, cluster, tbotApp)
+
+	registerName := key.GetRegisterName(test.ManagementClusterName, test.ClusterName)
+	if got := readAggregateOutputs(t, fakeClient)[registerName]; got != test.ClusterName {
+		t.Errorf("expected outputs[%s]=%s in the aggregate ConfigMap, got %q",
+			registerName, test.ClusterName, got)
+	}
+}
+
+// case I: bot enabled, cluster deleting — only that cluster's entry is dropped.
+func Test_ClusterController_BotEnabled_RemovesAggregateTbotOutputOnDelete(t *testing.T) {
+	registerName := key.GetRegisterName(test.ManagementClusterName, test.ClusterName)
+	seeded, err := yaml.Marshal(map[string]interface{}{"outputs": map[string]string{
+		registerName:  test.ClusterName,
+		"golem-otter": "otter",
+	}})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	aggregate := &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      key.TbotOutputsConfigmapName,
+			Namespace: key.TeleportBotNamespace,
+		},
+		Data: map[string]string{"values": string(seeded)},
+	}
+	cluster := test.NewCluster(test.ClusterName, test.NamespaceName,
+		[]string{key.TeleportOperatorFinalizer}, time.Now())
+	tbotApp := test.NewApp(key.TeleportBotAppName, key.TeleportBotNamespace)
+
+	fakeClient := reconcileWithBot(t, cluster, tbotApp, aggregate)
+
+	outputs := readAggregateOutputs(t, fakeClient)
+	if _, still := outputs[registerName]; still {
+		t.Errorf("expected %s to be removed from the aggregate ConfigMap, got %v", registerName, outputs)
+	}
+	if outputs["golem-otter"] != "otter" {
+		t.Errorf("expected the other cluster's entry to survive, got %v", outputs)
+	}
+}
+
+func readAggregateOutputs(t *testing.T, c client.Client) map[string]string {
+	t.Helper()
+	cm := &corev1.ConfigMap{}
+	if err := c.Get(context.TODO(), client.ObjectKey{
+		Name:      key.TbotOutputsConfigmapName,
+		Namespace: key.TeleportBotNamespace,
+	}, cm); err != nil {
+		t.Fatalf("failed to get aggregate ConfigMap: %v", err)
+	}
+	var doc struct {
+		Outputs map[string]string `yaml:"outputs"`
+	}
+	if err := yaml.Unmarshal([]byte(cm.Data["values"]), &doc); err != nil {
+		t.Fatalf("failed to unmarshal values: %v", err)
+	}
+	return doc.Outputs
 }

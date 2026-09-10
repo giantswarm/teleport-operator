@@ -147,6 +147,12 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			if err := r.Teleport.DeleteKubeconfigSecret(ctx, log, r.Client, cluster.Name, key.TeleportBotNamespace); err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
+
+			// Drop this cluster's entry from the aggregate outputs ConfigMap,
+			// leaving every other cluster's entry in place.
+			if err := r.Teleport.RemoveTbotOutput(ctx, log, r.Client, registerName); err != nil {
+				return ctrl.Result{}, microerror.Mask(err)
+			}
 		}
 
 		kubeAgentMgr, err := teleport.NewTeleportAppConfigManager(ctx, r.Client,
@@ -311,6 +317,14 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			if err := botMgr.EnsureConfig(ctx, log); err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
+		}
+
+		// Maintain the aggregate outputs ConfigMap alongside the per-cluster one.
+		// Deliberately outside the `secret == nil` gate: the entry must exist for
+		// as long as the cluster does, so running every reconcile lets a lost key
+		// heal itself. It writes only when the value actually changes.
+		if err := r.Teleport.EnsureTbotOutput(ctx, log, r.Client, registerName, cluster.Name); err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
 		}
 	}
 
