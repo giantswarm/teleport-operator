@@ -1,6 +1,7 @@
 package test
 
 import (
+	"context"
 	"fmt"
 	"reflect"
 	"testing"
@@ -9,6 +10,9 @@ import (
 	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 	capi "sigs.k8s.io/cluster-api/api/core/v1beta2"
+	"sigs.k8s.io/controller-runtime/pkg/client"
+
+	"github.com/giantswarm/teleport-operator/internal/pkg/key"
 )
 
 func CheckCluster(t *testing.T, expected, actual *capi.Cluster) {
@@ -165,4 +169,29 @@ func CheckError(t *testing.T, expectError bool, err error) {
 	if err == nil && expectError {
 		t.Fatal("did not receive an expected error")
 	}
+}
+
+// ReadTbotOutputsDoc returns the whole values document stored in the aggregate
+// tbot outputs ConfigMap.
+func ReadTbotOutputsDoc(t *testing.T, ctx context.Context, c client.Client) map[string]interface{} {
+	t.Helper()
+	cm := &corev1.ConfigMap{}
+	if err := c.Get(ctx, client.ObjectKey{
+		Name:      key.TbotOutputsConfigmapName,
+		Namespace: key.TeleportBotNamespace,
+	}, cm); err != nil {
+		t.Fatalf("failed to get the aggregate tbot outputs ConfigMap: %v", err)
+	}
+	doc := map[string]interface{}{}
+	if err := yaml.Unmarshal([]byte(cm.Data["values"]), &doc); err != nil {
+		t.Fatalf("failed to unmarshal values: %v\ncontent:\n%s", err, cm.Data["values"])
+	}
+	return doc
+}
+
+// ReadTbotOutputs returns just the `outputs` map from that ConfigMap.
+func ReadTbotOutputs(t *testing.T, ctx context.Context, c client.Client) map[string]interface{} {
+	t.Helper()
+	outputs, _ := ReadTbotOutputsDoc(t, ctx, c)["outputs"].(map[string]interface{})
+	return outputs
 }

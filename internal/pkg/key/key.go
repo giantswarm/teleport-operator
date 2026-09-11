@@ -89,6 +89,15 @@ func GetConfigmapName(clusterName string, appName string) string {
 	return fmt.Sprintf("%s-%s-config", clusterName, appName)
 }
 
+// RegisterName is the Teleport register name for a cluster: bare for the
+// management cluster itself, prefixed with it otherwise.
+func RegisterName(managementClusterName string, clusterName string) string {
+	if clusterName == managementClusterName {
+		return clusterName
+	}
+	return GetRegisterName(managementClusterName, clusterName)
+}
+
 func GetTbotConfigmapName(clusterName string) string {
 	return fmt.Sprintf("teleport-tbot-%s-config", clusterName)
 }

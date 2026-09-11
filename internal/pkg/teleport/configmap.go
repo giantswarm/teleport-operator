@@ -3,6 +3,7 @@ package teleport
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"github.com/giantswarm/microerror"
 	"github.com/go-logr/logr"
@@ -13,8 +14,8 @@ import (
 	"gopkg.in/yaml.v3"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
-	"k8s.io/client-go/util/retry"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 func (t *Teleport) GetConfigMap(ctx context.Context, log logr.Logger, ctrlClient client.Client, clusterName string, clusterNamespace string) (*corev1.ConfigMap, error) {
@@ -282,114 +283,65 @@ func (t *Teleport) getTbotConfigMapData(registerName string, clusterName string)
 	return key.GetTbotConfigmapDataFromTemplate(registerName, clusterName)
 }
 
-// EnsureTbotOutput records this cluster's tbot output in the aggregate
-// ConfigMap, leaving every other cluster's entry untouched.
-func (t *Teleport) EnsureTbotOutput(ctx context.Context, log logr.Logger, ctrlClient client.Client, registerName string, clusterName string) error {
-	return t.updateTbotOutputs(ctx, log, ctrlClient, func(outputs map[string]string) {
-		outputs[registerName] = clusterName
-	})
-}
-
-// RemoveTbotOutput drops this cluster's tbot output from the aggregate
-// ConfigMap on teardown, leaving every other cluster's entry in place.
-func (t *Teleport) RemoveTbotOutput(ctx context.Context, log logr.Logger, ctrlClient client.Client, registerName string) error {
-	return t.updateTbotOutputs(ctx, log, ctrlClient, func(outputs map[string]string) {
-		delete(outputs, registerName)
-	})
-}
-
-// updateTbotOutputs applies mutate to the `outputs` map held in the aggregate
-// ConfigMap. Every cluster reconciler writes this one object, so the map is
-// always re-read and merged rather than overwritten.
-func (t *Teleport) updateTbotOutputs(ctx context.Context, log logr.Logger, ctrlClient client.Client, mutate func(map[string]string)) error {
-	nn := client.ObjectKey{Name: key.TbotOutputsConfigmapName, Namespace: key.TeleportBotNamespace}
-
-	// Re-read inside the retry: on a lost race the winner's entry is already in
-	// the object, and retrying with our stale copy would erase it. AlreadyExists
-	// is retried too — two clusters reconciling for the first time can both find
-	// no ConfigMap and both try to create it, and the loser must then merge into
-	// what the winner created.
-	retriable := func(err error) bool {
-		return apierrors.IsConflict(err) || apierrors.IsAlreadyExists(err)
+// SetTbotOutputs writes the aggregate tbot outputs document.
+//
+// The map is a pure projection of the cluster list, so every writer derives the
+// same content from the same source: there is nothing to merge, and losing a
+// race is harmless because the winner wrote what we would have written. That is
+// also what lets a stale or orphaned entry heal on the next pass.
+func (t *Teleport) SetTbotOutputs(ctx context.Context, log logr.Logger, ctrlClient client.Client, outputs map[string]string) error {
+	desired := make(map[string]interface{}, len(outputs))
+	for registerName, clusterName := range outputs {
+		desired[registerName] = clusterName
 	}
-	return retry.OnError(retry.DefaultRetry, retriable, func() error {
-		return t.applyTbotOutputs(ctx, log, ctrlClient, nn, mutate)
-	})
-}
 
-func (t *Teleport) applyTbotOutputs(ctx context.Context, log logr.Logger, ctrlClient client.Client, nn client.ObjectKey, mutate func(map[string]string)) error {
-	cm := &corev1.ConfigMap{}
-	err := ctrlClient.Get(ctx, nn, cm)
-	if apierrors.IsNotFound(err) {
-		outputs := map[string]string{}
-		mutate(outputs)
-		if len(outputs) == 0 {
-			// Nothing to record: a teardown that found no ConfigMap has nothing
-			// to do, and creating an empty one would be pure noise.
-			return nil
-		}
-		values, err := marshalTbotOutputs(outputs)
+	cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+		Name:      key.TbotOutputsConfigmapName,
+		Namespace: key.TeleportBotNamespace,
+	}}
+	op, err := controllerutil.CreateOrUpdate(ctx, ctrlClient, cm, func() error {
+		// We own the `outputs` key, not the whole file: a sibling key belongs to
+		// whoever put it there and is left untouched.
+		doc, err := parseTbotValues(cm.Data["values"])
 		if err != nil {
-			return microerror.Mask(err)
-		}
-		cm = &corev1.ConfigMap{
-			ObjectMeta: metav1.ObjectMeta{Name: nn.Name, Namespace: nn.Namespace},
-			Data:       map[string]string{"values": values},
-		}
-		if err := ctrlClient.Create(ctx, cm); err != nil {
 			return err
 		}
-		log.Info("tbot: created aggregate outputs configmap", "configMapName", cm.Name)
-		return nil
-	}
-	if err != nil {
-		return microerror.Mask(err)
-	}
+		if reflect.DeepEqual(doc["outputs"], desired) {
+			// Compare semantically and leave the stored bytes alone, so a
+			// difference in formatting alone never triggers a write.
+			return nil
+		}
+		doc["outputs"] = desired
 
-	outputs, err := parseTbotOutputs(cm.Data["values"])
-	if err != nil {
-		return microerror.Mask(err)
-	}
-	mutate(outputs)
-
-	values, err := marshalTbotOutputs(outputs)
-	if err != nil {
-		return microerror.Mask(err)
-	}
-	if values == cm.Data["values"] {
-		// Called on every reconcile; don't churn a shared object for nothing.
+		values, err := yaml.Marshal(doc)
+		if err != nil {
+			return err
+		}
+		if cm.Data == nil {
+			cm.Data = map[string]string{}
+		}
+		cm.Data["values"] = string(values)
 		return nil
+	})
+	if err != nil {
+		return microerror.Mask(err)
 	}
-	if cm.Data == nil {
-		cm.Data = map[string]string{}
+	if op != controllerutil.OperationResultNone {
+		log.Info("tbot: wrote aggregate outputs configmap",
+			"configMapName", cm.Name, "operation", op, "clusters", len(outputs))
 	}
-	cm.Data["values"] = values
-	if err := ctrlClient.Update(ctx, cm); err != nil {
-		return err
-	}
-	log.Info("tbot: updated aggregate outputs configmap", "configMapName", cm.Name)
 	return nil
 }
 
-func parseTbotOutputs(values string) (map[string]string, error) {
-	doc := struct {
-		Outputs map[string]string `yaml:"outputs"`
-	}{}
+func parseTbotValues(values string) (map[string]interface{}, error) {
+	var doc map[string]interface{}
 	if values != "" {
 		if err := yaml.Unmarshal([]byte(values), &doc); err != nil {
 			return nil, microerror.Mask(err)
 		}
 	}
-	if doc.Outputs == nil {
-		doc.Outputs = map[string]string{}
+	if doc == nil {
+		doc = map[string]interface{}{}
 	}
-	return doc.Outputs, nil
-}
-
-func marshalTbotOutputs(outputs map[string]string) (string, error) {
-	out, err := yaml.Marshal(map[string]interface{}{"outputs": outputs})
-	if err != nil {
-		return "", microerror.Mask(err)
-	}
-	return string(out), nil
+	return doc, nil
 }

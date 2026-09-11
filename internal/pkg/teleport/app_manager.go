@@ -246,19 +246,19 @@ func setValuesFrom(hr *unstructured.Unstructured, valuesFrom []interface{}) {
 }
 
 func appendValuesReference(refs []interface{}, ref map[string]interface{}) []interface{} {
+	want := valuesReferenceID(ref)
 	for _, existing := range refs {
-		if sameValuesReference(existing, ref) {
+		entry, ok := existing.(map[string]interface{})
+		if ok && valuesReferenceID(entry) == want {
 			return refs
 		}
 	}
 	return append(refs, ref)
 }
 
-// removeValuesReference drops only an entry we wrote ourselves, so it compares
-// exactly. The loosened comparison used when appending must NOT be reused here:
-// an entry the parent cluster chart rendered is owned by that chart, and it is
-// the chart's job to stop rendering it — deleting it on our behalf would fight
-// the owner over a field we deliberately no longer manage.
+// removeValuesReference compares exactly, unlike appending: it must only
+// withdraw an entry we wrote ourselves. One the parent chart rendered is the
+// chart's to remove.
 func removeValuesReference(refs []interface{}, ref map[string]interface{}) []interface{} {
 	result := make([]interface{}, 0, len(refs))
 	for _, existing := range refs {
@@ -269,46 +269,19 @@ func removeValuesReference(refs []interface{}, ref map[string]interface{}) []int
 	return result
 }
 
-// sameValuesReference reports whether an existing `valuesFrom` entry already
-// points at the same values as ref, ignoring `optional`.
-//
-// The cluster chart declares this operator's ConfigMap in the HelmRelease's
-// valuesFrom itself and renders every entry with an explicit
-// `optional: false` (see the cluster.app.sortedValuesFrom helper). A plain
-// deep-equal against our own three-key entry therefore never matches the
-// chart-declared one, and we append a second reference to the very same
-// ConfigMap. `optional` only decides whether a missing source is an error, not
-// which values get loaded, so it must not take part in identity.
-//
-// Any other extra field — `targetPath` above all, which places the values at a
-// subpath and so means something genuinely different — still forces a
-// non-match, keeping the comparison conservative.
-//
-// This governs append identity only, and it prevents new duplicates rather than
-// removing existing ones: on a HelmRelease that already carries both the
-// chart-declared entry and a duplicate we appended earlier, the chart-declared
-// entry now matches first and we leave the list alone. That is deliberate.
-// Rewriting the list to prune the duplicate would mean another write to a field
-// owned by the chart, re-taking ownership of an atomic list — the very thing
-// this change exists to stop. The stale duplicate is harmless: it references the
-// same ConfigMap and key, so merging it twice is a no-op, and it disappears the
-// next time the owner re-applies the field.
-func sameValuesReference(existing interface{}, ref map[string]interface{}) bool {
-	entry, ok := existing.(map[string]interface{})
-	if !ok {
-		return false
+// valuesReferenceID identifies a `valuesFrom` entry by which values it loads.
+// `optional` is excluded because it decides error handling, not content — the
+// cluster chart renders its own entry with `optional: false`, and comparing
+// whole maps would miss it and append a duplicate. These four fields plus
+// `optional` are the whole of Flux's ValuesReference, so nothing is ignored.
+type valuesRefID struct{ kind, name, valuesKey, targetPath string }
+
+func valuesReferenceID(entry map[string]interface{}) valuesRefID {
+	field := func(k string) string {
+		v, _ := entry[k].(string)
+		return v
 	}
-	if len(entry) > 0 {
-		trimmed := make(map[string]interface{}, len(entry))
-		for k, v := range entry {
-			if k == "optional" {
-				continue
-			}
-			trimmed[k] = v
-		}
-		entry = trimmed
-	}
-	return reflect.DeepEqual(entry, ref)
+	return valuesRefID{field("kind"), field("name"), field("valuesKey"), field("targetPath")}
 }
 
 // --- App CR implementation ---

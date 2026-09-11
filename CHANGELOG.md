@@ -9,11 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Maintain a single aggregate ConfigMap `teleport-tbot-outputs` in `giantswarm` holding every cluster's tbot output under `outputs`, alongside the existing per-cluster ConfigMaps. Nothing consumes it yet; it is the first step towards tbot reading one Git-declared `valuesFrom`/`extraConfigs` reference instead of one per cluster, so the operator stops writing the tbot App CR or HelmRelease on every cluster. Entries are merged on a fresh read and retried on conflict, so concurrent cluster reconcilers cannot drop each other's entry.
+- Maintain an aggregate ConfigMap `teleport-tbot-outputs` in `giantswarm` listing every cluster's tbot output, rebuilt from the cluster list on each reconcile. It sits alongside the per-cluster ConfigMaps and nothing consumes it yet.
 
 ### Fixed
 
-- Stop appending a second `spec.valuesFrom` reference to the operator's own ConfigMap on HelmRelease-managed clusters. The cluster chart already declares that entry and renders it with an explicit `optional: false`, which never deep-equalled the operator's entry, so a duplicate was added on every cluster and the operator wrote to a field it does not own. It now recognises the chart's entry and issues no update at all. Existing duplicates are left in place — pruning them would mean another write to that field — and are harmless, since both entries resolve to the same ConfigMap and key.
+- Recognise the `spec.valuesFrom` entry the cluster chart already declares for the operator's ConfigMap, instead of appending a duplicate to every HelmRelease-managed cluster and writing to a field the operator does not own. Existing duplicates are left in place and are harmless.
 - Detect the Teleport `apps` list when it is nested under the `teleport-kube-agent` key, which is the only place `teleport-kube-agent-app` v0.11.0+ (release v35) reads its values. Previously only the flat layout was recognised, so installations that moved the list into the nested block lost the `app` role and silently stopped advertising their apps.
 
 ## [0.14.0] - 2026-08-25
