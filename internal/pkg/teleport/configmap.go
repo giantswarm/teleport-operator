@@ -3,6 +3,7 @@ package teleport
 import (
 	"context"
 	"fmt"
+	"reflect"
 
 	"github.com/giantswarm/microerror"
 	"github.com/go-logr/logr"
@@ -14,6 +15,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 func (t *Teleport) GetConfigMap(ctx context.Context, log logr.Logger, ctrlClient client.Client, clusterName string, clusterNamespace string) (*corev1.ConfigMap, error) {
@@ -279,4 +281,67 @@ func (t *Teleport) getConfigMapData(registerName, token string, roles []string, 
 
 func (t *Teleport) getTbotConfigMapData(registerName string, clusterName string) string {
 	return key.GetTbotConfigmapDataFromTemplate(registerName, clusterName)
+}
+
+// SetTbotOutputs writes the aggregate tbot outputs document.
+//
+// The map is a pure projection of the cluster list, so every writer derives the
+// same content from the same source: there is nothing to merge, and losing a
+// race is harmless because the winner wrote what we would have written. That is
+// also what lets a stale or orphaned entry heal on the next pass.
+func (t *Teleport) SetTbotOutputs(ctx context.Context, log logr.Logger, ctrlClient client.Client, outputs map[string]string) error {
+	desired := make(map[string]interface{}, len(outputs))
+	for registerName, clusterName := range outputs {
+		desired[registerName] = clusterName
+	}
+
+	cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+		Name:      key.TbotOutputsConfigmapName,
+		Namespace: key.TeleportBotNamespace,
+	}}
+	op, err := controllerutil.CreateOrUpdate(ctx, ctrlClient, cm, func() error {
+		// We own the `outputs` key, not the whole file: a sibling key belongs to
+		// whoever put it there and is left untouched.
+		doc, err := parseTbotValues(cm.Data["values"])
+		if err != nil {
+			return err
+		}
+		if reflect.DeepEqual(doc["outputs"], desired) {
+			// Compare semantically and leave the stored bytes alone, so a
+			// difference in formatting alone never triggers a write.
+			return nil
+		}
+		doc["outputs"] = desired
+
+		values, err := yaml.Marshal(doc)
+		if err != nil {
+			return err
+		}
+		if cm.Data == nil {
+			cm.Data = map[string]string{}
+		}
+		cm.Data["values"] = string(values)
+		return nil
+	})
+	if err != nil {
+		return microerror.Mask(err)
+	}
+	if op != controllerutil.OperationResultNone {
+		log.Info("tbot: wrote aggregate outputs configmap",
+			"configMapName", cm.Name, "operation", op, "clusters", len(outputs))
+	}
+	return nil
+}
+
+func parseTbotValues(values string) (map[string]interface{}, error) {
+	var doc map[string]interface{}
+	if values != "" {
+		if err := yaml.Unmarshal([]byte(values), &doc); err != nil {
+			return nil, microerror.Mask(err)
+		}
+	}
+	if doc == nil {
+		doc = map[string]interface{}{}
+	}
+	return doc, nil
 }

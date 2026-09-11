@@ -173,6 +173,136 @@ func Test_HelmRelease_EnsureConfig_Idempotent(t *testing.T) {
 	}
 }
 
+// The cluster chart declares this operator's ConfigMap in valuesFrom itself and
+// renders every entry with an explicit `optional: false`. That entry must be
+// recognised as already present, or we append a duplicate reference to the same
+// ConfigMap on every cluster.
+func Test_HelmRelease_EnsureConfig_Idempotent_ChartDeclaredEntryWithOptional(t *testing.T) {
+	hr := test.NewHelmRelease(testResourceName, testNamespace)
+	hr.Object["spec"] = map[string]interface{}{
+		"valuesFrom": []interface{}{
+			map[string]interface{}{
+				"kind":      "ConfigMap",
+				"name":      testConfigMapName,
+				"valuesKey": "values",
+				"optional":  false,
+			},
+		},
+	}
+	fakeClient, err := test.NewFakeK8sClientFromObjects(hr)
+	if err != nil {
+		t.Fatalf("failed to create fake client: %v", err)
+	}
+
+	mgr, err := NewTeleportAppConfigManager(context.Background(), fakeClient, testResourceName, testNamespace, testConfigMapName)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	log := ctrl.Log.WithName("test")
+	if err := mgr.EnsureConfig(context.Background(), log); err != nil {
+		t.Fatalf("EnsureConfig returned error: %v", err)
+	}
+
+	updated := newHelmReleaseUnstructured()
+	if err := fakeClient.Get(context.Background(), client.ObjectKey{Name: testResourceName, Namespace: testNamespace}, updated); err != nil {
+		t.Fatalf("failed to get HelmRelease: %v", err)
+	}
+
+	valuesFrom := getValuesFrom(updated)
+	if len(valuesFrom) != 1 {
+		t.Errorf("expected 1 ValuesFrom entry (chart-declared entry reused, no duplicate), got %d: %v", len(valuesFrom), valuesFrom)
+	}
+}
+
+// A `targetPath` entry places the values somewhere else entirely, so it is not
+// the same reference and must not suppress our own entry.
+func Test_HelmRelease_EnsureConfig_TargetPathEntryIsNotAMatch(t *testing.T) {
+	hr := test.NewHelmRelease(testResourceName, testNamespace)
+	hr.Object["spec"] = map[string]interface{}{
+		"valuesFrom": []interface{}{
+			map[string]interface{}{
+				"kind":       "ConfigMap",
+				"name":       testConfigMapName,
+				"valuesKey":  "values",
+				"targetPath": "some.nested.path",
+			},
+		},
+	}
+	fakeClient, err := test.NewFakeK8sClientFromObjects(hr)
+	if err != nil {
+		t.Fatalf("failed to create fake client: %v", err)
+	}
+
+	mgr, err := NewTeleportAppConfigManager(context.Background(), fakeClient, testResourceName, testNamespace, testConfigMapName)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	log := ctrl.Log.WithName("test")
+	if err := mgr.EnsureConfig(context.Background(), log); err != nil {
+		t.Fatalf("EnsureConfig returned error: %v", err)
+	}
+
+	updated := newHelmReleaseUnstructured()
+	if err := fakeClient.Get(context.Background(), client.ObjectKey{Name: testResourceName, Namespace: testNamespace}, updated); err != nil {
+		t.Fatalf("failed to get HelmRelease: %v", err)
+	}
+
+	valuesFrom := getValuesFrom(updated)
+	if len(valuesFrom) != 2 {
+		t.Errorf("expected 2 ValuesFrom entries (targetPath entry is a different reference), got %d: %v", len(valuesFrom), valuesFrom)
+	}
+}
+
+// Deleting must NOT strip an entry the parent cluster chart rendered — that
+// entry is the chart's to own and remove. Only an entry we wrote ourselves (our
+// exact three-key shape) may be deleted.
+func Test_HelmRelease_DeleteConfig_KeepsChartDeclaredEntry(t *testing.T) {
+	hr := test.NewHelmRelease(testResourceName, testNamespace)
+	hr.Object["spec"] = map[string]interface{}{
+		"valuesFrom": []interface{}{
+			map[string]interface{}{
+				"kind":      "ConfigMap",
+				"name":      testConfigMapName,
+				"valuesKey": "values",
+				"optional":  false,
+			},
+		},
+	}
+	fakeClient, err := test.NewFakeK8sClientFromObjects(hr)
+	if err != nil {
+		t.Fatalf("failed to create fake client: %v", err)
+	}
+
+	mgr, err := NewTeleportAppConfigManager(context.Background(), fakeClient, testResourceName, testNamespace, testConfigMapName)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	log := ctrl.Log.WithName("test")
+	if err := mgr.DeleteConfig(context.Background(), log); err != nil {
+		t.Fatalf("DeleteConfig returned error: %v", err)
+	}
+
+	updated := newHelmReleaseUnstructured()
+	if err := fakeClient.Get(context.Background(), client.ObjectKey{Name: testResourceName, Namespace: testNamespace}, updated); err != nil {
+		t.Fatalf("failed to get HelmRelease: %v", err)
+	}
+
+	valuesFrom := getValuesFrom(updated)
+	if len(valuesFrom) != 1 {
+		t.Fatalf("expected the chart-declared entry to survive delete, got %d entries: %v", len(valuesFrom), valuesFrom)
+	}
+	entry, ok := valuesFrom[0].(map[string]interface{})
+	if !ok {
+		t.Fatalf("expected map[string]interface{}, got %T", valuesFrom[0])
+	}
+	if entry["optional"] != false || entry["name"] != testConfigMapName {
+		t.Errorf("expected the untouched chart-declared entry, got %v", entry)
+	}
+}
+
 func Test_HelmRelease_DeleteConfig_RemovesEntry(t *testing.T) {
 	hr := test.NewHelmRelease(testResourceName, testNamespace)
 	hr.Object["spec"] = map[string]interface{}{

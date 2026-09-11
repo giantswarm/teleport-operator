@@ -246,14 +246,19 @@ func setValuesFrom(hr *unstructured.Unstructured, valuesFrom []interface{}) {
 }
 
 func appendValuesReference(refs []interface{}, ref map[string]interface{}) []interface{} {
+	want := valuesReferenceID(ref)
 	for _, existing := range refs {
-		if reflect.DeepEqual(existing, ref) {
+		entry, ok := existing.(map[string]interface{})
+		if ok && valuesReferenceID(entry) == want {
 			return refs
 		}
 	}
 	return append(refs, ref)
 }
 
+// removeValuesReference compares exactly, unlike appending: it must only
+// withdraw an entry we wrote ourselves. One the parent chart rendered is the
+// chart's to remove.
 func removeValuesReference(refs []interface{}, ref map[string]interface{}) []interface{} {
 	result := make([]interface{}, 0, len(refs))
 	for _, existing := range refs {
@@ -262,6 +267,21 @@ func removeValuesReference(refs []interface{}, ref map[string]interface{}) []int
 		}
 	}
 	return result
+}
+
+// valuesReferenceID identifies a `valuesFrom` entry by which values it loads.
+// `optional` is excluded because it decides error handling, not content — the
+// cluster chart renders its own entry with `optional: false`, and comparing
+// whole maps would miss it and append a duplicate. These four fields plus
+// `optional` are the whole of Flux's ValuesReference, so nothing is ignored.
+type valuesRefID struct{ kind, name, valuesKey, targetPath string }
+
+func valuesReferenceID(entry map[string]interface{}) valuesRefID {
+	field := func(k string) string {
+		v, _ := entry[k].(string)
+		return v
+	}
+	return valuesRefID{field("kind"), field("name"), field("valuesKey"), field("targetPath")}
 }
 
 // --- App CR implementation ---

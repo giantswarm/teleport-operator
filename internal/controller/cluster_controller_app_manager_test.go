@@ -443,3 +443,49 @@ func identitySecretInGiantswarm() *corev1.Secret {
 		Data: map[string][]byte{key.Identity: []byte(test.IdentityFileValue)},
 	}
 }
+
+// case H: bot enabled — every live cluster appears in the aggregate ConfigMap.
+func Test_ClusterController_BotEnabled_ProjectsAggregateTbotOutputs(t *testing.T) {
+	cluster := test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{})
+	other := test.NewCluster("badger", test.NamespaceName, nil, time.Time{})
+	tbotApp := test.NewApp(key.TeleportBotAppName, key.TeleportBotNamespace)
+
+	fakeClient := reconcileWithBot(t, cluster, other, tbotApp)
+
+	outputs := test.ReadTbotOutputs(t, context.TODO(), fakeClient)
+	want := map[string]string{
+		key.RegisterName(test.ManagementClusterName, test.ClusterName): test.ClusterName,
+		key.RegisterName(test.ManagementClusterName, "badger"):         "badger",
+	}
+	for reg, cl := range want {
+		if outputs[reg] != cl {
+			t.Errorf("expected outputs[%s]=%s, got outputs %v", reg, cl, outputs)
+		}
+	}
+}
+
+// case I: cluster deleting — its entry drops out while the others stay, and a
+// stale entry left behind by an earlier crash is cleaned up in the same pass.
+func Test_ClusterController_BotEnabled_DeletingClusterLeavesTheProjection(t *testing.T) {
+	deleting := test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Now())
+	survivor := test.NewCluster("badger", test.NamespaceName, nil, time.Time{})
+	tbotApp := test.NewApp(key.TeleportBotAppName, key.TeleportBotNamespace)
+	aggregate := test.NewTbotOutputsConfigMap(map[string]string{
+		key.RegisterName(test.ManagementClusterName, test.ClusterName): test.ClusterName,
+		key.RegisterName(test.ManagementClusterName, "badger"):         "badger",
+		"golem-orphan": "orphan",
+	})
+
+	fakeClient := reconcileDeleteWithBot(t, deleting, survivor, tbotApp, aggregate)
+
+	outputs := test.ReadTbotOutputs(t, context.TODO(), fakeClient)
+	if _, still := outputs[key.RegisterName(test.ManagementClusterName, test.ClusterName)]; still {
+		t.Errorf("expected the deleting cluster to leave the projection, got %v", outputs)
+	}
+	if _, still := outputs["golem-orphan"]; still {
+		t.Errorf("expected the orphaned entry to be cleaned up, got %v", outputs)
+	}
+	if outputs[key.RegisterName(test.ManagementClusterName, "badger")] != "badger" {
+		t.Errorf("expected the surviving cluster to remain, got %v", outputs)
+	}
+}
