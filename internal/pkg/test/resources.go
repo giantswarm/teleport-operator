@@ -7,6 +7,7 @@ import (
 
 	appv1alpha1 "github.com/giantswarm/apiextensions-application/api/v1alpha1"
 	teleportTypes "github.com/gravitational/teleport/api/types"
+	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -306,4 +307,26 @@ func NewFakeK8sClient(runtimeObjects []runtime.Object) (client.Client, error) {
 		fakeK8sClientBuilder.WithRuntimeObjects(runtimeObjects...)
 	}
 	return fakeK8sClientBuilder.Build(), nil
+}
+
+// NewTbotOutputsConfigMap builds the aggregate tbot outputs ConfigMap holding
+// the given register-name to cluster-name mapping.
+func NewTbotOutputsConfigMap(outputs map[string]string) *corev1.ConfigMap {
+	return NewTbotOutputsConfigMapWithDoc(map[string]interface{}{"outputs": outputs})
+}
+
+// NewTbotOutputsConfigMapWithDoc is NewTbotOutputsConfigMap for a values
+// document that carries more than just `outputs`.
+func NewTbotOutputsConfigMapWithDoc(doc map[string]interface{}) *corev1.ConfigMap {
+	values, err := yaml.Marshal(doc)
+	if err != nil {
+		panic(err)
+	}
+	return &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      key.TbotOutputsConfigmapName,
+			Namespace: key.TeleportBotNamespace,
+		},
+		Data: map[string]string{"values": string(values)},
+	}
 }
