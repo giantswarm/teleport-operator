@@ -11,6 +11,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - The `helm.sh/chart` label is valid for long chart versions: the 63-character cut trims the whole trailing run of `-`, `.` and `_`.
 - Detect the Teleport `apps` list when it is nested under the `teleport-kube-agent` key, which is the only place `teleport-kube-agent-app` v0.11.0+ (release v35) reads its values. Previously only the flat layout was recognised, so installations that moved the list into the nested block lost the `app` role and silently stopped advertising their apps.
+- Update `github.com/charlievieth/strcase` to v0.0.6. v0.0.5 panics at startup under Go 1.27, whose Unicode tables are version 17.0.0.
+- Update `golang.org/x/net` to v0.61.0 and `golang.org/x/crypto` to v0.58.0 to fix known vulnerabilities.
 
 ## [0.14.0] - 2026-08-25
 
