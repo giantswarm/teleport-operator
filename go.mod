@@ -1,6 +1,6 @@
 module github.com/giantswarm/teleport-operator
 
-go 1.26.0
+go 1.26.5
 
 require (
 	github.com/Masterminds/semver/v3 v3.5.0
@@ -8,7 +8,7 @@ require (
 	github.com/giantswarm/microerror v0.4.1
 	github.com/go-logr/logr v1.4.4
 	github.com/google/uuid v1.6.0
-	github.com/gravitational/teleport/api v0.0.0-20260608121040-679d6278399d
+	github.com/gravitational/teleport/api v0.0.0-20260813024307-37c3a8a456ec
 	github.com/onsi/ginkgo/v2 v2.33.1
 	github.com/onsi/gomega v1.44.0
 	github.com/pkg/errors v0.9.1
