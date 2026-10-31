@@ -132,8 +132,8 @@ github.com/google/pprof v0.0.0-20260402051712-545e8a4df936 h1:EwtI+Al+DeppwYX2oX
 github.com/google/pprof v0.0.0-20260402051712-545e8a4df936/go.mod h1:MxpfABSjhmINe3F1It9d+8exIHFvUqtLIRCdOGNXqiI=
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
-github.com/gravitational/teleport/api v0.0.0-20260608121040-679d6278399d h1:uoAggJhgpZUhEnh5WQECjTgQN4Vv5mCQtz6UofvDFNs=
-github.com/gravitational/teleport/api v0.0.0-20260608121040-679d6278399d/go.mod h1:YDEtNPyzI9GRgGHE45e5eDn2RshYQr+X3EO/hNwT92A=
+github.com/gravitational/teleport/api v0.0.0-20260813024307-37c3a8a456ec h1:sEF34xekeWmUUb/FWGJJQoUS5yZQsSEK2hWHfuGf+QQ=
+github.com/gravitational/teleport/api v0.0.0-20260813024307-37c3a8a456ec/go.mod h1:Wvmmoa4YcZTvW1EPa0JgLM1fqkfpVsevif8sDq2UCXE=
 github.com/gravitational/trace v1.5.4 h1:nMmF7alwvNiQJhC817Hhmgm95bzKOXbnxvkickTkRDY=
 github.com/gravitational/trace v1.5.4/go.mod h1:/uCbC3ukVU8Pdrh8+3vNLyyE1aGheBWpGGrMnwIK80E=
 github.com/grpc-ecosystem/grpc-gateway/v2 v2.29.0 h1:5VipnvEpbqr2gA2VbM+nYVbkIF28c5ZQfqCBQ5g2xfk=
