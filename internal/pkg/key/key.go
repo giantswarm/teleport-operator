@@ -19,10 +19,13 @@ const (
 	TeleportBotSecretName           = "identity-output"
 	TeleportBotNamespace            = "giantswarm"
 	TeleportBotAppName              = "teleport-tbot"
-	TbotOutputsConfigmapName        = "teleport-tbot-outputs"
 	TeleportAppTokenValidity        = 720 * time.Hour
 	TeleportKubeTokenValidity       = 720 * time.Hour
 	TeleportNodeTokenValidity       = 720 * time.Hour
+
+	TbotRegisteredClustersConfigmapName = "teleport-tbot-registered-clusters"
+	ManagedByLabel                      = "app.kubernetes.io/managed-by"
+	NotesAnnotation                     = "giantswarm.io/notes"
 
 	AppCatalog            = "appCatalog"
 	AppName               = "appName"

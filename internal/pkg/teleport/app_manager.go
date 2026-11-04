@@ -99,18 +99,16 @@ func helmReleaseSpecChartVersion(hr *unstructured.Unstructured) string {
 	return v
 }
 
-// TeleportAppConfigManager abstracts injecting a ConfigMap reference into either a
-// Giant Swarm App CR (via spec.extraConfigs) or a Flux HelmRelease (via
-// spec.valuesFrom).
+// TeleportAppConfigManager adds or removes the operator's ConfigMap reference on
+// an App CR (spec.extraConfigs). HelmReleases are left alone: Flux owns
+// spec.valuesFrom, so the reference has to be declared in their manifest.
 type TeleportAppConfigManager interface {
 	EnsureConfig(ctx context.Context, log logr.Logger) error
 	DeleteConfig(ctx context.Context, log logr.Logger) error
 }
 
-// NewTeleportAppConfigManager detects at call time whether the named resource is a
-// Flux HelmRelease or a Giant Swarm App CR and returns the appropriate manager.
-// HelmRelease takes precedence when both exist. Never returns nil — returns a
-// noOpTeleportAppConfigManager when neither resource is found.
+// NewTeleportAppConfigManager returns the manager for whichever of HelmRelease
+// or App CR exists under the given name, HelmRelease first. Never returns nil.
 func NewTeleportAppConfigManager(
 	ctx context.Context,
 	ctrlClient client.Client,
@@ -121,12 +119,7 @@ func NewTeleportAppConfigManager(
 	hr := newHelmReleaseUnstructured()
 	err := ctrlClient.Get(ctx, client.ObjectKey{Name: resourceName, Namespace: namespace}, hr)
 	if err == nil {
-		return &helmReleaseTeleportAppConfigManager{
-			client:        ctrlClient,
-			resourceName:  resourceName,
-			namespace:     namespace,
-			configMapName: configMapName,
-		}, nil
+		return &helmReleaseTeleportAppConfigManager{}, nil
 	}
 	if !apierrors.IsNotFound(err) {
 		return nil, microerror.Mask(err)
@@ -154,134 +147,17 @@ func NewTeleportAppConfigManager(
 
 // --- HelmRelease implementation ---
 
-type helmReleaseTeleportAppConfigManager struct {
-	client        client.Client
-	resourceName  string
-	namespace     string
-	configMapName string
-}
+// helmReleaseTeleportAppConfigManager never writes the HelmRelease.
+// spec.valuesFrom is an atomic list owned by Flux, so any change we make is
+// reverted on the next Flux reconcile.
+type helmReleaseTeleportAppConfigManager struct{}
 
 func (m *helmReleaseTeleportAppConfigManager) EnsureConfig(ctx context.Context, log logr.Logger) error {
-	hr := newHelmReleaseUnstructured()
-	if err := m.client.Get(ctx, client.ObjectKey{Name: m.resourceName, Namespace: m.namespace}, hr); err != nil {
-		return microerror.Mask(err)
-	}
-
-	desired := map[string]interface{}{
-		"kind":      "ConfigMap",
-		"name":      m.configMapName,
-		"valuesKey": "values",
-	}
-
-	before := getValuesFrom(hr)
-	updated := appendValuesReference(before, desired)
-	if reflect.DeepEqual(before, updated) {
-		return nil
-	}
-
-	setValuesFrom(hr, updated)
-
-	log.Info("Updating HelmRelease ValuesFrom", "helmrelease", m.resourceName, "configMap", m.configMapName)
-	if err := m.client.Update(ctx, hr); err != nil {
-		if apierrors.IsConflict(err) {
-			log.Error(err, "Conflict updating HelmRelease, will requeue", "helmrelease", m.resourceName)
-		}
-		return microerror.Mask(err)
-	}
 	return nil
 }
 
 func (m *helmReleaseTeleportAppConfigManager) DeleteConfig(ctx context.Context, log logr.Logger) error {
-	hr := newHelmReleaseUnstructured()
-	if err := m.client.Get(ctx, client.ObjectKey{Name: m.resourceName, Namespace: m.namespace}, hr); err != nil {
-		if apierrors.IsNotFound(err) {
-			return nil
-		}
-		return microerror.Mask(err)
-	}
-
-	desired := map[string]interface{}{
-		"kind":      "ConfigMap",
-		"name":      m.configMapName,
-		"valuesKey": "values",
-	}
-
-	before := getValuesFrom(hr)
-	updated := removeValuesReference(before, desired)
-	if reflect.DeepEqual(before, updated) {
-		return nil
-	}
-
-	setValuesFrom(hr, updated)
-
-	log.Info("Removing HelmRelease ValuesFrom entry", "helmrelease", m.resourceName, "configMap", m.configMapName)
-	if err := m.client.Update(ctx, hr); err != nil {
-		if apierrors.IsConflict(err) {
-			log.Error(err, "Conflict updating HelmRelease, will requeue", "helmrelease", m.resourceName)
-		}
-		return microerror.Mask(err)
-	}
 	return nil
-}
-
-func getValuesFrom(hr *unstructured.Unstructured) []interface{} {
-	spec, ok := hr.Object["spec"].(map[string]interface{})
-	if !ok {
-		return nil
-	}
-	valuesFrom, ok := spec["valuesFrom"].([]interface{})
-	if !ok {
-		return nil
-	}
-	return valuesFrom
-}
-
-func setValuesFrom(hr *unstructured.Unstructured, valuesFrom []interface{}) {
-	spec, ok := hr.Object["spec"].(map[string]interface{})
-	if !ok {
-		spec = map[string]interface{}{}
-		hr.Object["spec"] = spec
-	}
-	spec["valuesFrom"] = valuesFrom
-}
-
-func appendValuesReference(refs []interface{}, ref map[string]interface{}) []interface{} {
-	want := valuesReferenceID(ref)
-	for _, existing := range refs {
-		entry, ok := existing.(map[string]interface{})
-		if ok && valuesReferenceID(entry) == want {
-			return refs
-		}
-	}
-	return append(refs, ref)
-}
-
-// removeValuesReference compares exactly, unlike appending: it must only
-// withdraw an entry we wrote ourselves. One the parent chart rendered is the
-// chart's to remove.
-func removeValuesReference(refs []interface{}, ref map[string]interface{}) []interface{} {
-	result := make([]interface{}, 0, len(refs))
-	for _, existing := range refs {
-		if !reflect.DeepEqual(existing, ref) {
-			result = append(result, existing)
-		}
-	}
-	return result
-}
-
-// valuesReferenceID identifies a `valuesFrom` entry by which values it loads.
-// `optional` is excluded because it decides error handling, not content — the
-// cluster chart renders its own entry with `optional: false`, and comparing
-// whole maps would miss it and append a duplicate. These four fields plus
-// `optional` are the whole of Flux's ValuesReference, so nothing is ignored.
-type valuesRefID struct{ kind, name, valuesKey, targetPath string }
-
-func valuesReferenceID(entry map[string]interface{}) valuesRefID {
-	field := func(k string) string {
-		v, _ := entry[k].(string)
-		return v
-	}
-	return valuesRefID{field("kind"), field("name"), field("valuesKey"), field("targetPath")}
 }
 
 // --- App CR implementation ---

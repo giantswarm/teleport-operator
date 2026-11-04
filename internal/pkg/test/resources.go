@@ -309,22 +309,22 @@ func NewFakeK8sClient(runtimeObjects []runtime.Object) (client.Client, error) {
 	return fakeK8sClientBuilder.Build(), nil
 }
 
-// NewTbotOutputsConfigMap builds the aggregate tbot outputs ConfigMap holding
-// the given register-name to cluster-name mapping.
-func NewTbotOutputsConfigMap(outputs map[string]string) *corev1.ConfigMap {
-	return NewTbotOutputsConfigMapWithDoc(map[string]interface{}{"outputs": outputs})
+// NewTbotRegisteredClustersConfigMap builds the tbot registered-clusters
+// ConfigMap for the given register-name to cluster-name mapping.
+func NewTbotRegisteredClustersConfigMap(outputs map[string]string) *corev1.ConfigMap {
+	return NewTbotRegisteredClustersConfigMapWithDoc(map[string]interface{}{"outputs": outputs})
 }
 
-// NewTbotOutputsConfigMapWithDoc is NewTbotOutputsConfigMap for a values
-// document that carries more than just `outputs`.
-func NewTbotOutputsConfigMapWithDoc(doc map[string]interface{}) *corev1.ConfigMap {
+// NewTbotRegisteredClustersConfigMapWithDoc builds the same ConfigMap from an
+// arbitrary values document.
+func NewTbotRegisteredClustersConfigMapWithDoc(doc map[string]interface{}) *corev1.ConfigMap {
 	values, err := yaml.Marshal(doc)
 	if err != nil {
 		panic(err)
 	}
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
-			Name:      key.TbotOutputsConfigmapName,
+			Name:      key.TbotRegisteredClustersConfigmapName,
 			Namespace: key.TeleportBotNamespace,
 		},
 		Data: map[string]string{"values": string(values)},

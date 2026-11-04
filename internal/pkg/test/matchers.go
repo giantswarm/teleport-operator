@@ -171,16 +171,16 @@ func CheckError(t *testing.T, expectError bool, err error) {
 	}
 }
 
-// ReadTbotOutputsDoc returns the whole values document stored in the aggregate
-// tbot outputs ConfigMap.
-func ReadTbotOutputsDoc(t *testing.T, ctx context.Context, c client.Client) map[string]interface{} {
+// ReadTbotRegisteredClustersDoc returns the values document stored in the tbot
+// registered-clusters ConfigMap.
+func ReadTbotRegisteredClustersDoc(t *testing.T, ctx context.Context, c client.Client) map[string]interface{} {
 	t.Helper()
 	cm := &corev1.ConfigMap{}
 	if err := c.Get(ctx, client.ObjectKey{
-		Name:      key.TbotOutputsConfigmapName,
+		Name:      key.TbotRegisteredClustersConfigmapName,
 		Namespace: key.TeleportBotNamespace,
 	}, cm); err != nil {
-		t.Fatalf("failed to get the aggregate tbot outputs ConfigMap: %v", err)
+		t.Fatalf("failed to get the tbot registered-clusters ConfigMap: %v", err)
 	}
 	doc := map[string]interface{}{}
 	if err := yaml.Unmarshal([]byte(cm.Data["values"]), &doc); err != nil {
@@ -189,9 +189,9 @@ func ReadTbotOutputsDoc(t *testing.T, ctx context.Context, c client.Client) map[
 	return doc
 }
 
-// ReadTbotOutputs returns just the `outputs` map from that ConfigMap.
-func ReadTbotOutputs(t *testing.T, ctx context.Context, c client.Client) map[string]interface{} {
+// ReadTbotRegisteredClusters returns just the `outputs` map from that ConfigMap.
+func ReadTbotRegisteredClusters(t *testing.T, ctx context.Context, c client.Client) map[string]interface{} {
 	t.Helper()
-	outputs, _ := ReadTbotOutputsDoc(t, ctx, c)["outputs"].(map[string]interface{})
+	outputs, _ := ReadTbotRegisteredClustersDoc(t, ctx, c)["outputs"].(map[string]interface{})
 	return outputs
 }

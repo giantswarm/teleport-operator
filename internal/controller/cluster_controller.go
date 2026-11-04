@@ -39,13 +39,7 @@ const identityExpirationPeriod = 20 * time.Minute
 
 // ClusterReconciler reconciles a Cluster object
 type ClusterReconciler struct {
-	Client client.Client
-	// APIReader reads straight from the API server, bypassing the manager's
-	// cache. Read-modify-write on an object several reconcilers share must not
-	// re-read from an eventually consistent cache: after a conflict the cache
-	// can still serve the copy we just lost against, so the retry would merge
-	// stale data and drop the winner's entry.
-	APIReader         client.Reader
+	Client            client.Client
 	Log               logr.Logger
 	Scheme            *runtime.Scheme
 	Teleport          *teleport.Teleport
@@ -54,47 +48,28 @@ type ClusterReconciler struct {
 	lastAssignedRoles []string
 }
 
-// desiredTbotOutputs projects the cluster list into the tbot outputs map. The
-// aggregate ConfigMap is derived state, so it is rebuilt from the authoritative
-// list rather than mutated per cluster - which is what makes an orphaned entry
-// (a cluster deleted while the operator was down, say) heal by itself.
-func (r *ClusterReconciler) desiredTbotOutputs(ctx context.Context) (map[string]string, error) {
+// syncTbotRegisteredClusters rebuilds the tbot registered-clusters ConfigMap
+// from the full cluster list. A cluster stays listed until its Cluster object
+// is gone, so access survives a deletion that gets stuck.
+func (r *ClusterReconciler) syncTbotRegisteredClusters(ctx context.Context, log logr.Logger) error {
+	if !r.IsBotEnabled {
+		return nil
+	}
 	clusters := &capi.ClusterList{}
 	if err := r.Client.List(ctx, clusters); err != nil {
-		return nil, microerror.Mask(err)
+		return microerror.Mask(err)
 	}
 	outputs := make(map[string]string, len(clusters.Items))
-	for i := range clusters.Items {
-		cluster := &clusters.Items[i]
-		if !cluster.DeletionTimestamp.IsZero() {
-			continue
-		}
+	for _, cluster := range clusters.Items {
 		outputs[key.RegisterName(r.Teleport.Config.ManagementClusterName, cluster.Name)] = cluster.Name
 	}
-	return outputs, nil
-}
-
-// syncTbotOutputs refreshes the aggregate ConfigMap. Nothing consumes it yet, so
-// a failure must not fail the reconcile - every other side effect is already
-// persisted by this point, and the next pass rebuilds the map from scratch.
-func (r *ClusterReconciler) syncTbotOutputs(ctx context.Context, log logr.Logger) {
-	if !r.IsBotEnabled {
-		return
-	}
-	outputs, err := r.desiredTbotOutputs(ctx)
-	if err != nil {
-		log.Error(err, "tbot: could not list clusters for the aggregate outputs configmap")
-		return
-	}
-	if err := r.Teleport.SetTbotOutputs(ctx, log, r.Client, outputs); err != nil {
-		log.Error(err, "tbot: could not write the aggregate outputs configmap")
-	}
+	return r.Teleport.SetTbotRegisteredClusters(ctx, log, r.Client, outputs)
 }
 
 //+kubebuilder:rbac:groups=cluster.x-k8s.io.giantswarm.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=cluster.x-k8s.io.giantswarm.io,resources=clusters/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=cluster.x-k8s.io.giantswarm.io,resources=clusters/finalizers,verbs=update
-//+kubebuilder:rbac:groups=helm.toolkit.fluxcd.io,resources=helmreleases,verbs=get;list;watch;update;patch
+//+kubebuilder:rbac:groups=helm.toolkit.fluxcd.io,resources=helmreleases,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -107,6 +82,10 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	cluster := &capi.Cluster{}
 	if err := r.Client.Get(ctx, req.NamespacedName, cluster); err != nil {
 		if apierrors.IsNotFound(err) {
+			// The cluster is gone: drop it from the registered clusters.
+			if err := r.syncTbotRegisteredClusters(ctx, log); err != nil {
+				return ctrl.Result{}, microerror.Mask(err)
+			}
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, microerror.Mask(err)
@@ -187,9 +166,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			if err := r.Teleport.DeleteKubeconfigSecret(ctx, log, r.Client, cluster.Name, key.TeleportBotNamespace); err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
-
-			// The deleting cluster is already excluded from the projection.
-			r.syncTbotOutputs(ctx, log)
 		}
 
 		kubeAgentMgr, err := teleport.NewTeleportAppConfigManager(ctx, r.Client,
@@ -356,10 +332,9 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			}
 		}
 
-		// Maintained alongside the per-cluster ConfigMaps until the consumer is
-		// switched over. Outside the `secret == nil` gate: the entry must exist
-		// for as long as the cluster does.
-		r.syncTbotOutputs(ctx, log)
+		if err := r.syncTbotRegisteredClusters(ctx, log); err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
+		}
 	}
 
 	// We need to requeue to check the teleport token validity

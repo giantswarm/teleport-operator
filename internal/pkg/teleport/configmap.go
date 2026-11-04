@@ -3,7 +3,6 @@ package teleport
 import (
 	"context"
 	"fmt"
-	"reflect"
 
 	"github.com/giantswarm/microerror"
 	"github.com/go-logr/logr"
@@ -283,65 +282,37 @@ func (t *Teleport) getTbotConfigMapData(registerName string, clusterName string)
 	return key.GetTbotConfigmapDataFromTemplate(registerName, clusterName)
 }
 
-// SetTbotOutputs writes the aggregate tbot outputs document.
-//
-// The map is a pure projection of the cluster list, so every writer derives the
-// same content from the same source: there is nothing to merge, and losing a
-// race is harmless because the winner wrote what we would have written. That is
-// also what lets a stale or orphaned entry heal on the next pass.
-func (t *Teleport) SetTbotOutputs(ctx context.Context, log logr.Logger, ctrlClient client.Client, outputs map[string]string) error {
-	desired := make(map[string]interface{}, len(outputs))
-	for registerName, clusterName := range outputs {
-		desired[registerName] = clusterName
+// SetTbotRegisteredClusters writes the ConfigMap listing every cluster tbot
+// should produce a kubeconfig for. The operator owns the whole ConfigMap: any
+// other content is overwritten, because it would end up in the tbot values.
+func (t *Teleport) SetTbotRegisteredClusters(ctx context.Context, log logr.Logger, ctrlClient client.Client, outputs map[string]string) error {
+	values, err := yaml.Marshal(map[string]interface{}{"outputs": outputs})
+	if err != nil {
+		return microerror.Mask(err)
 	}
 
 	cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
-		Name:      key.TbotOutputsConfigmapName,
+		Name:      key.TbotRegisteredClustersConfigmapName,
 		Namespace: key.TeleportBotNamespace,
 	}}
 	op, err := controllerutil.CreateOrUpdate(ctx, ctrlClient, cm, func() error {
-		// We own the `outputs` key, not the whole file: a sibling key belongs to
-		// whoever put it there and is left untouched.
-		doc, err := parseTbotValues(cm.Data["values"])
-		if err != nil {
-			return err
+		if cm.Labels == nil {
+			cm.Labels = map[string]string{}
 		}
-		if reflect.DeepEqual(doc["outputs"], desired) {
-			// Compare semantically and leave the stored bytes alone, so a
-			// difference in formatting alone never triggers a write.
-			return nil
+		cm.Labels[key.ManagedByLabel] = key.TeleportOperatorLabelValue
+		if cm.Annotations == nil {
+			cm.Annotations = map[string]string{}
 		}
-		doc["outputs"] = desired
-
-		values, err := yaml.Marshal(doc)
-		if err != nil {
-			return err
-		}
-		if cm.Data == nil {
-			cm.Data = map[string]string{}
-		}
-		cm.Data["values"] = string(values)
+		cm.Annotations[key.NotesAnnotation] = "Clusters tbot creates kubeconfigs for. Managed by teleport-operator, do not edit."
+		cm.Data = map[string]string{"values": string(values)}
 		return nil
 	})
 	if err != nil {
 		return microerror.Mask(err)
 	}
 	if op != controllerutil.OperationResultNone {
-		log.Info("tbot: wrote aggregate outputs configmap",
+		log.Info("tbot: wrote registered clusters configmap",
 			"configMapName", cm.Name, "operation", op, "clusters", len(outputs))
 	}
 	return nil
-}
-
-func parseTbotValues(values string) (map[string]interface{}, error) {
-	var doc map[string]interface{}
-	if values != "" {
-		if err := yaml.Unmarshal([]byte(values), &doc); err != nil {
-			return nil, microerror.Mask(err)
-		}
-	}
-	if doc == nil {
-		doc = map[string]interface{}{}
-	}
-	return doc, nil
 }
