@@ -10,6 +10,7 @@ import (
 
 	appv1alpha1 "github.com/giantswarm/apiextensions-application/api/v1alpha1"
 	teleportTypes "github.com/gravitational/teleport/api/types"
+	"github.com/gravitational/trace"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime"
@@ -45,6 +46,7 @@ func Test_ClusterController(t *testing.T) {
 		expectedConfigMap   *corev1.ConfigMap
 		expectedError       error
 		expectedRoles       []string
+		expectedGoneTokens  []string
 	}{
 		{
 			name:      "case 0: Register cluster with apps enabled",
@@ -131,8 +133,13 @@ func Test_ClusterController(t *testing.T) {
 			identity:      newIdentity(test.LastReadValue),
 			cluster:       test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Now()),
 			secret:        test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
-			configMap:     test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.TokenName, []string{key.RoleKube}),
+			configMap:     test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, test.NewTokenName, []string{key.RoleKube}),
 			expectedRoles: []string{key.RoleKube},
+			tokens: []teleportTypes.ProvisionToken{
+				test.NewToken(test.TokenName, test.ClusterName, []string{key.RoleNode}),
+				test.NewToken(test.NewTokenName, test.ClusterName, []string{key.RoleKube}),
+			},
+			expectedGoneTokens: []string{test.TokenName, test.NewTokenName},
 		},
 		{
 			name:           "case 5: Reconnect to Teleport when credentials are rotated",
@@ -284,6 +291,12 @@ func Test_ClusterController(t *testing.T) {
 				t.Fatalf("unexpected error %v", err)
 			} else if tc.expectedError != nil {
 				t.Fatalf("did not receive an expected error %v", tc.expectedError)
+			}
+
+			for _, name := range tc.expectedGoneTokens {
+				if _, err := controller.Teleport.TeleportClient.GetToken(ctx, name); !trace.IsNotFound(err) {
+					t.Fatalf("expected token %q to be deleted from Teleport, GetToken returned err=%v", name, err)
+				}
 			}
 
 			clusterList := &capi.ClusterList{}

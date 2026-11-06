@@ -274,7 +274,7 @@ func (t *Teleport) RenderConfigMapValues(registerName, token string, roles []str
 }
 
 func (t *Teleport) getConfigMapData(registerName, token string, roles []string, tkaVersion string) string {
-	return key.GetConfigmapDataFromTemplate(token, t.Config.ProxyAddr, registerName, t.Config.TeleportVersion, roles, tkaVersion)
+	return key.GetConfigmapDataFromTemplate(token, t.Config.ProxyAddr, registerName, t.Config.TeleportVersion, roles, tkaVersion, t.Config.ManagementClusterName)
 }
 
 func (t *Teleport) getTbotConfigMapData(registerName string, clusterName string) string {
