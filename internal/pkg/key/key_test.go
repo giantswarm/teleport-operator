@@ -1,6 +1,10 @@
 package key
 
-import "testing"
+import (
+	"testing"
+
+	"gopkg.in/yaml.v3"
+)
 
 func TestUsesNestedKubeAgentValues(t *testing.T) {
 	cases := []struct {
@@ -27,7 +31,7 @@ func TestUsesNestedKubeAgentValues(t *testing.T) {
 }
 
 func TestGetConfigmapDataFromTemplate_NestedOnlyAtOrAbove0_11_0(t *testing.T) {
-	data := GetConfigmapDataFromTemplate("tok", "proxy:443", "kube", "18.7.6", []string{"kube", "app"}, "0.11.0")
+	data := GetConfigmapDataFromTemplate("tok", "proxy:443", "kube", "18.7.6", []string{"kube", "app"}, "0.11.0", "gazelle")
 	if want := "teleport-kube-agent:\n"; data[:len(want)] != want {
 		t.Fatalf("expected nested-only layout, got:\n%s", data)
 	}
@@ -37,7 +41,7 @@ func TestGetConfigmapDataFromTemplate_DualBlockBelow0_11_0(t *testing.T) {
 	cases := []string{"", "0.10.8", "not-a-version"}
 	for _, tkaVersion := range cases {
 		t.Run(tkaVersion, func(t *testing.T) {
-			data := GetConfigmapDataFromTemplate("tok", "proxy:443", "kube", "18.7.6", []string{"kube", "app"}, tkaVersion)
+			data := GetConfigmapDataFromTemplate("tok", "proxy:443", "kube", "18.7.6", []string{"kube", "app"}, tkaVersion, "gazelle")
 			if !startsWith(data, "roles:") {
 				t.Fatalf("expected flat root keys first, got:\n%s", data)
 			}
@@ -49,20 +53,75 @@ func TestGetConfigmapDataFromTemplate_DualBlockBelow0_11_0(t *testing.T) {
 }
 
 func TestGetConfigmapDataFromTemplate_NestedFloorDropsDowngrade(t *testing.T) {
-	data := GetConfigmapDataFromTemplate("tok", "proxy:443", "kube", "17.5.4", []string{"kube"}, "0.11.0")
+	data := GetConfigmapDataFromTemplate("tok", "proxy:443", "kube", "17.5.4", []string{"kube"}, "0.11.0", "gazelle")
 	if containsLine(data, `  teleportVersionOverride: "17.5.4"`) {
 		t.Fatalf("expected nested block to omit downgrade override, got:\n%s", data)
 	}
 }
 
 func TestGetConfigmapDataFromTemplate_DualBlockFlatPassesOverride(t *testing.T) {
-	data := GetConfigmapDataFromTemplate("tok", "proxy:443", "kube", "1.0.0", []string{"kube"}, "")
+	data := GetConfigmapDataFromTemplate("tok", "proxy:443", "kube", "1.0.0", []string{"kube"}, "", "gazelle")
 	if !containsLine(data, `teleportVersionOverride: "1.0.0"`) {
 		t.Fatalf("expected flat block to keep passthrough override, got:\n%s", data)
 	}
 	if containsLine(data, `  teleportVersionOverride: "1.0.0"`) {
 		t.Fatalf("expected nested block to drop below-floor override, got:\n%s", data)
 	}
+}
+
+func TestGetConfigmapDataFromTemplate_LabelsManagementCluster(t *testing.T) {
+	t.Run("nested-only", func(t *testing.T) {
+		data := GetConfigmapDataFromTemplate("tok", "proxy:443", "kube", "18.7.6", []string{"kube"}, "0.11.0", "gazelle")
+		if !containsLine(data, "  labels:") || !containsLine(data, `    giantswarm.io/mc: "gazelle"`) {
+			t.Fatalf("expected nested labels block, got:\n%s", data)
+		}
+		root := parseValues(t, data)
+		if got := mcLabel(root[TeleportKubeAgentValuesKey]); got != "gazelle" {
+			t.Fatalf("expected %s.labels.giantswarm.io/mc = gazelle, got %q in:\n%s", TeleportKubeAgentValuesKey, got, data)
+		}
+		if _, ok := root["labels"]; ok {
+			t.Fatalf("expected no root labels in nested-only layout, got:\n%s", data)
+		}
+	})
+
+	t.Run("dual", func(t *testing.T) {
+		data := GetConfigmapDataFromTemplate("tok", "proxy:443", "kube", "18.7.6", []string{"kube"}, "0.10.0", "gazelle")
+		if !containsLine(data, "labels:") || !containsLine(data, `  giantswarm.io/mc: "gazelle"`) {
+			t.Fatalf("expected flat labels block, got:\n%s", data)
+		}
+		if !containsLine(data, "  labels:") || !containsLine(data, `    giantswarm.io/mc: "gazelle"`) {
+			t.Fatalf("expected nested labels block, got:\n%s", data)
+		}
+		root := parseValues(t, data)
+		if got := mcLabel(root); got != "gazelle" {
+			t.Fatalf("expected labels.giantswarm.io/mc = gazelle, got %q in:\n%s", got, data)
+		}
+		if got := mcLabel(root[TeleportKubeAgentValuesKey]); got != "gazelle" {
+			t.Fatalf("expected %s.labels.giantswarm.io/mc = gazelle, got %q in:\n%s", TeleportKubeAgentValuesKey, got, data)
+		}
+	})
+}
+
+func parseValues(t *testing.T, data string) map[string]interface{} {
+	t.Helper()
+	var root map[string]interface{}
+	if err := yaml.Unmarshal([]byte(data), &root); err != nil {
+		t.Fatalf("failed to parse values YAML: %v\n%s", err, data)
+	}
+	return root
+}
+
+func mcLabel(block interface{}) string {
+	m, ok := block.(map[string]interface{})
+	if !ok {
+		return ""
+	}
+	labels, ok := m["labels"].(map[string]interface{})
+	if !ok {
+		return ""
+	}
+	v, _ := labels["giantswarm.io/mc"].(string)
+	return v
 }
 
 func TestResolveNestedTeleportVersionOverride(t *testing.T) {
