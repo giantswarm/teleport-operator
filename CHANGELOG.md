@@ -9,7 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Label every kube-agent with `giantswarm.io/mc: <management cluster>` in the rendered `teleport-kube-agent` values (nested and flat layouts), so Teleport roles can be scoped to one management cluster's clusters.
+- Label every kube-agent with `giantswarm.io/installation: <management cluster>` in the rendered `teleport-kube-agent` values (nested and flat layouts), so Teleport roles can be scoped to one management cluster's clusters.
 
 ### Changed
 

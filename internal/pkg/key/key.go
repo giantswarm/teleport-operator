@@ -37,7 +37,7 @@ const (
 
 	// ManagementClusterLabel is the static label every teleport-kube-agent
 	// carries, set to the name of the management cluster that configured it.
-	ManagementClusterLabel = "giantswarm.io/mc"
+	ManagementClusterLabel = "giantswarm.io/installation"
 
 	// TeleportKubeAgentValuesKey is the top-level key under which
 	// teleport-kube-agent v0.11.0+ reads its values.

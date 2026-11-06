@@ -72,12 +72,12 @@ func TestGetConfigmapDataFromTemplate_DualBlockFlatPassesOverride(t *testing.T) 
 func TestGetConfigmapDataFromTemplate_LabelsManagementCluster(t *testing.T) {
 	t.Run("nested-only", func(t *testing.T) {
 		data := GetConfigmapDataFromTemplate("tok", "proxy:443", "kube", "18.7.6", []string{"kube"}, "0.11.0", "gazelle")
-		if !containsLine(data, "  labels:") || !containsLine(data, `    giantswarm.io/mc: "gazelle"`) {
+		if !containsLine(data, "  labels:") || !containsLine(data, `    giantswarm.io/installation: "gazelle"`) {
 			t.Fatalf("expected nested labels block, got:\n%s", data)
 		}
 		root := parseValues(t, data)
 		if got := mcLabel(root[TeleportKubeAgentValuesKey]); got != "gazelle" {
-			t.Fatalf("expected %s.labels.giantswarm.io/mc = gazelle, got %q in:\n%s", TeleportKubeAgentValuesKey, got, data)
+			t.Fatalf("expected %s.labels.giantswarm.io/installation = gazelle, got %q in:\n%s", TeleportKubeAgentValuesKey, got, data)
 		}
 		if _, ok := root["labels"]; ok {
 			t.Fatalf("expected no root labels in nested-only layout, got:\n%s", data)
@@ -86,18 +86,18 @@ func TestGetConfigmapDataFromTemplate_LabelsManagementCluster(t *testing.T) {
 
 	t.Run("dual", func(t *testing.T) {
 		data := GetConfigmapDataFromTemplate("tok", "proxy:443", "kube", "18.7.6", []string{"kube"}, "0.10.0", "gazelle")
-		if !containsLine(data, "labels:") || !containsLine(data, `  giantswarm.io/mc: "gazelle"`) {
+		if !containsLine(data, "labels:") || !containsLine(data, `  giantswarm.io/installation: "gazelle"`) {
 			t.Fatalf("expected flat labels block, got:\n%s", data)
 		}
-		if !containsLine(data, "  labels:") || !containsLine(data, `    giantswarm.io/mc: "gazelle"`) {
+		if !containsLine(data, "  labels:") || !containsLine(data, `    giantswarm.io/installation: "gazelle"`) {
 			t.Fatalf("expected nested labels block, got:\n%s", data)
 		}
 		root := parseValues(t, data)
 		if got := mcLabel(root); got != "gazelle" {
-			t.Fatalf("expected labels.giantswarm.io/mc = gazelle, got %q in:\n%s", got, data)
+			t.Fatalf("expected labels.giantswarm.io/installation = gazelle, got %q in:\n%s", got, data)
 		}
 		if got := mcLabel(root[TeleportKubeAgentValuesKey]); got != "gazelle" {
-			t.Fatalf("expected %s.labels.giantswarm.io/mc = gazelle, got %q in:\n%s", TeleportKubeAgentValuesKey, got, data)
+			t.Fatalf("expected %s.labels.giantswarm.io/installation = gazelle, got %q in:\n%s", TeleportKubeAgentValuesKey, got, data)
 		}
 	})
 }
@@ -120,7 +120,7 @@ func mcLabel(block interface{}) string {
 	if !ok {
 		return ""
 	}
-	v, _ := labels["giantswarm.io/mc"].(string)
+	v, _ := labels["giantswarm.io/installation"].(string)
 	return v
 }
 
