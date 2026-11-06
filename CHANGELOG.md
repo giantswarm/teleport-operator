@@ -15,10 +15,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Create join tokens with `CreateToken` instead of upserting them, and delete them by the names stored in the cluster's Secret and ConfigMap instead of listing all tokens. The operator's Teleport role now needs only `create`, `read` and `delete` on `token`; `list` and `update` are no longer used. A Secret or ConfigMap without a readable token does not block cluster deletion.
 
-### Security
-
-- Validate a cluster's join token by looking it up by name instead of listing every token in the Teleport cluster, so a leaked operator identity cannot enumerate other installations' join secrets. See `docs/security/blast-radius.md`.
-
 ### Fixed
 
 - On cluster deletion, delete both of the cluster's join tokens (node, and kube/app). Previously only the first token matching the cluster label was removed.
