@@ -12,8 +12,6 @@ rules:
   verbs:
   - get
   - list
-  - patch
-  - update
   - watch
 - apiGroups:
   - application.giantswarm.io

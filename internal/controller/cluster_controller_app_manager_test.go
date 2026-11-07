@@ -8,6 +8,7 @@ import (
 	appv1alpha1 "github.com/giantswarm/apiextensions-application/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/client-go/kubernetes/scheme"
 	ctrl "sigs.k8s.io/controller-runtime"
@@ -143,7 +144,7 @@ func Test_ClusterController_BotEnabled_TbotAppCR_EnsureConfig(t *testing.T) {
 	t.Errorf("expected ExtraConfigs to contain %q, got %+v", wantCM, updated.Spec.ExtraConfigs)
 }
 
-// case B: tbot HelmRelease exists — EnsureConfig adds ValuesFrom entry.
+// case B: tbot HelmRelease exists — the operator leaves its valuesFrom alone.
 func Test_ClusterController_BotEnabled_TbotHelmRelease_EnsureConfig(t *testing.T) {
 	cluster := test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{})
 	tbotHR := test.NewHelmRelease(key.TeleportBotAppName, key.TeleportBotNamespace)
@@ -157,16 +158,9 @@ func Test_ClusterController_BotEnabled_TbotHelmRelease_EnsureConfig(t *testing.T
 		t.Fatalf("failed to get tbot HelmRelease: %v", err)
 	}
 
-	wantCM := key.GetTbotConfigmapName(test.ClusterName)
-	spec, _ := updated.Object["spec"].(map[string]interface{})
-	valuesFrom, _ := spec["valuesFrom"].([]interface{})
-	for _, entry := range valuesFrom {
-		ref, ok := entry.(map[string]interface{})
-		if ok && ref["name"] == wantCM {
-			return // found — test passes
-		}
+	if valuesFrom := helmReleaseValuesFrom(updated); len(valuesFrom) != 0 {
+		t.Errorf("expected the HelmRelease valuesFrom to be left empty, got %+v", valuesFrom)
 	}
-	t.Errorf("expected ValuesFrom to contain %q, got %+v", wantCM, valuesFrom)
 }
 
 // case C: neither tbot App CR nor HelmRelease exists — reconcile succeeds (no-op).
@@ -201,7 +195,7 @@ func Test_ClusterController_BotEnabled_TbotAppCR_DeleteConfig(t *testing.T) {
 	}
 }
 
-// case E: tbot HelmRelease exists, cluster deleting — DeleteConfig removes ValuesFrom entry.
+// case E: tbot HelmRelease exists, cluster deleting — its valuesFrom is left alone.
 func Test_ClusterController_BotEnabled_TbotHelmRelease_DeleteConfig(t *testing.T) {
 	cluster := test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Now())
 	tbotHR := test.NewHelmRelease(key.TeleportBotAppName, key.TeleportBotNamespace)
@@ -224,14 +218,8 @@ func Test_ClusterController_BotEnabled_TbotHelmRelease_DeleteConfig(t *testing.T
 		t.Fatalf("failed to get tbot HelmRelease: %v", err)
 	}
 
-	wantCM := key.GetTbotConfigmapName(test.ClusterName)
-	spec, _ := updated.Object["spec"].(map[string]interface{})
-	valuesFrom, _ := spec["valuesFrom"].([]interface{})
-	for _, entry := range valuesFrom {
-		ref, ok := entry.(map[string]interface{})
-		if ok && ref["name"] == wantCM {
-			t.Errorf("expected ValuesFrom entry %q to be removed, still present", wantCM)
-		}
+	if valuesFrom := helmReleaseValuesFrom(updated); len(valuesFrom) != 1 {
+		t.Errorf("expected the HelmRelease valuesFrom to be left alone, got %+v", valuesFrom)
 	}
 }
 
@@ -363,7 +351,7 @@ func Test_ClusterController_KubeAgent_AppCR_EnsureConfig(t *testing.T) {
 	t.Errorf("expected ExtraConfigs to contain %q, got %+v", wantCM, updated.Spec.ExtraConfigs)
 }
 
-// case G: kube-agent HelmRelease exists — EnsureConfig adds ValuesFrom entry.
+// case G: kube-agent HelmRelease exists — the operator leaves its valuesFrom alone.
 func Test_ClusterController_KubeAgent_HelmRelease_EnsureConfig(t *testing.T) {
 	cluster := test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{})
 	kubeHR := test.NewHelmRelease(kubeAgentAppName(), test.NamespaceName)
@@ -377,16 +365,9 @@ func Test_ClusterController_KubeAgent_HelmRelease_EnsureConfig(t *testing.T) {
 		t.Fatalf("failed to get kube-agent HelmRelease: %v", err)
 	}
 
-	wantCM := key.GetConfigmapName(test.ClusterName, test.AppName)
-	spec, _ := updated.Object["spec"].(map[string]interface{})
-	valuesFrom, _ := spec["valuesFrom"].([]interface{})
-	for _, entry := range valuesFrom {
-		ref, ok := entry.(map[string]interface{})
-		if ok && ref["name"] == wantCM {
-			return
-		}
+	if valuesFrom := helmReleaseValuesFrom(updated); len(valuesFrom) != 0 {
+		t.Errorf("expected the HelmRelease valuesFrom to be left empty, got %+v", valuesFrom)
 	}
-	t.Errorf("expected ValuesFrom to contain %q, got %+v", wantCM, valuesFrom)
 }
 
 // case H: neither kube-agent resource exists — reconcile succeeds (no-op).
@@ -395,7 +376,7 @@ func Test_ClusterController_KubeAgent_NoResource_NoOp(t *testing.T) {
 	reconcileWithKubeAgent(t, cluster)
 }
 
-// case I: kube-agent HelmRelease exists, cluster deleting — DeleteConfig removes ValuesFrom entry.
+// case I: kube-agent HelmRelease exists, cluster deleting — its valuesFrom is left alone.
 func Test_ClusterController_KubeAgent_HelmRelease_DeleteConfig(t *testing.T) {
 	cluster := test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Now())
 	kubeHR := test.NewHelmRelease(kubeAgentAppName(), test.NamespaceName)
@@ -421,14 +402,8 @@ func Test_ClusterController_KubeAgent_HelmRelease_DeleteConfig(t *testing.T) {
 		t.Fatalf("failed to get kube-agent HelmRelease: %v", err)
 	}
 
-	wantCM := key.GetConfigmapName(test.ClusterName, test.AppName)
-	spec, _ := updated.Object["spec"].(map[string]interface{})
-	valuesFrom, _ := spec["valuesFrom"].([]interface{})
-	for _, entry := range valuesFrom {
-		ref, ok := entry.(map[string]interface{})
-		if ok && ref["name"] == wantCM {
-			t.Errorf("expected ValuesFrom entry %q to be removed, still present", wantCM)
-		}
+	if valuesFrom := helmReleaseValuesFrom(updated); len(valuesFrom) != 1 {
+		t.Errorf("expected the HelmRelease valuesFrom to be left alone, got %+v", valuesFrom)
 	}
 }
 
@@ -441,5 +416,49 @@ func identitySecretInGiantswarm() *corev1.Secret {
 			Namespace: key.TeleportBotNamespace,
 		},
 		Data: map[string][]byte{key.Identity: []byte(test.IdentityFileValue)},
+	}
+}
+
+func helmReleaseValuesFrom(hr *unstructured.Unstructured) []interface{} {
+	valuesFrom, _, _ := unstructured.NestedSlice(hr.Object, "spec", "valuesFrom")
+	return valuesFrom
+}
+
+// Every cluster is registered, including one that is being deleted.
+func Test_ClusterController_BotEnabled_RegistersAllClusters(t *testing.T) {
+	cluster := test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Time{})
+	deleting := test.NewCluster("badger", test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Now())
+	tbotApp := test.NewApp(key.TeleportBotAppName, key.TeleportBotNamespace)
+
+	fakeClient := reconcileWithBot(t, cluster, deleting, tbotApp)
+
+	outputs := test.ReadTbotRegisteredClusters(t, context.TODO(), fakeClient)
+	want := map[string]string{
+		key.RegisterName(test.ManagementClusterName, test.ClusterName): test.ClusterName,
+		key.RegisterName(test.ManagementClusterName, "badger"):         "badger",
+	}
+	for reg, cl := range want {
+		if outputs[reg] != cl {
+			t.Errorf("expected outputs[%s]=%s, got outputs %v", reg, cl, outputs)
+		}
+	}
+}
+
+// Once a Cluster is gone, its entry and any stale entry are removed.
+func Test_ClusterController_BotEnabled_GoneClusterIsUnregistered(t *testing.T) {
+	survivor := test.NewCluster("badger", test.NamespaceName, nil, time.Time{})
+	registered := test.NewTbotRegisteredClustersConfigMap(map[string]string{
+		key.RegisterName(test.ManagementClusterName, test.ClusterName): test.ClusterName,
+		key.RegisterName(test.ManagementClusterName, "badger"):         "badger",
+		"golem-orphan": "orphan",
+	})
+
+	// test.ClusterName does not exist, so the reconcile takes the NotFound path.
+	fakeClient := reconcileWithBot(t, survivor, registered)
+
+	outputs := test.ReadTbotRegisteredClusters(t, context.TODO(), fakeClient)
+	want := map[string]interface{}{key.RegisterName(test.ManagementClusterName, "badger"): "badger"}
+	if len(outputs) != len(want) || outputs[key.RegisterName(test.ManagementClusterName, "badger")] != "badger" {
+		t.Errorf("expected only the surviving cluster, got %v", outputs)
 	}
 }

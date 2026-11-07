@@ -14,6 +14,7 @@ import (
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"sigs.k8s.io/controller-runtime/pkg/client"
+	"sigs.k8s.io/controller-runtime/pkg/controller/controllerutil"
 )
 
 func (t *Teleport) GetConfigMap(ctx context.Context, log logr.Logger, ctrlClient client.Client, clusterName string, clusterNamespace string) (*corev1.ConfigMap, error) {
@@ -279,4 +280,39 @@ func (t *Teleport) getConfigMapData(registerName, token string, roles []string, 
 
 func (t *Teleport) getTbotConfigMapData(registerName string, clusterName string) string {
 	return key.GetTbotConfigmapDataFromTemplate(registerName, clusterName)
+}
+
+// SetTbotRegisteredClusters writes the ConfigMap listing every cluster tbot
+// should produce a kubeconfig for. The operator owns the whole ConfigMap: any
+// other content is overwritten, because it would end up in the tbot values.
+func (t *Teleport) SetTbotRegisteredClusters(ctx context.Context, log logr.Logger, ctrlClient client.Client, outputs map[string]string) error {
+	values, err := yaml.Marshal(map[string]interface{}{"outputs": outputs})
+	if err != nil {
+		return microerror.Mask(err)
+	}
+
+	cm := &corev1.ConfigMap{ObjectMeta: metav1.ObjectMeta{
+		Name:      key.TbotRegisteredClustersConfigmapName,
+		Namespace: key.TeleportBotNamespace,
+	}}
+	op, err := controllerutil.CreateOrUpdate(ctx, ctrlClient, cm, func() error {
+		if cm.Labels == nil {
+			cm.Labels = map[string]string{}
+		}
+		cm.Labels[key.ManagedByLabel] = key.TeleportOperatorLabelValue
+		if cm.Annotations == nil {
+			cm.Annotations = map[string]string{}
+		}
+		cm.Annotations[key.NotesAnnotation] = "Clusters tbot creates kubeconfigs for. Managed by teleport-operator, do not edit."
+		cm.Data = map[string]string{"values": string(values)}
+		return nil
+	})
+	if err != nil {
+		return microerror.Mask(err)
+	}
+	if op != controllerutil.OperationResultNone {
+		log.Info("tbot: wrote registered clusters configmap",
+			"configMapName", cm.Name, "operation", op, "clusters", len(outputs))
+	}
+	return nil
 }
