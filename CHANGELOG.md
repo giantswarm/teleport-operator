@@ -9,11 +9,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Maintain a ConfigMap `teleport-tbot-registered-clusters` in `giantswarm` listing every cluster tbot creates a kubeconfig for, rebuilt from the cluster list on each reconcile. A cluster stays listed until its Cluster object is gone. Nothing consumes it yet; the tbot HelmRelease will reference it from Git.
+- Maintain a ConfigMap `teleport-tbot-registered-clusters` in `giantswarm` namespace, listing every cluster tbot creates a kubeconfig for. The ConfigMap needs to be referenced from the HelmRelease in Git.
 
 ### Fixed
 
-- Stop writing `spec.valuesFrom` on HelmReleases. Flux owns the field and reverted every change, so the operator and Flux kept overwriting each other. The reference must be declared in the HelmRelease manifest; the cluster chart already does this for `teleport-kube-agent`. App CRs are unchanged. The `update` and `patch` permissions on HelmReleases are removed.
+- Stop writing `spec.valuesFrom` on HelmReleases. Flux owns the field and will overwrite any changes made to it.
 - The `helm.sh/chart` label is valid for long chart versions: the 63-character cut trims the whole trailing run of `-`, `.` and `_`.
 - Detect the Teleport `apps` list when it is nested under the `teleport-kube-agent` key, which is the only place `teleport-kube-agent-app` v0.11.0+ (release v35) reads its values. Previously only the flat layout was recognised, so installations that moved the list into the nested block lost the `app` role and silently stopped advertising their apps.
 - Update `github.com/charlievieth/strcase` to v0.0.6. v0.0.5 panics at startup under Go 1.27, whose Unicode tables are version 17.0.0.

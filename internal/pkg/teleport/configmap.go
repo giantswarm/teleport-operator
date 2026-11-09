@@ -282,9 +282,8 @@ func (t *Teleport) getTbotConfigMapData(registerName string, clusterName string)
 	return key.GetTbotConfigmapDataFromTemplate(registerName, clusterName)
 }
 
-// SetTbotRegisteredClusters writes the ConfigMap listing every cluster tbot
-// should produce a kubeconfig for. The operator owns the whole ConfigMap: any
-// other content is overwritten, because it would end up in the tbot values.
+// SetTbotRegisteredClusters write the ConfigMap listing all the clusters
+// tbot should create a kubeconfig for
 func (t *Teleport) SetTbotRegisteredClusters(ctx context.Context, log logr.Logger, ctrlClient client.Client, outputs map[string]string) error {
 	values, err := yaml.Marshal(map[string]interface{}{"outputs": outputs})
 	if err != nil {
@@ -303,7 +302,7 @@ func (t *Teleport) SetTbotRegisteredClusters(ctx context.Context, log logr.Logge
 		if cm.Annotations == nil {
 			cm.Annotations = map[string]string{}
 		}
-		cm.Annotations[key.NotesAnnotation] = "Clusters tbot creates kubeconfigs for. Managed by teleport-operator, do not edit."
+		cm.Annotations[key.NotesAnnotation] = "Clusters tbot creates kubeconfigs for. DO NOT EDIT, managed by teleport-operator."
 		cm.Data = map[string]string{"values": string(values)}
 		return nil
 	})

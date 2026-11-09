@@ -189,7 +189,7 @@ func ReadTbotRegisteredClustersDoc(t *testing.T, ctx context.Context, c client.C
 	return doc
 }
 
-// ReadTbotRegisteredClusters returns just the `outputs` map from that ConfigMap.
+// ReadTbotRegisteredClusters returns just the `outputs` map from the ConfigMap.
 func ReadTbotRegisteredClusters(t *testing.T, ctx context.Context, c client.Client) map[string]interface{} {
 	t.Helper()
 	outputs, _ := ReadTbotRegisteredClustersDoc(t, ctx, c)["outputs"].(map[string]interface{})

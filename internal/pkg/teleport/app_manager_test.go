@@ -101,8 +101,7 @@ func Test_NewTeleportAppConfigManager_BothExist_HelmReleaseTakesPrecedence(t *te
 
 // --- HelmRelease tests ---
 
-// Flux owns spec.valuesFrom, so neither call may write the HelmRelease, whether
-// or not the entry is there.
+// Flux owns spec.valuesFrom, no calls should modify it.
 func Test_HelmRelease_EnsureAndDeleteConfig_NeverWrite(t *testing.T) {
 	declared := map[string]interface{}{
 		"kind":      "ConfigMap",

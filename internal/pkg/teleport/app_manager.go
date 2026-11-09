@@ -147,9 +147,8 @@ func NewTeleportAppConfigManager(
 
 // --- HelmRelease implementation ---
 
-// helmReleaseTeleportAppConfigManager never writes the HelmRelease.
-// spec.valuesFrom is an atomic list owned by Flux, so any change we make is
-// reverted on the next Flux reconcile.
+// helmReleaseTeleportAppConfigManager will never modify the HelmRelease valuesFrom section
+// valuesFrom is managed by Flux
 type helmReleaseTeleportAppConfigManager struct{}
 
 func (m *helmReleaseTeleportAppConfigManager) EnsureConfig(ctx context.Context, log logr.Logger) error {

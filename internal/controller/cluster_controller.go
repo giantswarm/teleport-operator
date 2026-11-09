@@ -48,9 +48,7 @@ type ClusterReconciler struct {
 	lastAssignedRoles []string
 }
 
-// syncTbotRegisteredClusters rebuilds the tbot registered-clusters ConfigMap
-// from the full cluster list. A cluster stays listed until its Cluster object
-// is gone, so access survives a deletion that gets stuck.
+// syncTbotRegisteredClusters builds the tbot-registered clusters from the full CAPI cluster list
 func (r *ClusterReconciler) syncTbotRegisteredClusters(ctx context.Context, log logr.Logger) error {
 	if !r.IsBotEnabled {
 		return nil
