@@ -166,10 +166,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			if err := r.Teleport.DeleteTbotConfigMap(ctx, log, r.Client, cluster.Name, key.TeleportBotNamespace); err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
-
-			if err := r.Teleport.DeleteKubeconfigSecret(ctx, log, r.Client, cluster.Name, key.TeleportBotNamespace); err != nil {
-				return ctrl.Result{}, microerror.Mask(err)
-			}
 		}
 
 		kubeAgentMgr, err := teleport.NewTeleportAppConfigManager(ctx, r.Client,

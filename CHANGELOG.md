@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Maintain a ConfigMap `teleport-tbot-registered-clusters` in `giantswarm` namespace, listing every cluster tbot creates a kubeconfig for. The ConfigMap needs to be referenced from the HelmRelease in Git.
 
+### Changed
+
+- Keep a deleting cluster's kubeconfig secret until it's completely removed.
+
 ### Fixed
 
 - Stop writing `spec.valuesFrom` on HelmReleases. Flux owns the field and will overwrite any changes made to it.

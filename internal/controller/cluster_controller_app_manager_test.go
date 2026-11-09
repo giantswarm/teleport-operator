@@ -7,6 +7,7 @@ import (
 
 	appv1alpha1 "github.com/giantswarm/apiextensions-application/api/v1alpha1"
 	corev1 "k8s.io/api/core/v1"
+	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/apis/meta/v1/unstructured"
 	"k8s.io/apimachinery/pkg/types"
@@ -460,5 +461,56 @@ func Test_ClusterController_BotEnabled_GoneClusterIsUnregistered(t *testing.T) {
 	want := map[string]interface{}{key.RegisterName(test.ManagementClusterName, "badger"): "badger"}
 	if len(outputs) != len(want) || outputs[key.RegisterName(test.ManagementClusterName, "badger")] != "badger" {
 		t.Errorf("expected only the surviving cluster, got %v", outputs)
+	}
+}
+
+func kubeconfigSecret(clusterName string) *corev1.Secret {
+	return &corev1.Secret{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      key.GetKubeconfigSecretName(clusterName),
+			Namespace: key.TeleportBotNamespace,
+		},
+	}
+}
+
+func kubeconfigSecretExists(t *testing.T, c client.Client, clusterName string) bool {
+	t.Helper()
+	err := c.Get(context.TODO(), client.ObjectKey{
+		Name:      key.GetKubeconfigSecretName(clusterName),
+		Namespace: key.TeleportBotNamespace,
+	}, &corev1.Secret{})
+	if apierrors.IsNotFound(err) {
+		return false
+	}
+	if err != nil {
+		t.Fatalf("failed to get kubeconfig secret: %v", err)
+	}
+	return true
+}
+
+// A cluster stuck in deletion keeps its kubeconfig, so it stays reachable.
+func Test_ClusterController_BotEnabled_DeletingClusterKeepsKubeconfig(t *testing.T) {
+	cluster := test.NewCluster(test.ClusterName, test.NamespaceName, []string{key.TeleportOperatorFinalizer}, time.Now())
+	tbotHR := test.NewHelmRelease(key.TeleportBotAppName, key.TeleportBotNamespace)
+
+	fakeClient := reconcileDeleteWithBot(t, cluster, tbotHR, kubeconfigSecret(test.ClusterName))
+
+	if !kubeconfigSecretExists(t, fakeClient, test.ClusterName) {
+		t.Errorf("expected the kubeconfig secret to be kept while the cluster is deleting")
+	}
+}
+
+// Once a Cluster is gone, its kubeconfig is deleted; other clusters keep theirs.
+func Test_ClusterController_BotEnabled_GoneClusterKubeconfigDeleted(t *testing.T) {
+	survivor := test.NewCluster("badger", test.NamespaceName, nil, time.Time{})
+
+	// test.ClusterName does not exist, so the reconcile takes the NotFound path.
+	fakeClient := reconcileWithBot(t, survivor, kubeconfigSecret(test.ClusterName), kubeconfigSecret("badger"))
+
+	if kubeconfigSecretExists(t, fakeClient, test.ClusterName) {
+		t.Errorf("expected the kubeconfig secret of the gone cluster to be deleted")
+	}
+	if !kubeconfigSecretExists(t, fakeClient, "badger") {
+		t.Errorf("expected the kubeconfig secret of the surviving cluster to be kept")
 	}
 }
