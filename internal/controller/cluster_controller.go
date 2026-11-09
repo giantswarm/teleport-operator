@@ -84,6 +84,12 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			if err := r.syncTbotRegisteredClusters(ctx, log); err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
+			// Make sure the kubeconfig is deleted after the sync
+			if r.IsBotEnabled {
+				if err := r.Teleport.DeleteKubeconfigSecret(ctx, log, r.Client, req.Name, key.TeleportBotNamespace); err != nil {
+					return ctrl.Result{}, microerror.Mask(err)
+				}
+			}
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, microerror.Mask(err)
