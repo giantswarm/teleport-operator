@@ -302,7 +302,7 @@ func (t *Teleport) SetTbotRegisteredClusters(ctx context.Context, log logr.Logge
 		if cm.Annotations == nil {
 			cm.Annotations = map[string]string{}
 		}
-		cm.Annotations[key.NotesAnnotation] = "Clusters tbot creates kubeconfigs for. DO NOT EDIT, managed by teleport-operator."
+		cm.Annotations[key.NotesAnnotation] = "Clusters with kubeconfigs created by tbot. DO NOT EDIT, managed by teleport-operator."
 		cm.Data = map[string]string{"values": string(values)}
 		return nil
 	})
