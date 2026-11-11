@@ -48,10 +48,26 @@ type ClusterReconciler struct {
 	lastAssignedRoles []string
 }
 
+// syncTbotRegisteredClusters builds the tbot-registered clusters from the full CAPI cluster list
+func (r *ClusterReconciler) syncTbotRegisteredClusters(ctx context.Context, log logr.Logger) error {
+	if !r.IsBotEnabled {
+		return nil
+	}
+	clusters := &capi.ClusterList{}
+	if err := r.Client.List(ctx, clusters); err != nil {
+		return microerror.Mask(err)
+	}
+	outputs := make(map[string]string, len(clusters.Items))
+	for _, cluster := range clusters.Items {
+		outputs[key.RegisterName(r.Teleport.Config.ManagementClusterName, cluster.Name)] = cluster.Name
+	}
+	return r.Teleport.SetTbotRegisteredClusters(ctx, log, r.Client, outputs)
+}
+
 //+kubebuilder:rbac:groups=cluster.x-k8s.io.giantswarm.io,resources=clusters,verbs=get;list;watch;create;update;patch;delete
 //+kubebuilder:rbac:groups=cluster.x-k8s.io.giantswarm.io,resources=clusters/status,verbs=get;update;patch
 //+kubebuilder:rbac:groups=cluster.x-k8s.io.giantswarm.io,resources=clusters/finalizers,verbs=update
-//+kubebuilder:rbac:groups=helm.toolkit.fluxcd.io,resources=helmreleases,verbs=get;list;watch;update;patch
+//+kubebuilder:rbac:groups=helm.toolkit.fluxcd.io,resources=helmreleases,verbs=get;list;watch
 
 // Reconcile is part of the main kubernetes reconciliation loop which aims to
 // move the current state of the cluster closer to the desired state.
@@ -64,6 +80,16 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	cluster := &capi.Cluster{}
 	if err := r.Client.Get(ctx, req.NamespacedName, cluster); err != nil {
 		if apierrors.IsNotFound(err) {
+			// The cluster is gone: drop it from the registered clusters.
+			if err := r.syncTbotRegisteredClusters(ctx, log); err != nil {
+				return ctrl.Result{}, microerror.Mask(err)
+			}
+			// Make sure the kubeconfig is deleted after the sync
+			if r.IsBotEnabled {
+				if err := r.Teleport.DeleteKubeconfigSecret(ctx, log, r.Client, req.Name, key.TeleportBotNamespace); err != nil {
+					return ctrl.Result{}, microerror.Mask(err)
+				}
+			}
 			return ctrl.Result{}, nil
 		}
 		return ctrl.Result{}, microerror.Mask(err)
@@ -105,10 +131,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 		r.Teleport.Identity = newIdentityConfig
 	}
 
-	registerName := cluster.Name
-	if cluster.Name != r.Teleport.Config.ManagementClusterName {
-		registerName = key.GetRegisterName(r.Teleport.Config.ManagementClusterName, cluster.Name)
-	}
+	registerName := key.RegisterName(r.Teleport.Config.ManagementClusterName, cluster.Name)
 
 	// Check if the cluster instance is marked to be deleted, which is indicated by the deletion timestamp being set.
 	// if it is, delete the cluster from teleport
@@ -141,10 +164,6 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			}
 
 			if err := r.Teleport.DeleteTbotConfigMap(ctx, log, r.Client, cluster.Name, key.TeleportBotNamespace); err != nil {
-				return ctrl.Result{}, microerror.Mask(err)
-			}
-
-			if err := r.Teleport.DeleteKubeconfigSecret(ctx, log, r.Client, cluster.Name, key.TeleportBotNamespace); err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
 		}
@@ -311,6 +330,10 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			if err := botMgr.EnsureConfig(ctx, log); err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
+		}
+
+		if err := r.syncTbotRegisteredClusters(ctx, log); err != nil {
+			return ctrl.Result{}, microerror.Mask(err)
 		}
 	}
 
