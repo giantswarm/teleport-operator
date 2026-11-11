@@ -7,6 +7,7 @@ import (
 
 	appv1alpha1 "github.com/giantswarm/apiextensions-application/api/v1alpha1"
 	teleportTypes "github.com/gravitational/teleport/api/types"
+	"gopkg.in/yaml.v3"
 	corev1 "k8s.io/api/core/v1"
 	apimeta "k8s.io/apimachinery/pkg/api/meta"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
@@ -310,4 +311,26 @@ func NewFakeK8sClient(runtimeObjects []runtime.Object) (client.Client, error) {
 		fakeK8sClientBuilder.WithRuntimeObjects(runtimeObjects...)
 	}
 	return fakeK8sClientBuilder.Build(), nil
+}
+
+// NewTbotRegisteredClustersConfigMap builds the tbot registered-clusters
+// ConfigMap for the given register-name to cluster-name mapping.
+func NewTbotRegisteredClustersConfigMap(outputs map[string]string) *corev1.ConfigMap {
+	return NewTbotRegisteredClustersConfigMapWithDoc(map[string]interface{}{"outputs": outputs})
+}
+
+// NewTbotRegisteredClustersConfigMapWithDoc builds the same ConfigMap from an
+// arbitrary values document.
+func NewTbotRegisteredClustersConfigMapWithDoc(doc map[string]interface{}) *corev1.ConfigMap {
+	values, err := yaml.Marshal(doc)
+	if err != nil {
+		panic(err)
+	}
+	return &corev1.ConfigMap{
+		ObjectMeta: metav1.ObjectMeta{
+			Name:      key.TbotRegisteredClustersConfigmapName,
+			Namespace: key.TeleportBotNamespace,
+		},
+		Data: map[string]string{"values": string(values)},
+	}
 }

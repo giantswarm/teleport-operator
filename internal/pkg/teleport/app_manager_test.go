@@ -99,142 +99,60 @@ func Test_NewTeleportAppConfigManager_BothExist_HelmReleaseTakesPrecedence(t *te
 	}
 }
 
-// --- HelmRelease EnsureConfig tests ---
+// --- HelmRelease tests ---
 
-func Test_HelmRelease_EnsureConfig_AddsEntry(t *testing.T) {
-	hr := test.NewHelmRelease(testResourceName, testNamespace)
-	fakeClient, err := test.NewFakeK8sClientFromObjects(hr)
-	if err != nil {
-		t.Fatalf("failed to create fake client: %v", err)
+// Flux owns spec.valuesFrom, no calls should modify it.
+func Test_HelmRelease_EnsureAndDeleteConfig_NeverWrite(t *testing.T) {
+	declared := map[string]interface{}{
+		"kind":      "ConfigMap",
+		"name":      testConfigMapName,
+		"valuesKey": "values",
+		"optional":  false,
 	}
+	cases := map[string][]interface{}{
+		"entry missing":  nil,
+		"entry declared": {declared},
+	}
+	for name, valuesFrom := range cases {
+		t.Run(name, func(t *testing.T) {
+			hr := test.NewHelmRelease(testResourceName, testNamespace)
+			if valuesFrom != nil {
+				hr.Object["spec"] = map[string]interface{}{"valuesFrom": valuesFrom}
+			}
+			fakeClient, err := test.NewFakeK8sClientFromObjects(hr)
+			if err != nil {
+				t.Fatalf("failed to create fake client: %v", err)
+			}
+			before := getHelmRelease(t, fakeClient)
 
-	mgr, err := NewTeleportAppConfigManager(context.Background(), fakeClient, testResourceName, testNamespace, testConfigMapName)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
+			mgr, err := NewTeleportAppConfigManager(context.Background(), fakeClient, testResourceName, testNamespace, testConfigMapName)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			log := ctrl.Log.WithName("test")
+			if err := mgr.EnsureConfig(context.Background(), log); err != nil {
+				t.Fatalf("EnsureConfig returned error: %v", err)
+			}
+			if err := mgr.DeleteConfig(context.Background(), log); err != nil {
+				t.Fatalf("DeleteConfig returned error: %v", err)
+			}
 
-	log := ctrl.Log.WithName("test")
-	if err := mgr.EnsureConfig(context.Background(), log); err != nil {
-		t.Fatalf("EnsureConfig returned error: %v", err)
-	}
-
-	updated := newHelmReleaseUnstructured()
-	if err := fakeClient.Get(context.Background(), client.ObjectKey{Name: testResourceName, Namespace: testNamespace}, updated); err != nil {
-		t.Fatalf("failed to get HelmRelease: %v", err)
-	}
-
-	valuesFrom := getValuesFrom(updated)
-	if len(valuesFrom) != 1 {
-		t.Fatalf("expected 1 ValuesFrom entry, got %d", len(valuesFrom))
-	}
-	ref, ok := valuesFrom[0].(map[string]interface{})
-	if !ok {
-		t.Fatalf("expected map[string]interface{}, got %T", valuesFrom[0])
-	}
-	if ref["kind"] != "ConfigMap" || ref["name"] != testConfigMapName || ref["valuesKey"] != "values" {
-		t.Errorf("unexpected ValuesFrom entry: %+v", ref)
+			after := getHelmRelease(t, fakeClient)
+			if after.GetResourceVersion() != before.GetResourceVersion() {
+				t.Errorf("expected the HelmRelease to be untouched, resourceVersion %s -> %s",
+					before.GetResourceVersion(), after.GetResourceVersion())
+			}
+		})
 	}
 }
 
-func Test_HelmRelease_EnsureConfig_Idempotent(t *testing.T) {
-	hr := test.NewHelmRelease(testResourceName, testNamespace)
-	hr.Object["spec"] = map[string]interface{}{
-		"valuesFrom": []interface{}{
-			map[string]interface{}{
-				"kind":      "ConfigMap",
-				"name":      testConfigMapName,
-				"valuesKey": "values",
-			},
-		},
-	}
-	fakeClient, err := test.NewFakeK8sClientFromObjects(hr)
-	if err != nil {
-		t.Fatalf("failed to create fake client: %v", err)
-	}
-
-	mgr, err := NewTeleportAppConfigManager(context.Background(), fakeClient, testResourceName, testNamespace, testConfigMapName)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	log := ctrl.Log.WithName("test")
-	if err := mgr.EnsureConfig(context.Background(), log); err != nil {
-		t.Fatalf("EnsureConfig returned error: %v", err)
-	}
-
-	updated := newHelmReleaseUnstructured()
-	if err := fakeClient.Get(context.Background(), client.ObjectKey{Name: testResourceName, Namespace: testNamespace}, updated); err != nil {
+func getHelmRelease(t *testing.T, c client.Client) *unstructured.Unstructured {
+	t.Helper()
+	hr := newHelmReleaseUnstructured()
+	if err := c.Get(context.Background(), client.ObjectKey{Name: testResourceName, Namespace: testNamespace}, hr); err != nil {
 		t.Fatalf("failed to get HelmRelease: %v", err)
 	}
-
-	valuesFrom := getValuesFrom(updated)
-	if len(valuesFrom) != 1 {
-		t.Errorf("expected 1 ValuesFrom entry (no duplicate), got %d", len(valuesFrom))
-	}
-}
-
-func Test_HelmRelease_DeleteConfig_RemovesEntry(t *testing.T) {
-	hr := test.NewHelmRelease(testResourceName, testNamespace)
-	hr.Object["spec"] = map[string]interface{}{
-		"valuesFrom": []interface{}{
-			map[string]interface{}{
-				"kind":      "ConfigMap",
-				"name":      testConfigMapName,
-				"valuesKey": "values",
-			},
-		},
-	}
-	fakeClient, err := test.NewFakeK8sClientFromObjects(hr)
-	if err != nil {
-		t.Fatalf("failed to create fake client: %v", err)
-	}
-
-	mgr, err := NewTeleportAppConfigManager(context.Background(), fakeClient, testResourceName, testNamespace, testConfigMapName)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	log := ctrl.Log.WithName("test")
-	if err := mgr.DeleteConfig(context.Background(), log); err != nil {
-		t.Fatalf("DeleteConfig returned error: %v", err)
-	}
-
-	updated := newHelmReleaseUnstructured()
-	if err := fakeClient.Get(context.Background(), client.ObjectKey{Name: testResourceName, Namespace: testNamespace}, updated); err != nil {
-		t.Fatalf("failed to get HelmRelease: %v", err)
-	}
-
-	valuesFrom := getValuesFrom(updated)
-	if len(valuesFrom) != 0 {
-		t.Errorf("expected empty ValuesFrom after delete, got %d entries", len(valuesFrom))
-	}
-}
-
-func Test_HelmRelease_DeleteConfig_NoOp_WhenEntryAbsent(t *testing.T) {
-	hr := test.NewHelmRelease(testResourceName, testNamespace)
-	fakeClient, err := test.NewFakeK8sClientFromObjects(hr)
-	if err != nil {
-		t.Fatalf("failed to create fake client: %v", err)
-	}
-
-	mgr, err := NewTeleportAppConfigManager(context.Background(), fakeClient, testResourceName, testNamespace, testConfigMapName)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-
-	log := ctrl.Log.WithName("test")
-	if err := mgr.DeleteConfig(context.Background(), log); err != nil {
-		t.Fatalf("DeleteConfig returned error: %v", err)
-	}
-
-	updated := newHelmReleaseUnstructured()
-	if err := fakeClient.Get(context.Background(), client.ObjectKey{Name: testResourceName, Namespace: testNamespace}, updated); err != nil {
-		t.Fatalf("failed to get HelmRelease: %v", err)
-	}
-	valuesFrom := getValuesFrom(updated)
-	if len(valuesFrom) != 0 {
-		t.Errorf("expected ValuesFrom unchanged (empty), got %d entries", len(valuesFrom))
-	}
+	return hr
 }
 
 // --- App CR EnsureConfig tests ---

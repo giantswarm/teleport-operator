@@ -23,6 +23,10 @@ const (
 	TeleportKubeTokenValidity       = 720 * time.Hour
 	TeleportNodeTokenValidity       = 720 * time.Hour
 
+	TbotRegisteredClustersConfigmapName = "teleport-tbot-registered-clusters"
+	ManagedByLabel                      = "app.kubernetes.io/managed-by"
+	NotesAnnotation                     = "giantswarm.io/notes"
+
 	AppCatalog            = "appCatalog"
 	AppName               = "appName"
 	AppVersion            = "appVersion"
@@ -90,6 +94,15 @@ func RolesToSystemRoles(roles []string) []types.SystemRole {
 
 func GetConfigmapName(clusterName string, appName string) string {
 	return fmt.Sprintf("%s-%s-config", clusterName, appName)
+}
+
+// RegisterName is the Teleport register name for a cluster: bare for the
+// management cluster itself, prefixed with it otherwise.
+func RegisterName(managementClusterName string, clusterName string) string {
+	if clusterName == managementClusterName {
+		return clusterName
+	}
+	return GetRegisterName(managementClusterName, clusterName)
 }
 
 func GetTbotConfigmapName(clusterName string) string {

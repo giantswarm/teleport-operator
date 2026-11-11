@@ -9,14 +9,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Maintain a ConfigMap `teleport-tbot-registered-clusters` in `giantswarm` namespace, listing every cluster tbot creates a kubeconfig for. The ConfigMap needs to be referenced from the HelmRelease in Git.
 - Label every kube-agent with `giantswarm.io/installation: <management cluster>` in the rendered `teleport-kube-agent` values (nested and flat layouts), so Teleport roles can be scoped to one management cluster's clusters.
 
 ### Changed
 
+- Keep a deleting cluster's kubeconfig secret until it's completely removed.
 - Create join tokens with `CreateToken` instead of upserting them, and delete them by the names stored in the cluster's Secret and ConfigMap instead of listing all tokens. The operator's Teleport role now needs only `create`, `read` and `delete` on `token`; `list` and `update` are no longer used. A Secret or ConfigMap without a readable token does not block cluster deletion.
 
 ### Fixed
 
+- Stop writing `spec.valuesFrom` on HelmReleases. Flux owns the field and will overwrite any changes made to it.
 - On cluster deletion, delete both of the cluster's join tokens (node, and kube/app). Previously only the first token matching the cluster label was removed.
 - The `helm.sh/chart` label is valid for long chart versions: the 63-character cut trims the whole trailing run of `-`, `.` and `_`.
 - Detect the Teleport `apps` list when it is nested under the `teleport-kube-agent` key, which is the only place `teleport-kube-agent-app` v0.11.0+ (release v35) reads its values. Previously only the flat layout was recognised, so installations that moved the list into the nested block lost the `app` role and silently stopped advertising their apps.
