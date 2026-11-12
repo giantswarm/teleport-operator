@@ -22,6 +22,7 @@ const (
 	TeleportAppTokenValidity        = 720 * time.Hour
 	TeleportKubeTokenValidity       = 720 * time.Hour
 	TeleportNodeTokenValidity       = 720 * time.Hour
+	ConfigUpdateAnnotation          = "teleport-operator.giantswarm.io/config-updated"
 
 	TbotRegisteredClustersConfigmapName = "teleport-tbot-registered-clusters"
 	ManagedByLabel                      = "app.kubernetes.io/managed-by"
