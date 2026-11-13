@@ -39,6 +39,10 @@ const (
 	RoleApp               = "app"
 	RoleNode              = "node"
 
+	// ManagementClusterLabel is the static label every teleport-kube-agent
+	// carries, set to the name of the management cluster that configured it.
+	ManagementClusterLabel = "giantswarm.io/installation"
+
 	// TeleportKubeAgentValuesKey is the top-level key under which
 	// teleport-kube-agent v0.11.0+ reads its values.
 	TeleportKubeAgentValuesKey = "teleport-kube-agent"
@@ -176,10 +180,14 @@ func ResolveNestedTeleportVersionOverride(teleportVersion string) string {
 // but the nested block applies a floor (see ResolveTeleportVersionOverride):
 // the override is dropped if it would be a downgrade against the v0.11.0
 // chart's bundled Teleport version.
-func GetConfigmapDataFromTemplate(authToken, proxyAddr, kubeClusterName, teleportVersion string, roles []string, tkaVersion string) string {
-	flat := renderFlatValuesBlock(authToken, proxyAddr, kubeClusterName, teleportVersion, roles)
+//
+// Both blocks carry the static agent label ManagementClusterLabel set to
+// managementClusterName, so Teleport roles can be scoped to the kube
+// clusters of one management cluster.
+func GetConfigmapDataFromTemplate(authToken, proxyAddr, kubeClusterName, teleportVersion string, roles []string, tkaVersion, managementClusterName string) string {
+	flat := renderFlatValuesBlock(authToken, proxyAddr, kubeClusterName, teleportVersion, roles, managementClusterName)
 	nestedOverride := ResolveNestedTeleportVersionOverride(teleportVersion)
-	nested := renderNestedValuesBlock(authToken, proxyAddr, kubeClusterName, nestedOverride, roles)
+	nested := renderNestedValuesBlock(authToken, proxyAddr, kubeClusterName, nestedOverride, roles, managementClusterName)
 
 	if UsesNestedKubeAgentValues(tkaVersion) {
 		return nested
@@ -187,7 +195,7 @@ func GetConfigmapDataFromTemplate(authToken, proxyAddr, kubeClusterName, telepor
 	return flat + nested
 }
 
-func renderFlatValuesBlock(authToken, proxyAddr, kubeClusterName, teleportVersion string, roles []string) string {
+func renderFlatValuesBlock(authToken, proxyAddr, kubeClusterName, teleportVersion string, roles []string, managementClusterName string) string {
 	body := fmt.Sprintf(`roles: "%s"
 authToken: "%s"
 proxyAddr: "%s"
@@ -196,10 +204,11 @@ kubeClusterName: "%s"
 	if teleportVersion != "" {
 		body += fmt.Sprintf("teleportVersionOverride: %q\n", teleportVersion)
 	}
+	body += fmt.Sprintf("labels:\n  %s: %q\n", ManagementClusterLabel, managementClusterName)
 	return body
 }
 
-func renderNestedValuesBlock(authToken, proxyAddr, kubeClusterName, teleportVersion string, roles []string) string {
+func renderNestedValuesBlock(authToken, proxyAddr, kubeClusterName, teleportVersion string, roles []string, managementClusterName string) string {
 	body := fmt.Sprintf(`%s:
   roles: "%s"
   authToken: "%s"
@@ -209,6 +218,7 @@ func renderNestedValuesBlock(authToken, proxyAddr, kubeClusterName, teleportVers
 	if teleportVersion != "" {
 		body += fmt.Sprintf("  teleportVersionOverride: %q\n", teleportVersion)
 	}
+	body += fmt.Sprintf("  labels:\n    %s: %q\n", ManagementClusterLabel, managementClusterName)
 	return body
 }
 

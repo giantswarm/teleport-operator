@@ -14,9 +14,7 @@ import (
 type Client interface {
 	Ping(ctx context.Context) (proto.PingResponse, error)
 	GetToken(ctx context.Context, name string) (types.ProvisionToken, error)
-	GetTokens(ctx context.Context) ([]types.ProvisionToken, error)
 	CreateToken(ctx context.Context, token types.ProvisionToken) error
-	UpsertToken(ctx context.Context, token types.ProvisionToken) error
 	DeleteToken(ctx context.Context, name string) error
 }
 
