@@ -7,7 +7,11 @@ import (
 	"time"
 
 	"github.com/gravitational/teleport/api/types"
+	"github.com/gravitational/trace"
+	corev1 "k8s.io/api/core/v1"
+	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	ctrl "sigs.k8s.io/controller-runtime"
+	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	"github.com/giantswarm/teleport-operator/internal/pkg/config"
 	"github.com/giantswarm/teleport-operator/internal/pkg/key"
@@ -20,9 +24,7 @@ func Test_GenerateToken(t *testing.T) {
 		name           string
 		registerName   string
 		tokenType      []string
-		failsList      bool
-		failsDelete    bool
-		failsUpsert    bool
+		failsCreate    bool
 		expectError    bool
 		expectedRoles  []string
 		expectedExpiry time.Duration
@@ -52,9 +54,9 @@ func Test_GenerateToken(t *testing.T) {
 			expectedExpiry: 720 * time.Hour,
 		},
 		{
-			name:         "case 3: Fail in case new token cannot be upserted",
+			name:         "case 3: fail in case new token cannot be created",
 			registerName: key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
-			failsUpsert:  true,
+			failsCreate:  true,
 			expectError:  true,
 		},
 	}
@@ -63,9 +65,7 @@ func Test_GenerateToken(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			teleport := New(test.NamespaceName, &config.Config{}, test.NewMockTokenGenerator(test.TokenName))
 			teleport.TeleportClient = test.NewTeleportClient(test.FakeTeleportClientConfig{
-				FailsList:   tc.failsList,
-				FailsDelete: tc.failsDelete,
-				FailsUpsert: tc.failsUpsert,
+				FailsCreate: tc.failsCreate,
 			})
 
 			ctx := context.TODO()
@@ -113,7 +113,7 @@ func Test_IsTokenValid(t *testing.T) {
 		tokenName      string
 		tokenType      string
 		tokens         []types.ProvisionToken
-		failsList      bool
+		failsGet       bool
 		expectError    bool
 		expectedResult bool
 	}{
@@ -142,11 +142,11 @@ func Test_IsTokenValid(t *testing.T) {
 			expectedResult: false,
 		},
 		{
-			name:         "case 3: Service should fail when token list cannot be retrieved",
+			name:         "case 3: client error is surfaced",
 			registerName: key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
 			tokenName:    test.TokenName,
 			tokenType:    test.TokenTypeKube,
-			failsList:    true,
+			failsGet:     true,
 			expectError:  true,
 		},
 		{
@@ -165,14 +165,32 @@ func Test_IsTokenValid(t *testing.T) {
 			tokens:         []types.ProvisionToken{test.NewToken(test.TokenName, test.ClusterName, []string{"kube"}, time.Now().Add(1*time.Hour))},
 			expectedResult: false,
 		},
+		{
+			name:           "case 6: token missing in Teleport is invalid, not an error",
+			registerName:   key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
+			tokenName:      "missing",
+			tokenType:      test.TokenTypeKube,
+			tokens:         nil,
+			expectError:    false,
+			expectedResult: false,
+		},
+		{
+			name:           "case 7: empty stored token is invalid, not an error",
+			registerName:   key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
+			tokenName:      "",
+			tokenType:      test.TokenTypeKube,
+			tokens:         nil,
+			expectError:    false,
+			expectedResult: false,
+		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			teleport := New(test.NamespaceName, &config.Config{}, token.NewGenerator())
 			teleport.TeleportClient = test.NewTeleportClient(test.FakeTeleportClientConfig{
-				Tokens:    tc.tokens,
-				FailsList: tc.failsList,
+				Tokens:   tc.tokens,
+				FailsGet: tc.failsGet,
 			})
 
 			ctx := context.TODO()
@@ -186,50 +204,35 @@ func Test_IsTokenValid(t *testing.T) {
 	}
 }
 
-func Test_DeleteToken(t *testing.T) {
+func Test_DeleteTokenByName(t *testing.T) {
 	testCases := []struct {
-		name          string
-		registerName  string
-		token         types.ProvisionToken
-		tokens        []types.ProvisionToken
-		failsDelete   bool
-		expectDeleted bool
-		expectError   bool
+		name        string
+		tokenName   string
+		tokens      []types.ProvisionToken
+		failsDelete bool
+		expectError bool
 	}{
 		{
-			name:          "case 0: Delete token from Teleport",
-			registerName:  key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
-			token:         test.NewToken(test.TokenName, test.ClusterName, []string{"kube"}),
-			tokens:        []types.ProvisionToken{test.NewToken(test.TokenName, test.ClusterName, []string{"kube"})},
-			expectDeleted: true,
+			name:      "case 0: existing token is removed from Teleport",
+			tokenName: test.TokenName,
+			tokens:    []types.ProvisionToken{test.NewToken(test.TokenName, test.ClusterName, []string{"kube"})},
 		},
 		{
-			name:          "case 1: Do not delete token in case cluster label does not match",
-			registerName:  test.ManagementClusterName,
-			token:         test.NewToken(test.TokenName, test.ClusterName, []string{"kube"}),
-			tokens:        []types.ProvisionToken{test.NewToken(test.TokenName, test.ClusterName, []string{"kube"})},
-			expectDeleted: false,
+			name:      "case 1: missing token is not an error",
+			tokenName: test.TokenName,
+			tokens:    nil,
 		},
 		{
-			name:          "case 2: Succeed in case token does not exist",
-			registerName:  key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
-			token:         test.NewToken(test.TokenName, test.ManagementClusterName, []string{"kube"}),
-			expectDeleted: true,
-		},
-		{
-			name:         "case 3: Fail in case teleport client is unable to delete the token",
-			registerName: key.GetRegisterName(test.ManagementClusterName, test.ClusterName),
-			token:        test.NewToken(test.TokenName, test.ManagementClusterName, []string{"kube"}),
-			tokens:       []types.ProvisionToken{test.NewToken(test.TokenName, test.ClusterName, []string{"kube"})},
-			failsDelete:  true,
-			expectError:  true,
+			name:        "case 2: client error is surfaced",
+			tokenName:   test.TokenName,
+			tokens:      []types.ProvisionToken{test.NewToken(test.TokenName, test.ClusterName, []string{"kube"})},
+			failsDelete: true,
+			expectError: true,
 		},
 	}
 
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
-			var storedToken types.ProvisionToken
-
 			ctx := context.TODO()
 			log := ctrl.Log.WithName("test")
 
@@ -239,16 +242,138 @@ func Test_DeleteToken(t *testing.T) {
 				Tokens:      tc.tokens,
 			})
 
-			err := teleport.DeleteToken(ctx, log, tc.registerName)
+			err := teleport.DeleteTokenByName(ctx, log, tc.tokenName)
 			test.CheckError(t, tc.expectError, err)
-			if err == nil {
-				storedToken, err = teleport.TeleportClient.GetToken(ctx, tc.token.GetName())
+			if err != nil {
+				return
+			}
 
-				if tc.expectDeleted && err == nil {
-					t.Fatalf("token %v was not deleted", storedToken)
+			if _, err := teleport.TeleportClient.GetToken(ctx, tc.tokenName); !trace.IsNotFound(err) {
+				t.Fatalf("expected token %q to be gone from Teleport, GetToken returned err=%v", tc.tokenName, err)
+			}
+		})
+	}
+}
+
+func Test_DeleteClusterTokens(t *testing.T) {
+	const kubeTokenName = test.NewTokenName
+
+	testCases := []struct {
+		name          string
+		secret        *corev1.Secret
+		configMap     *corev1.ConfigMap
+		tokens        []types.ProvisionToken
+		failsDelete   bool
+		expectError   bool
+		expectAbsent  []string
+		expectPresent []string
+	}{
+		{
+			name:      "case 0: node token from Secret and kube token from ConfigMap are both deleted",
+			secret:    test.NewSecret(test.ClusterName, test.NamespaceName, test.TokenName),
+			configMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, kubeTokenName, []string{"kube"}),
+			tokens: []types.ProvisionToken{
+				test.NewToken(test.TokenName, test.ClusterName, []string{"node"}),
+				test.NewToken(kubeTokenName, test.ClusterName, []string{"kube"}),
+			},
+			expectAbsent: []string{test.TokenName, kubeTokenName},
+		},
+		{
+			name:      "case 1: only ConfigMap present deletes the kube token and leaves others alone",
+			configMap: test.NewConfigMap(test.ClusterName, test.AppName, test.NamespaceName, kubeTokenName, []string{"kube"}),
+			tokens: []types.ProvisionToken{
+				test.NewToken(test.TokenName, test.ClusterName, []string{"node"}),
+				test.NewToken(kubeTokenName, test.ClusterName, []string{"kube"}),
+			},
+			expectAbsent:  []string{kubeTokenName},
+			expectPresent: []string{test.TokenName},
+		},
+		{
+			name: "case 2: neither Secret nor ConfigMap present makes no Teleport call",
+			tokens: []types.ProvisionToken{
+				test.NewToken(test.TokenName, test.ClusterName, []string{"node"}),
+			},
+			// Any DeleteToken call would fail, so success proves none was made.
+			failsDelete:   true,
+			expectPresent: []string{test.TokenName},
+		},
+		{
+			name: "case 3: Secret without a join token is skipped without error or Teleport call",
+			secret: &corev1.Secret{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      key.GetSecretName(test.ClusterName),
+					Namespace: test.NamespaceName,
+				},
+				Data: map[string][]byte{"unrelated": []byte("value")},
+			},
+			tokens: []types.ProvisionToken{
+				test.NewToken(test.TokenName, test.ClusterName, []string{"node"}),
+			},
+			failsDelete:   true,
+			expectPresent: []string{test.TokenName},
+		},
+		{
+			name: "case 4: ConfigMap without an auth token is skipped without error or Teleport call",
+			configMap: &corev1.ConfigMap{
+				ObjectMeta: metav1.ObjectMeta{
+					Name:      key.GetConfigmapName(test.ClusterName, test.AppName),
+					Namespace: test.NamespaceName,
+				},
+				Data: map[string]string{"values": "proxyAddr: 127.0.0.1\n"},
+			},
+			tokens: []types.ProvisionToken{
+				test.NewToken(kubeTokenName, test.ClusterName, []string{"kube"}),
+			},
+			failsDelete:   true,
+			expectPresent: []string{kubeTokenName},
+		},
+		{
+			name:   "case 5: empty stored token names are skipped without error or Teleport call",
+			secret: test.NewSecret(test.ClusterName, test.NamespaceName, ""),
+			// The dual-block fixture quotes the value, so this stores `authToken: ""`.
+			configMap: test.NewDualBlockConfigMap(test.ClusterName, test.AppName, test.NamespaceName, "", []string{"kube"}),
+			tokens: []types.ProvisionToken{
+				test.NewToken(test.TokenName, test.ClusterName, []string{"node"}),
+			},
+			failsDelete:   true,
+			expectPresent: []string{test.TokenName},
+		},
+	}
+
+	for _, tc := range testCases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctx := context.TODO()
+			log := ctrl.Log.WithName("test")
+
+			var objects []client.Object
+			if tc.secret != nil {
+				objects = append(objects, tc.secret)
+			}
+			if tc.configMap != nil {
+				objects = append(objects, tc.configMap)
+			}
+			ctrlClient, err := test.NewFakeK8sClientFromObjects(objects...)
+			if err != nil {
+				t.Fatalf("unexpected error %v", err)
+			}
+
+			teleport := New(test.NamespaceName, &config.Config{AppName: test.AppName}, token.NewGenerator())
+			teleport.TeleportClient = test.NewTeleportClient(test.FakeTeleportClientConfig{
+				FailsDelete: tc.failsDelete,
+				Tokens:      tc.tokens,
+			})
+
+			err = teleport.DeleteClusterTokens(ctx, log, ctrlClient, test.ClusterName, test.NamespaceName)
+			test.CheckError(t, tc.expectError, err)
+
+			for _, name := range tc.expectAbsent {
+				if _, err := teleport.TeleportClient.GetToken(ctx, name); !trace.IsNotFound(err) {
+					t.Fatalf("expected token %q to be deleted, GetToken returned err=%v", name, err)
 				}
-				if !tc.expectDeleted && err != nil {
-					t.Fatalf("token %v was unexpectedly deleted", tc.token)
+			}
+			for _, name := range tc.expectPresent {
+				if _, err := teleport.TeleportClient.GetToken(ctx, name); err != nil {
+					t.Fatalf("expected token %q to remain, GetToken returned err=%v", name, err)
 				}
 			}
 		})

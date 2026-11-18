@@ -260,9 +260,10 @@ func Test_CreateConfigMap_NestedOnlyFor0_11_0(t *testing.T) {
 	}
 
 	teleport := New(test.NamespaceName, &config.Config{
-		AppName:         test.AppName,
-		ProxyAddr:       test.ProxyAddr,
-		TeleportVersion: test.TeleportVersionForNested,
+		AppName:               test.AppName,
+		ManagementClusterName: test.ManagementClusterName,
+		ProxyAddr:             test.ProxyAddr,
+		TeleportVersion:       test.TeleportVersionForNested,
 	}, token.NewGenerator())
 
 	registerName := key.GetRegisterName(test.ManagementClusterName, test.ClusterName)
@@ -288,9 +289,10 @@ func Test_CreateConfigMap_NestedSkipsDowngradeOverride(t *testing.T) {
 	}
 
 	teleport := New(test.NamespaceName, &config.Config{
-		AppName:         test.AppName,
-		ProxyAddr:       test.ProxyAddr,
-		TeleportVersion: test.TeleportVersion, // 1.0.0 - below bundled 18.7.6
+		AppName:               test.AppName,
+		ManagementClusterName: test.ManagementClusterName,
+		ProxyAddr:             test.ProxyAddr,
+		TeleportVersion:       test.TeleportVersion, // 1.0.0 - below bundled 18.7.6
 	}, token.NewGenerator())
 
 	registerName := key.GetRegisterName(test.ManagementClusterName, test.ClusterName)
@@ -316,9 +318,10 @@ func Test_CreateConfigMap_DualBlockWhenTKAUnknown(t *testing.T) {
 	}
 
 	teleport := New(test.NamespaceName, &config.Config{
-		AppName:         test.AppName,
-		ProxyAddr:       test.ProxyAddr,
-		TeleportVersion: test.TeleportVersion, // 1.0.0 - flat passes through, nested drops (below floor)
+		AppName:               test.AppName,
+		ManagementClusterName: test.ManagementClusterName,
+		ProxyAddr:             test.ProxyAddr,
+		TeleportVersion:       test.TeleportVersion, // 1.0.0 - flat passes through, nested drops (below floor)
 	}, token.NewGenerator())
 
 	registerName := key.GetRegisterName(test.ManagementClusterName, test.ClusterName)
@@ -345,9 +348,10 @@ func Test_UpdateConfigMap_MigratesFlatToNested(t *testing.T) {
 	}
 
 	teleport := New(test.NamespaceName, &config.Config{
-		AppName:         test.AppName,
-		ProxyAddr:       test.ProxyAddr,
-		TeleportVersion: test.TeleportVersionForNested,
+		AppName:               test.AppName,
+		ManagementClusterName: test.ManagementClusterName,
+		ProxyAddr:             test.ProxyAddr,
+		TeleportVersion:       test.TeleportVersionForNested,
 	}, token.NewGenerator())
 
 	if err := teleport.UpdateConfigMap(ctx, log, ctrlClient, existing, test.NewTokenName, []string{"kube", "app"}, test.AppVersionNested); err != nil {
@@ -373,9 +377,10 @@ func Test_UpdateConfigMap_NestedDropsDowngradeOverride(t *testing.T) {
 	}
 
 	teleport := New(test.NamespaceName, &config.Config{
-		AppName:         test.AppName,
-		ProxyAddr:       test.ProxyAddr,
-		TeleportVersion: test.TeleportVersion, // downgrade vs bundled 18.7.6
+		AppName:               test.AppName,
+		ManagementClusterName: test.ManagementClusterName,
+		ProxyAddr:             test.ProxyAddr,
+		TeleportVersion:       test.TeleportVersion, // downgrade vs bundled 18.7.6
 	}, token.NewGenerator())
 
 	if err := teleport.UpdateConfigMap(ctx, log, ctrlClient, existing, test.TokenName, []string{"kube", "app"}, test.AppVersionNested); err != nil {
@@ -401,9 +406,10 @@ func Test_UpdateConfigMap_DualBlockForUnknownTKA(t *testing.T) {
 	}
 
 	teleport := New(test.NamespaceName, &config.Config{
-		AppName:         test.AppName,
-		ProxyAddr:       test.ProxyAddr,
-		TeleportVersion: test.TeleportVersion, // 1.0.0 - matches NewDualBlockConfigMap fixture
+		AppName:               test.AppName,
+		ManagementClusterName: test.ManagementClusterName,
+		ProxyAddr:             test.ProxyAddr,
+		TeleportVersion:       test.TeleportVersion, // 1.0.0 - matches NewDualBlockConfigMap fixture
 	}, token.NewGenerator())
 
 	if err := teleport.UpdateConfigMap(ctx, log, ctrlClient, existing, test.TokenName, []string{"kube", "app"}, ""); err != nil {

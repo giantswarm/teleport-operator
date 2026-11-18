@@ -136,8 +136,8 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 	// Check if the cluster instance is marked to be deleted, which is indicated by the deletion timestamp being set.
 	// if it is, delete the cluster from teleport
 	if !cluster.DeletionTimestamp.IsZero() {
-		// Delete teleport token for the cluster
-		if err := r.Teleport.DeleteToken(ctx, log, registerName); err != nil {
+		// Delete the cluster's teleport join tokens by the names stored in its Secret and ConfigMap
+		if err := r.Teleport.DeleteClusterTokens(ctx, log, r.Client, cluster.Name, cluster.Namespace); err != nil {
 			return ctrl.Result{}, microerror.Mask(err)
 		}
 
@@ -292,7 +292,7 @@ func (r *ClusterReconciler) Reconcile(ctx context.Context, req ctrl.Request) (ct
 			if err := r.Teleport.UpdateConfigMap(ctx, log, r.Client, configMap, writeToken, roles, tkaVersion); err != nil {
 				return ctrl.Result{}, microerror.Mask(err)
 			}
-			log.Info("Updated config map to align teleport version and values layout",
+			log.Info("Updated config map to match rendered values",
 				"configMapName", configMap.GetName(),
 				"teleportVersion", r.Teleport.Config.TeleportVersion,
 				"nestedValuesOnly", key.UsesNestedKubeAgentValues(tkaVersion))

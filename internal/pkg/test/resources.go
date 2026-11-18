@@ -49,8 +49,10 @@ const (
 	TeleportVersionForNestedNew = "18.8.0"
 
 	ConfigMapValuesFormat               = "authToken: %s\nproxyAddr: %s\nroles: %s\nkubeClusterName: %s\nteleportVersionOverride: %s"
-	ConfigMapValuesNestedFormat         = "teleport-kube-agent:\n  authToken: %s\n  proxyAddr: %s\n  roles: %s\n  kubeClusterName: %s\n  teleportVersionOverride: %s"
-	ConfigMapValuesNestedFormatNoVerOvr = "teleport-kube-agent:\n  authToken: %s\n  proxyAddr: %s\n  roles: %s\n  kubeClusterName: %s\n"
+	ConfigMapValuesNestedFormat         = "teleport-kube-agent:\n  authToken: %s\n  proxyAddr: %s\n  roles: %s\n  kubeClusterName: %s\n  teleportVersionOverride: %s\n" + configMapNestedLabels
+	ConfigMapValuesNestedFormatNoVerOvr = "teleport-kube-agent:\n  authToken: %s\n  proxyAddr: %s\n  roles: %s\n  kubeClusterName: %s\n" + configMapNestedLabels
+
+	configMapNestedLabels = "  labels:\n    " + key.ManagementClusterLabel + ": " + ManagementClusterName + "\n"
 )
 
 var LastReadValue = time.Now()
@@ -137,6 +139,7 @@ kubeClusterName: "%s"
 	if teleportVersion != "" {
 		flat += fmt.Sprintf("teleportVersionOverride: %q\n", teleportVersion)
 	}
+	flat += fmt.Sprintf("labels:\n  %s: %q\n", key.ManagementClusterLabel, ManagementClusterName)
 	nested := fmt.Sprintf(`%s:
   roles: "%s"
   authToken: "%s"
@@ -146,6 +149,7 @@ kubeClusterName: "%s"
 	if override := key.ResolveNestedTeleportVersionOverride(teleportVersion); override != "" {
 		nested += fmt.Sprintf("  teleportVersionOverride: %q\n", override)
 	}
+	nested += configMapNestedLabels
 	return &corev1.ConfigMap{
 		ObjectMeta: metav1.ObjectMeta{
 			Name:      key.GetConfigmapName(clusterName, appName),

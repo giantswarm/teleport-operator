@@ -90,25 +90,6 @@ func CheckConfigMap(t *testing.T, expected, actual *corev1.ConfigMap) {
 	}
 }
 
-func CheckTokens(t *testing.T, expected, actual []types.ProvisionToken) {
-	if len(expected) != len(actual) {
-		t.Fatalf("unexpected number of tokens: expected %d, actual %d", len(expected), len(actual))
-	}
-
-	for _, actualToken := range actual {
-		isExpected := false
-		for _, expectedToken := range expected {
-			if expectedToken.GetName() == actualToken.GetName() {
-				isExpected = true
-				break
-			}
-		}
-		if !isExpected {
-			t.Fatalf("unexpected list of tokens: expected %v, actual %v", expected, actual)
-		}
-	}
-}
-
 func CheckToken(t *testing.T, expected, actual types.ProvisionToken) {
 	if expected == nil && actual == nil {
 		return
