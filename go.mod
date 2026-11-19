@@ -23,7 +23,7 @@ require (
 )
 
 require (
-	github.com/beevik/etree v1.6.0 // indirect
+	github.com/beevik/etree v1.7.0 // indirect
 	github.com/beorn7/perks v1.0.1 // indirect
 	github.com/blang/semver/v4 v4.0.0 // indirect
 	github.com/cenkalti/backoff/v5 v5.0.3 // indirect
@@ -75,8 +75,8 @@ require (
 	github.com/prometheus/client_model v0.6.2 // indirect
 	github.com/prometheus/common v0.70.0 // indirect
 	github.com/prometheus/procfs v0.21.1 // indirect
-	github.com/russellhaering/gosaml2 v0.11.0 // indirect
-	github.com/russellhaering/goxmldsig v1.6.0 // indirect
+	github.com/russellhaering/gosaml2 v0.12.0 // indirect
+	github.com/russellhaering/goxmldsig v1.6.1 // indirect
 	github.com/spf13/pflag v1.0.10 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	go.opentelemetry.io/auto/sdk v1.2.1 // indirect
