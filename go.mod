@@ -9,7 +9,7 @@ require (
 	github.com/go-logr/logr v1.4.4
 	github.com/google/uuid v1.6.0
 	github.com/gravitational/teleport/api v0.0.0-20260825163510-1283425b60ec
-	github.com/gravitational/trace v1.5.4
+	github.com/gravitational/trace v1.6.0
 	github.com/onsi/ginkgo/v2 v2.34.0
 	github.com/onsi/gomega v1.44.0
 	github.com/pkg/errors v0.9.1
